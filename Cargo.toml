@@ -1,5 +1,5 @@
 [package]
-name = "valera_utils"
+name = "v_utils"
 version = "0.1.2"
 edition = "2021"
 resolver = "1"
