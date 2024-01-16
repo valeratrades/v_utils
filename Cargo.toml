@@ -14,7 +14,7 @@ repository = "https://github.com/Valera6/utils"
 
 [dependencies]
 anyhow = "1.0.79"
-dirs = "5.0.1"
+dirs = { version = "5.0.1", optional = true }
 serde = { version = "1.0.195", features = ["derive"] }
 
 # amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
