@@ -25,4 +25,5 @@ default = []
 files = ["dirs"] 
 klines = []
 
-full = ["files", "klines"]
+#? am I doing this right? Am I sure the external dependency should be here too?
+full = ["dirs", "files", "klines"]
