@@ -1,8 +1,28 @@
 [package]
 name = "valera_utils"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
+resolver = "1"
+description = "My utils crate"
+rust-version = "1.75"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Valera6/utils"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.79"
+dirs = "5.0.1"
+serde = { version = "1.0.195", features = ["derive"] }
+
+# amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
+[features]
+default = []
+
+#? is that the syntaxis?
+files = ["dirs"] 
+klines = []
+
+full = ["files", "klines"]
