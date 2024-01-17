@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "0.1.42"
+version = "0.1.43"
 edition = "2021"
 resolver = "1"
 description = "My utils crate"
@@ -25,8 +25,8 @@ serde_json = "1.0.111"
 default = ["full"]
 
 files = ["dirs"] 
-klines = ["chrono"]
-#fuck_me = ["klines", "polars"]
+trades = ["chrono"]
+#fuck_me = ["trades", "polars"]
 
 #full = ["files", "fuck_me"]
-full = ["files", "klines"]
+full = ["files", "trades"]

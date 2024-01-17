@@ -1,5 +1,5 @@
 #[cfg(feature = "files")]
 pub mod expanded_path;
 
-#[cfg(feature = "klines")]
+#[cfg(feature = "trades")]
 pub mod klines;
