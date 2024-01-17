@@ -3,7 +3,7 @@ use std::fmt;
 
 /// Used by most requests::api endpoints
 ///_NB_: in the `.as_strings()` we don't check for validity of provided strings
-pub enum Symbols{
+pub enum Symbols {
 	CoinAsString(String),
 	CoinsAsStrings(Vec<String>),
 	CoinAsSymbol(Box<dyn Symbol>),
@@ -14,7 +14,7 @@ impl Symbols {
 		match self {
 			Self::CoinAsString(s) => vec![s.clone()],
 			Self::CoinsAsStrings(v) => v.clone(),
-			Self::CoinAsSymbol(s)=> vec![s.inner()],
+			Self::CoinAsSymbol(s) => vec![s.inner()],
 			Self::CoinsAsSymbols(v) => v.iter().map(|s| s.inner()).collect(),
 		}
 	}
@@ -22,9 +22,7 @@ impl Symbols {
 
 /// So functions can say they just want any symbol. Could use enum, but community suggested following logic: `likely to add more structs ? use trait : likely to implement more functionality on each ? use enum`
 pub trait Symbol {
-	fn inner(&self) -> String {
-		self.inner()
-	}
+	fn inner(&self) -> String;
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -55,7 +53,10 @@ impl fmt::Debug for CoinmSymbol {
 
 impl std::convert::From<&str> for UsdtSymbol {
 	fn from(value: &str) -> Self {
-		if !["BUSD", "ETH", "BTC", "BNB", "USDC", "TUSD"].into_iter().all(|quote| !(value.ends_with(quote) && value != quote)) {
+		if !["BUSD", "ETH", "BTC", "BNB", "USDC", "TUSD"]
+			.into_iter()
+			.all(|quote| !(value.ends_with(quote) && value != quote))
+		{
 			panic!("UsdtSymbol must be quoted against USDT.\nHave: {}\nWant: BTCUSDT", value);
 		}
 
