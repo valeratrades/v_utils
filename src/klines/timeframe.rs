@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Result};
 use chrono::Duration;
-
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer};
-use std::fmt;
+use serde::{de::Error as SerdeError, Deserialize, Deserializer};
+use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct Timeframe {
@@ -124,36 +122,52 @@ impl Timeframe {
 	}
 }
 
+fn parse_timeframe(s: &str) -> Result<Timeframe> {
+	let (n_str, designator_str) = match s.char_indices().rev().next() {
+		Some((idx, _)) => s.split_at(idx),
+		None => {
+			return Err(anyhow!(
+				"Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"
+			))
+		}
+	};
+
+	let n = if n_str.is_empty() {
+		1
+	} else {
+		n_str.parse::<usize>().map_err(|_| {
+			anyhow!(
+				"Invalid number in timeframe '{}'. Expected a string representing a timeframe like '5s' or '3M'",
+				n_str
+			)
+		})?
+	};
+
+	let designator = TimeframeDesignator::from_str(designator_str).map_err(|_| {
+		anyhow!(
+			"Invalid or missing timeframe designator '{}'. Expected a string representing a timeframe like '5s' or '3M'",
+			designator_str
+		)
+	})?;
+
+	Ok(Timeframe { designator, n })
+}
+
+impl FromStr for Timeframe {
+	type Err = anyhow::Error;
+
+	fn from_str(s: &str) -> Result<Self> {
+		parse_timeframe(s)
+	}
+}
+
 impl<'de> Deserialize<'de> for Timeframe {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		deserializer.deserialize_str(TimeframeVisitor)
-	}
-}
-
-struct TimeframeVisitor;
-
-impl<'de> Visitor<'de> for TimeframeVisitor {
-	type Value = Timeframe;
-
-	fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-		formatter.write_str("a string representing a timeframe like '5s' or '3M'")
-	}
-
-	fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-	where
-		E: de::Error,
-	{
-		let (n_str, designator_str) = value.split_at(value.len() - 1);
-		let n = match n_str {
-			"" => 1,
-			_ => n_str.parse::<usize>().map_err(E::custom)?,
-		};
-		let designator = TimeframeDesignator::from_str(designator_str).map_err(|_| E::custom("invalid or missing timeframe designator"))?;
-
-		Ok(Timeframe { designator, n })
+		let s = String::deserialize(deserializer)?;
+		parse_timeframe(&s).map_err(|e| SerdeError::custom(e.to_string()))
 	}
 }
 
