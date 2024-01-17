@@ -121,6 +121,11 @@ impl Timeframe {
 		Ok(tf_string)
 	}
 }
+impl std::fmt::Display for Timeframe {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.display().fmt(f)
+	}
+}
 
 fn parse_timeframe(s: &str) -> Result<Timeframe> {
 	let (n_str, designator_str) = match s.char_indices().rev().next() {
