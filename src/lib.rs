@@ -2,4 +2,4 @@
 pub mod expanded_path;
 
 #[cfg(feature = "trades")]
-pub mod klines;
+pub mod trades;
