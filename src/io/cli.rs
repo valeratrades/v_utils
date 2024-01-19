@@ -22,7 +22,7 @@ pub fn confirm(message: &str) -> bool {
 	if input == "y" || input == "yes" {
 		true
 	} else {
-		eprintln!("Aborted.");
+		eprintln!("Aborted by user.");
 		false
 	}
 }
