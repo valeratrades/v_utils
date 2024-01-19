@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "0.1.45"
+version = "0.1.46"
 edition = "2021"
 resolver = "1"
 description = "My utils crate"
@@ -26,7 +26,6 @@ default = ["full"]
 
 io = ["dirs"] 
 trades = ["chrono"]
-#fuck_me = ["trades", "polars"]
+data = []
 
-#full = ["io", "fuck_me"]
-full = ["io", "trades"]
+full = ["io", "data", "trades"]
