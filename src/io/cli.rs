@@ -7,6 +7,7 @@ use std::io::{self, Write};
 ///		println!("Opening order...");
 ///}
 ///```
+//TODO!: make it take anything "stringable". valera_lib might have an example.
 pub fn confirm(message: &str) -> bool {
 	let stdin = io::stdin();
 	let mut stdout = io::stdout();
@@ -18,5 +19,10 @@ pub fn confirm(message: &str) -> bool {
 	stdin.read_line(&mut input).expect("Failed to read line");
 
 	let input = input.trim().to_lowercase();
-	input == "y" || input == "yes"
+	if input == "y" || input == "yes" {
+		true
+	} else {
+		eprintln!("Aborted.");
+		false
+	}
 }
