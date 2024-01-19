@@ -1,4 +1,5 @@
 pub use anyhow::{Error, Result};
+pub const COMPACT_FORMAT_DELIMITER: char = ':';
 
 ///```rust
 ///use v_utils::init_compact_format;
