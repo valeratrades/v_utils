@@ -1,13 +1,13 @@
 [package]
 name = "v_utils"
-version = "0.1.44"
+version = "0.1.45"
 edition = "2021"
 resolver = "1"
 description = "My utils crate"
 rust-version = "1.75"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/Valera6/utils"
+repository = "https://github.com/Valera6/v_utils"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -24,9 +24,9 @@ serde_json = "1.0.111"
 [features]
 default = ["full"]
 
-files = ["dirs"] 
+io = ["dirs"] 
 trades = ["chrono"]
 #fuck_me = ["trades", "polars"]
 
-#full = ["files", "fuck_me"]
-full = ["files", "trades"]
+#full = ["io", "fuck_me"]
+full = ["io", "trades"]
