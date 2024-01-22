@@ -48,3 +48,9 @@ impl AsRef<Path> for ExpandedPath {
 		self.0.as_ref()
 	}
 }
+
+impl ExpandedPath {
+	pub fn process(self) -> PathBuf {
+		self.0
+	}
+}

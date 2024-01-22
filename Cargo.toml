@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "0.1.48"
+version = "0.1.49"
 edition = "2021"
 resolver = "1"
 description = "My utils crate"
