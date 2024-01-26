@@ -1,3 +1,4 @@
+use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,6 +28,32 @@ impl Side {
 impl std::fmt::Display for Side {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.to_str().fmt(f)
+	}
+}
+
+impl<'de> Deserialize<'de> for Side {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		struct SideVisitor;
+
+		impl<'de> serde::de::Visitor<'de> for SideVisitor {
+			type Value = Side;
+
+			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+				formatter.write_str("`BUY` or `SELL`")
+			}
+
+			fn visit_str<E>(self, value: &str) -> Result<Side, E>
+			where
+				E: serde::de::Error,
+			{
+				Side::from_str(value).map_err(serde::de::Error::custom)
+			}
+		}
+
+		deserializer.deserialize_str(SideVisitor)
 	}
 }
 
