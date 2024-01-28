@@ -1,7 +1,14 @@
+extern crate proc_macro;
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput, Ident};
+
 //TODO!: get rid of the dependency \
 pub use anyhow::{Error, Result};
 // here to be used when interacting with the library from outside, so if I change it, nothing outside of library breaks
 pub const COMPACT_FORMAT_DELIMITER: char = ':';
+
+// need to make a `const fn` that will be exported right before the macros, which produces an array of all acceptable names for referencing the struct.
 
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
 ///```rust
@@ -19,7 +26,7 @@ pub const COMPACT_FORMAT_DELIMITER: char = ':';
 ///```
 #[macro_export]
 macro_rules! init_compact_format {
-($name:ident, [ $(($field:ident, $field_type:ty)),* ]) => {
+	($name:ident, [ $(($field:ident, $field_type:ty)),* ]) => {
 #[derive(Clone, Debug, PartialEq)]
 pub struct $name {
 $(
@@ -40,6 +47,7 @@ impl std::str::FromStr for $name {
 		assert_eq!(parts.len(), fields.len(), "Incorrect number of parameters provided");
 
 		let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();
+		//- instead of discarding [0], which is the name, want to assert it is either of: [$name, {name but as if it was a field}, or {name but only capitalized letters; eithre all capitalized or all lowercase}]
 		for param in s.split(':') {
 			if let Some(first_char) = param.chars().next() {
 				let value = &param[1..];
@@ -72,3 +80,67 @@ impl std::fmt::Display for $name {
 	}
 }
 };}
+
+/////BUG: will not work if any of the child structs share the same accronym.
+//// must end with 's'
+////- umbrella_compact_optional!(Protocol, [SAR, TrailingStop, TpSl, LeadingCrosses]);
+//// and then if need a wrapper
+////- umbrella_compact_optional_wrapped!(Protocol, ProtocolWrapper::new([SAR, TrailingStop, TpSl, LeadingCrosses]);
+////TODO!: assert that first split on "::" is followed by "new("
+////TODO!!!!!!!!!!!!!: implement Umbrella struct constructor
+
+//#[proc_macro]
+//pub fn pascal_to_snake(input: TokenStream) -> TokenStream {
+//	let input = parse_macro_input!(input as DeriveInput);
+//	let name = input.ident;
+//	let snake_case_name = to_snake_case(&name.to_string());
+//	let snake_case_ident = Ident::new(&snake_case_name, name.span());
+//	TokenStream::from(snake_case_ident)
+//}
+//
+//fn to_snake_case(s: &str) -> String {
+//	let mut snake_case = String::new();
+//	for (i, char) in s.chars().enumerate() {
+//		if char.is_uppercase() && i != 0 {
+//			snake_case.push('_');
+//		}
+//		snake_case.push(char.to_lowercase().next().unwrap());
+//	}
+//	snake_case
+//}
+//
+//#[macro_export]
+//macro_rules! umbrella_compact_optional {
+//	($name:ident, [ $struct: ty, * ]) => {
+//#[derive(Clone, Debug)]
+//pub enum concat_idents!($name, s) {
+//	$(
+//		pascal_to_snake_case!($struct): $struct,
+//	)*
+//}
+//};}
+////- umbrella_compact_optional!(Protocol, [SAR, TrailingStop, TpSl, LeadingCrosses]);
+//
+//#[cfg(test)]
+//mod tests {
+//	use super::*;
+//	use proc_macro::TokenStream;
+//	use quote::quote;
+//
+//	#[test]
+//	fn test_pascal_to_snake() {
+//		let input = TokenStream::from(quote! {
+//			struct TestStruct;
+//		});
+//
+//		let expected_output = "test_struct".to_string();
+//		let actual_output = pascal_to_snake(input).to_string();
+//
+//		assert!(
+//			actual_output.contains(&expected_output),
+//			"Expected '{}', found '{}'",
+//			expected_output,
+//			actual_output
+//		);
+//	}
+//}
