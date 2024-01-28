@@ -1,7 +1,9 @@
 //TODO!: get rid of the dependency \
 pub use anyhow::{Error, Result};
+// here to be used when interacting with the library from outside, so if I change it, nothing outside of library breaks
 pub const COMPACT_FORMAT_DELIMITER: char = ':';
 
+/// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
 ///```rust
 ///use v_utils::init_compact_format;
 ///use v_utils::trades::{Timeframe, TimeframeDesignator};
