@@ -30,7 +30,7 @@ macro_rules! init_compact_format {
 #[derive(Clone, Debug, PartialEq)]
 pub struct $name {
 $(
-$field: $field_type,
+pub $field: $field_type,
 )*
 }
 ///NB: Note that FromStr takes string withot $name, while Display prints it with $name
