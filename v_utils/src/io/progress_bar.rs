@@ -1,5 +1,13 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+///```rust
+///use v_utils::io::ProgressBar;
+///
+///let mut pb = ProgressBar::new(100);
+///for i in 0..100 {
+///    pb.progress(i);
+///}
+///
 #[derive(Clone, Debug)]
 pub struct ProgressBar {
 	bar_width: f64,
