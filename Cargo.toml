@@ -3,3 +3,4 @@ members = [
 	"v_utils",
 	"v_utils_*",
 ]
+resolver = "1"
