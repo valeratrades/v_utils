@@ -19,4 +19,4 @@ quote = { version = "^1.0.35" }
 anyhow = { version = "^1.0.79" }
 
 [lib]
-proc-macros = true
+proc-macro = true
