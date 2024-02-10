@@ -1,16 +1,32 @@
 extern crate proc_macro;
+
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Ident, LitStr};
+use syn::{parse_macro_input, LitStr};
 
 #[proc_macro]
 pub fn to_lowercase(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as LitStr);
 	let s = input.value().to_lowercase();
 	let expanded = quote! {
-		#s
+		{
+			let result: &'static str = #s;
+			result
+		}
 	};
 	TokenStream::from(expanded)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_lowercase_macro() {
+		// You need to execute the resulting Rust code from the macro to test its output
+		let result: &'static str = to_lowercase!("HELLO WORLD");
+		assert_eq!(result, "hello world");
+	}
 }
 
 /////BUG: will not work if any of the child structs share the same accronym.

@@ -5,4 +5,4 @@ pub mod io;
 pub mod trades;
 
 #[cfg(feature = "macros")]
-pub mod macros;
+pub mod data;
