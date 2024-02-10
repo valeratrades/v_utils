@@ -10,22 +10,25 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as LitStr);
 
 	let s = input.value();
-	let mut result = Vec::new();
+	let mut split_caps = Vec::new();
 	let mut current_word = String::new();
 	for c in s.chars() {
 		if c.is_uppercase() && !current_word.is_empty() {
-			result.push(current_word);
+			split_caps.push(current_word);
 			current_word = String::new();
 		}
 		current_word.push(c);
 	}
 	if !current_word.is_empty() {
-		result.push(current_word);
+		split_caps.push(current_word);
 	}
+
+	eprintln!("{:?}", split_caps);
+	let accronym = split_caps.iter().map(|s| s.chars().next().unwrap()).collect::<String>().to_lowercase();
 
 	let expanded = quote! {
 		{
-			let result: Vec<String> = vec![#(#result.to_string()),*];
+			let result: &'static str = #accronym;
 			result
 		}
 	};
