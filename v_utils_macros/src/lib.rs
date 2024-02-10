@@ -4,29 +4,33 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, LitStr};
 
+/// returns Vec<String> of the ways to refer to a struct name
 #[proc_macro]
-pub fn to_lowercase(input: TokenStream) -> TokenStream {
+pub fn graphemics(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as LitStr);
-	let s = input.value().to_lowercase();
+
+	let s = input.value();
+	let mut result = Vec::new();
+	let mut current_word = String::new();
+	for c in s.chars() {
+		if c.is_uppercase() && !current_word.is_empty() {
+			result.push(current_word);
+			current_word = String::new();
+		}
+		current_word.push(c);
+	}
+	if !current_word.is_empty() {
+		result.push(current_word);
+	}
+
 	let expanded = quote! {
 		{
-			let result: &'static str = #s;
+			let result: Vec<String> = vec![#(#result.to_string()),*];
 			result
 		}
 	};
+
 	TokenStream::from(expanded)
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_lowercase_macro() {
-		// You need to execute the resulting Rust code from the macro to test its output
-		let result: &'static str = to_lowercase!("HELLO WORLD");
-		assert_eq!(result, "hello world");
-	}
 }
 
 /////BUG: will not work if any of the child structs share the same accronym.

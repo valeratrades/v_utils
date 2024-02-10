@@ -1,13 +1,8 @@
 // stole the tests archiecture from dtolnay's workshop.
 
-use derive_builder::Builder;
+use v_utils_macros::graphemics;
 
-#[derive(Builder)]
-pub struct Command {
-	executable: String,
-	args: Vec<String>,
-	env: Vec<String>,
-	current_dir: String,
+fn main() {
+	let result: Vec<String> = graphemics!("HELLO WORLD");
+	eprintln!("{:?}", result);
 }
-
-fn main() {}
