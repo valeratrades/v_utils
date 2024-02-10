@@ -23,12 +23,15 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 		split_caps.push(current_word);
 	}
 
-	eprintln!("{:?}", split_caps);
 	let accronym = split_caps.iter().map(|s| s.chars().next().unwrap()).collect::<String>().to_lowercase();
+	let same_lower = s.to_lowercase();
+	let same_upper = s.to_uppercase();
+	let same = s.clone();
+	let snake_case = split_caps.iter().map(|s| s.to_lowercase()).collect::<Vec<String>>().join("_");
 
 	let expanded = quote! {
 		{
-			let result: &'static str = #accronym;
+			let result: Vec<&'static str> = vec![#accronym, #same_lower, #same_upper, #same, #snake_case];
 			result
 		}
 	};
