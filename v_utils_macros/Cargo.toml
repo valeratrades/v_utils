@@ -1,6 +1,6 @@
 [package]
 name = "v_utils_macros"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Macros for my utils crate"
 rust-version = "1.75"
@@ -18,7 +18,7 @@ name = "tests"
 path = "tests/progress.rs"
 
 [dev-dependencies]
-trybuild = { version = "1.0.49", features = ["diff"]}
+trybuild = { version = "^1.0.89", features = ["diff"]}
 
 [dependencies]
 proc-macro2 = { version = "^1.0.78" }
