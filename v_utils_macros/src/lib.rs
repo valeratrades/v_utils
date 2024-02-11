@@ -48,10 +48,8 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
-/////BUG: will not work if any of the child structs share the same acronym.
-//// must end with 's'
-
-#[proc_macro_derive(FromCompactFormat)]
+///BUG: will not work if any of the child structs share the same acronym and same fields.
+#[proc_macro_derive(FromVecString)]
 pub fn derive(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;

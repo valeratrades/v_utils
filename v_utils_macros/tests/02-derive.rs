@@ -1,6 +1,6 @@
-use v_utils_macros::FromCompactFormat;
+use v_utils_macros::FromVecString;
 
-#[derive(FromCompactFormat)]
+#[derive(FromVecString)]
 pub struct Test {
 	a: i32,
 	b: i32,
