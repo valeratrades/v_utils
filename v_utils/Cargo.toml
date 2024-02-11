@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 description = "My utils crate"
 rust-version = "1.75"
@@ -9,7 +9,13 @@ readme = "README.md"
 repository = "https://github.com/Valera6/v_utils"
 
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[test]]
+name = "tests"
+path = "tests/main.rs"
+
+[dev-dependencies]
+trybuild = { version = "^1.0.89", features = ["diff"]}
+v_utils_macros = { path = "../v_utils_macros" }
 
 [dependencies]
 anyhow = "^1.0.79"

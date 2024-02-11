@@ -30,16 +30,20 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	let same = s.clone();
 	let snake_case = split_caps.iter().map(|s| s.to_lowercase()).collect::<Vec<String>>().join("_");
 
-	let unique_set = vec![acronym, acronym_caps, same_lower, same_upper, same, snake_case]
-		.into_iter()
-		.collect::<std::collections::HashSet<String>>();
-	let unique_vec = unique_set.into_iter().collect::<Vec<String>>();
+	let graphems = [acronym, acronym_caps, same_lower, same_upper, same, snake_case];
+	let mut unique_items = Vec::new();
+	let mut seen_items = std::collections::HashSet::new();
+	for item in graphems.iter() {
+		if seen_items.insert(item) {
+			unique_items.push(item);
+		}
+	}
 
 	let expanded = quote! {
 		{
 			let mut result: Vec<&'static str> = Vec::new();
 			#(
-				result.push(#unique_vec);
+				result.push(#unique_items);
 			)*
 			result
 		}
@@ -48,10 +52,99 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
+
+#[proc_macro_derive(CompactFormat)]
+pub fn derive_compact_format(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+	
+	let mut first_chars: Vec<char> = Vec::new();
+	for field in fields {
+		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap().clone();
+		if !first_chars.contains(&first_char) {
+			first_chars.push(first_char);
+		} else {
+			panic!("Field names must be unique");
+		}
+	}
+
+	let n_fields = fields.len();
+
+	let map_fields_to_chars = fields.iter().map(|f| {
+		let ident = &f.ident;
+		let ty = &f.ty;
+		let first_char = ident.as_ref().unwrap().to_string().chars().next().unwrap();
+		quote! {
+			#ident: provided_params.get(&#first_char).unwrap().parse::<#ty>()?,
+		}
+	});
+
+	let display_fields = fields.iter().map(|f| {
+		let ident = &f.ident;
+		let first_char = ident.as_ref().unwrap().to_string().chars().next().unwrap();
+		quote! {
+			write!(f, ":{}{}", #first_char, self.#ident)?;
+		}
+	});
+
+	let expanded = quote! {
+		impl std::str::FromStr for #name {
+			type Err = anyhow::Error;
+
+			fn from_str(s: &str) -> anyhow::Result<Self> {
+				let (name, params_part) = s.split_once(':').ok_or(anyhow::anyhow!("Could not split string on ':'"))?;
+				let params_split = params_part.split(':').collect::<Vec<&str>>();
+				if params_split.len() != #n_fields {
+					return Err(anyhow::anyhow!("Expected {} fields, got {}", #n_fields, params_split.len()));
+				}
+				let graphemics = v_utils_macros::graphemics!(#name);
+				if !graphemics.contains(&name) {
+					return Err(anyhow::anyhow!("Incorrect name provided. Expected one of: {:?}", graphemics));
+				}
+
+				let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();
+				for param in params_split {
+					if let Some(first_char) = param.chars().next() {
+						let value = &param[1..];
+						provided_params.insert(first_char, value);
+					}
+				}
+				Ok(#name {
+					#(#map_fields_to_chars)*
+				})
+
+			}
+		}
+
+		impl std::fmt::Display for #name {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				let graphemics = v_utils_macros::graphemics!(#name);
+				let a_struct_name = graphemics[0];
+				write!(f, "{}", a_struct_name)?;
+
+				#(#display_fields)*
+
+				std::result::Result::Ok(())
+			}
+		}
+	};
+
+	expanded.into()
+}
+
 /// Put on a struct with optional fields, each of which implements FromStr
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym and same fields. In reality, shouldn't happen.
 #[proc_macro_derive(FromVecStr)]
-pub fn derive(input: TokenStream) -> TokenStream {
+pub fn derive_from_vec_str(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 	let fields = if let syn::Data::Struct(syn::DataStruct {
