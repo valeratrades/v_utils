@@ -52,6 +52,28 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
+/// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
+/// Macro generates FromStr and Display; assuming this format.
+///```rust
+///use v_utils_macros::CompactFormat;
+///use v_utils::trades::{Timeframe, TimeframeDesignator};
+///
+///#[derive(CompactFormat, PartialEq, Debug)]
+///pub struct SAR {
+///	 pub start: f64,
+///	 pub increment: f64,
+///	 pub max: f64,
+///	 pub timeframe: Timeframe,
+///}
+///
+///fn main() {
+///	let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
+///	let params_str = "sar:s0.07:i0.02:m0.15:t5m";
+///	assert_eq!(sar, params_str.parse::<SAR>().unwrap());
+/// let sar_write = sar.to_string();
+/// assert_eq!(params_str, sar_write);
+///}
+///```
 
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
@@ -66,7 +88,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 	} else {
 		unimplemented!()
 	};
-	
+
 	let mut first_chars: Vec<char> = Vec::new();
 	for field in fields {
 		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap().clone();
