@@ -2,14 +2,14 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, LitStr};
+use syn::parse_macro_input;
 
 /// returns Vec<String> of the ways to refer to a struct name
 #[proc_macro]
 pub fn graphemics(input: TokenStream) -> TokenStream {
-	let input = parse_macro_input!(input as LitStr);
+	let input = parse_macro_input!(input as syn::Ident);
 
-	let s = input.value();
+	let s = input.to_string();
 	let mut split_caps = Vec::new();
 	let mut current_word = String::new();
 	for c in s.chars() {
@@ -41,3 +41,25 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 
 /////BUG: will not work if any of the child structs share the same accronym.
 //// must end with 's'
+
+//? derive what? I need it to be able to deserialize from Vec<String>
+//#[proc_macro_derive()]
+//pub fn derive(input: TokenStream) -> TokenStream {
+//	let ast = parse_macro_input!(input as syn::DeriveInput);
+//	let name = &ast.ident;
+//
+//	let expanded = quote! {
+//		impl From<&str> for #name {
+//			fn from(s: &str) -> Self {
+//				let mut split = s.split_whitespace();
+//				#name {
+//					#(
+//						#name::#name_variant: split.next().unwrap().parse().unwrap(),
+//					)*
+//				}
+//			}
+//		}
+//	};
+//
+//	expanded.into()
+//}

@@ -15,8 +15,7 @@ pub const COMPACT_FORMAT_DELIMITER: char = ':';
 ///fn main() {
 ///	let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
 ///	let params_string = "sar:s0.07:i0.02:m0.15:t5m";
-/// let without_name = params_string.splitn(2, ':').collect::<Vec<_>>()[1];
-///	assert_eq!(sar, without_name.parse::<SAR>().unwrap());
+///	assert_eq!(sar, params_string.parse::<SAR>().unwrap());
 ///}
 ///```
 #[macro_export]
@@ -34,16 +33,22 @@ impl std::str::FromStr for $name {
 	type Err = v_utils::data::compact_format::Error;
 
 	fn from_str(s: &str) -> v_utils::data::compact_format::Result<Self> {
+		// // Didn't know how to use proc macros, so that counts len
 		let parts = s.split(':').collect::<Vec<_>>();
 		let mut fields = Vec::new();
 		$(
 		fields.push(stringify!($field));
 		)*
-		assert_eq!(parts.len(), fields.len(), "Incorrect number of parameters provided");
+		assert_eq!(parts.len(), fields.len() + 1, "Incorrect number of parameters provided");
+		//
 
 		let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();
-		//- instead of discarding [0], which is the name, want to assert it is either of: [$name, {name but as if it was a field}, or {name but only capitalized letters; eithre all capitalized or all lowercase}]
-		for param in s.split(':') {
+		let (name, fields) = s.split_at(s.find(':').unwrap());
+		let graphemics = v_utils_macros::graphemics!($name);
+		if !graphemics.contains(&name) {
+			panic!("Incorrect name provided. Expected one of: {:?}", graphemics);
+		}
+		for param in fields.split(':') {
 			if let Some(first_char) = param.chars().next() {
 				let value = &param[1..];
 				provided_params.insert(first_char, value);
