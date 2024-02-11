@@ -4,4 +4,4 @@
     - [x] snake_case
     - [x] itself
 
-- [ ] derive serde to/from Vec<String> on my Protocols
+- [x] derive serde to/from Vec<String> on my Protocols
