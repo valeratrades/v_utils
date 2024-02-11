@@ -42,6 +42,27 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 /////BUG: will not work if any of the child structs share the same accronym.
 //// must end with 's'
 
+#[proc_macro_derive(FromCompactFormat)]
+pub fn derive(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+
+	let expanded = quote! {
+		//impl From<Vec<String>> for #name {
+		//	fn from(v: Vec<String>) -> Self {
+		//		#name {
+		//			#(
+		//				#name::#name_variant: v[#index].parse().unwrap(),
+		//			)*
+		//		}
+		//	}
+		//}
+		println!("Hello, {}!", stringify!(#name));
+	};
+
+	expanded.into()
+}
+
 //? derive what? I need it to be able to deserialize from Vec<String>
 //#[proc_macro_derive()]
 //pub fn derive(input: TokenStream) -> TokenStream {
