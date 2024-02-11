@@ -50,7 +50,7 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 
 /// Put on a struct with optional fields, each of which implements FromStr
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym and same fields. In reality, shouldn't happen.
-#[proc_macro_derive(FromVecString)]
+#[proc_macro_derive(FromVecStr)]
 pub fn derive(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;

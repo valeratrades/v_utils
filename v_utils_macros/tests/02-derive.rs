@@ -1,6 +1,6 @@
-use v_utils_macros::FromVecString;
+use v_utils_macros::FromVecStr;
 
-#[derive(FromVecString, Debug, Clone)]
+#[derive(FromVecStr, Debug, Clone)]
 pub struct Protocols {
 	pub trailing_stop: Option<f64>,
 	pub take_profit_stop_loss: Option<f64>,
