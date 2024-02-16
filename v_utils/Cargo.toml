@@ -11,7 +11,7 @@ repository = "https://github.com/Valera6/v_utils"
 
 [[test]]
 name = "tests"
-path = "tests/main.rs"
+path = "tests/unit_tests_main.rs"
 
 [dev-dependencies]
 trybuild = { version = "^1.0.89", features = ["diff"]}

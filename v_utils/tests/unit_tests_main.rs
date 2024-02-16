@@ -1,5 +1,5 @@
 #[test]
 fn tests() {
 	let t = trybuild::TestCases::new();
-	//t.pass("tests/protocols-spec-from-vec-str.rs");
+	//t.pass("tests/protocols_in_discetionary_engine.rs");
 }
