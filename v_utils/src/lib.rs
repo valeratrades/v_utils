@@ -5,4 +5,4 @@ pub mod io;
 pub mod trades;
 
 #[cfg(feature = "macros")]
-pub use v_utils_macros::* as macros;
+pub extern crate v_utils_macros as macros;
