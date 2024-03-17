@@ -74,7 +74,7 @@ struct ClaudeConversation {
 impl LlmConversation for ClaudeConversation {
 	fn new(conversation: &Conversation) -> Self {
 		let mut messages = Vec::new();
-		for message in &conversation.messages {
+		for message in &conversation.0 {
 			messages.push(ClaudeMessage {
 				role: {
 					match message.role {
@@ -103,9 +103,9 @@ pub fn ask_claude(conversation: &Conversation, model: Model) -> Result<Response>
 	headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
 	let payload = json!({
-		"model": ClaudeModel::from_general(model).to_str(),
+		"model": ClaudeModel::from_general(model.clone()).to_str(),
 		"max_tokens": 1024,
-		"messages": conversation
+		"messages": conversation.messages
 	});
 
 	let client = Client::new();

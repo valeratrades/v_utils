@@ -1,5 +1,4 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
-use std::convert::From;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
@@ -18,6 +17,7 @@ impl Timestamp {
 	pub fn get_ms(&self) -> &i64 {
 		&self.ms
 	}
+
 	fn from_ns(ns: i64) -> Self {
 		let s = ns / 1_000_000_000;
 		let ms = ns / 1_000_000;
@@ -103,6 +103,7 @@ impl Timestamp {
 		let now_ms = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
 		Self::from_ns(now_ms * 1_000_000)
 	}
+
 	pub fn new() -> Self {
 		Self::now()
 	}
@@ -112,6 +113,7 @@ impl Timestamp {
 		let ns_to_subtract = s.into() * 1_000_000_000;
 		Self::from_ns(self.ns - ns_to_subtract)
 	}
+
 	pub fn add<T: Into<i64>>(&self, s: T) -> Self {
 		let ns_to_add = s.into() * 1_000_000_000;
 		Self::from_ns(self.ns + ns_to_add)

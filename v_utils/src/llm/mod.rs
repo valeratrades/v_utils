@@ -4,7 +4,7 @@ use serde::Serialize;
 mod claude;
 
 pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
-	let mut conv = Conversation::new("");
+	let mut conv = Conversation::new();
 	conv.add(Role::User, message);
 	conversation(&conv, model)
 }
@@ -37,18 +37,20 @@ impl Message {
 		}
 	}
 }
-pub struct Conversation {
-	pub messages: Vec<Message>,
-}
+
+pub struct Conversation(pub Vec<Message>);
+
 impl Conversation {
-	pub fn new<T: AsRef<str>>(system_message: T) -> Self {
-		Self {
-			messages: vec![Message::new(Role::System, system_message)],
-		}
+	pub fn new() -> Self {
+		Self(Vec::new())
+	}
+
+	pub fn new_with_system<T: AsRef<str>>(system_message: T) -> Self {
+		Self(vec![Message::new(Role::System, system_message)])
 	}
 
 	pub fn add<T: AsRef<str>>(&mut self, role: Role, content: T) {
-		self.messages.push(Message::new(role, content));
+		self.0.push(Message::new(role, content));
 	}
 
 	pub fn add_exchange<T: AsRef<str>>(&mut self, user_message: T, assistant_message: T) {
@@ -57,6 +59,7 @@ impl Conversation {
 	}
 }
 
+#[derive(Debug)]
 pub struct Response {
 	pub text: String,
 	pub cost_cents: f32,
