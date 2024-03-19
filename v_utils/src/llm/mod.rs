@@ -90,6 +90,11 @@ impl Response {
 			false => Ok(extracted),
 		}
 	}
+
+	pub fn extract_codeblock(&self, extension: &str) -> Result<String> {
+		let extracted = self.extract_codeblocks(extension)?; // because performance does not matter. Could use `find` here over `filter` there, but ehh
+		Ok(extracted[0].clone())
+	}
 }
 
 trait LlmResponse {
