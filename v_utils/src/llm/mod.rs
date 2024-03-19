@@ -1,6 +1,8 @@
 use anyhow::Result;
 use serde::Serialize;
 
+//TODO: add reading conversation from json file or directory of json files
+
 mod claude;
 
 pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
@@ -74,9 +76,10 @@ impl Response {
 		let extracted: Vec<String> = self
 			.text
 			.split("```")
-			.filter_map(|s| {
-				if s.starts_with(extension) {
-					Some(s.strip_prefix(extension).unwrap().to_string())
+			.enumerate()
+			.filter_map(|(i, s)| {
+				if i % 2 == 1 /*When we don't have an extension to match on, this is the only way to get separate text inside and outside codeblock delimiters*/ && s.starts_with(extension) {
+					Some(s.strip_prefix(extension).unwrap().trim().to_string())
 				} else {
 					None
 				}
