@@ -70,8 +70,9 @@ impl std::fmt::Display for Response {
 	}
 }
 impl Response {
-	pub fn extract_codeblocks(&self, extension: &str) -> Vec<String> {
-		self.text
+	pub fn extract_codeblocks(&self, extension: &str) -> Result<Vec<String>> {
+		let extracted: Vec<String> = self
+			.text
 			.split("```")
 			.filter_map(|s| {
 				if s.starts_with(extension) {
@@ -80,7 +81,14 @@ impl Response {
 					None
 				}
 			})
-			.collect()
+			.collect();
+		match extracted.is_empty() {
+			true => Err(anyhow::anyhow!(
+				"Failed to find any {extension} codeblocks in the response:\nResponse: {}",
+				self.text
+			)),
+			false => Ok(extracted),
+		}
 	}
 }
 
