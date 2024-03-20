@@ -107,3 +107,22 @@ trait LlmResponse {
 trait LlmConversation: Serialize {
 	fn new(conversation: &Conversation) -> Self;
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_oneshot() {
+		let response = oneshot("What is the cost of a haiku?", Model::Fast).unwrap();
+		println!("{:?}", response);
+	}
+
+	#[test]
+	fn test_conversation() {
+		let mut conv = Conversation::new_with_system("Today is January 1, 1950");
+		conv.add(Role::User, "What day is today?");
+		let response = conversation(&conv, Model::Fast, Some(10), Some(vec![";"])).unwrap();
+		println!("{:?}", response);
+	}
+}

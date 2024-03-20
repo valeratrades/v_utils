@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,7 @@ pub fn ask_claude<T: AsRef<str>>(
 	max_tokens: Option<usize>,
 	stop_sequences: Option<Vec<T>>,
 ) -> Result<Response> {
-	let conversation = ClaudeConversation::new(&conversation);
+	let mut conversation = ClaudeConversation::new(&conversation);
 
 	let api_key = std::env::var("CLAUDE_TOKEN").expect("CLAUDE_TOKEN environment variable not set");
 	let url = "https://api.anthropic.com/v1/messages";
@@ -107,14 +107,25 @@ pub fn ask_claude<T: AsRef<str>>(
 	headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
 	headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
+	let system_message = match conversation.messages[0].role == "system" {
+		true => {
+			let system_message = conversation.messages.remove(0);
+			Some(system_message.content)
+		}
+		false => None,
+	};
+
+	let max_tokens = match max_tokens {
+		Some(max) => max,
+		None => 4096, // on 3rd generaltion of claude, this is maximum output size for every one of the models
+	};
+
 	let mut payload = json!({
 		"model": ClaudeModel::from_general(model.clone()).to_str(),
 		"temperature": 0.0,
+		"max_tokens": max_tokens,
 		"messages": conversation.messages
 	});
-	if let Some(max) = max_tokens {
-		payload.as_object_mut().unwrap().insert("max_tokens".to_string(), serde_json::json!(max));
-	}
 	if let Some(stop_seqs) = stop_sequences {
 		let stop_seqs_str: Vec<String> = stop_seqs.into_iter().map(|s| s.as_ref().to_string()).collect();
 		payload
@@ -122,12 +133,16 @@ pub fn ask_claude<T: AsRef<str>>(
 			.unwrap()
 			.insert("stop_sequences".to_string(), serde_json::json!(stop_seqs_str));
 	}
+	if let Some(system_message) = system_message {
+		payload.as_object_mut().unwrap().insert("system".to_string(), serde_json::json!(system_message));
+	}
 
 	let client = Client::new();
-	let response = client.post(url).headers(headers).json(&payload).send().expect("Failed to send request");
+	let response = client.post(url).headers(headers).json(&payload).send()?;
 
-	let response_raw = response.text().expect("Failed to read response body");
-	let response: ClaudeResponse = serde_json::from_str(&response_raw).expect("Failed to parse response body");
+	let response_raw = response.text()?;
+	let response: ClaudeResponse =
+		serde_json::from_str(&response_raw).map_err(|_| anyhow!("Failed to read response from anthropic api: {}", &response_raw))?;
 	Ok(response.to_general_form())
 }
 

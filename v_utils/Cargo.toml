@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "1.0.10"
+version = "1.0.11"
 edition = "2021"
 description = "My utils crate"
 rust-version = "1.75"
@@ -8,10 +8,6 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Valera6/v_utils"
 
-
-[[test]]
-name = "tests"
-path = "tests/unit_tests_main.rs"
 
 [dev-dependencies]
 trybuild = { version = "^1.0.89", features = ["diff"]}
