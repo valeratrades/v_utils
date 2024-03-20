@@ -8,11 +8,11 @@ mod claude;
 pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
 	let mut conv = Conversation::new();
 	conv.add(Role::User, message);
-	conversation(&conv, model)
+	conversation(&conv, model, None, None)
 }
 
-pub fn conversation(conv: &Conversation, model: Model) -> Result<Response> {
-	claude::ask_claude(conv, model)
+pub fn conversation(conv: &Conversation, model: Model, max_tokens: Option<usize>, stop_sequences: Option<Vec<&str>>) -> Result<Response> {
+	claude::ask_claude(conv, model, max_tokens, stop_sequences)
 }
 
 #[derive(Clone, Debug)]

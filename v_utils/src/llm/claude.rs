@@ -91,7 +91,12 @@ impl LlmConversation for ClaudeConversation {
 }
 
 ///docs: https://docs.anthropic.com/claude/reference/messages_post
-pub fn ask_claude(conversation: &Conversation, model: Model) -> Result<Response> {
+pub fn ask_claude<T: AsRef<str>>(
+	conversation: &Conversation,
+	model: Model,
+	max_tokens: Option<usize>,
+	stop_sequences: Option<Vec<T>>,
+) -> Result<Response> {
 	let conversation = ClaudeConversation::new(&conversation);
 
 	let api_key = std::env::var("CLAUDE_TOKEN").expect("CLAUDE_TOKEN environment variable not set");
@@ -102,11 +107,21 @@ pub fn ask_claude(conversation: &Conversation, model: Model) -> Result<Response>
 	headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
 	headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
-	let payload = json!({
+	let mut payload = json!({
 		"model": ClaudeModel::from_general(model.clone()).to_str(),
-		"max_tokens": 1024,
+		"temperature": 0.0,
 		"messages": conversation.messages
 	});
+	if let Some(max) = max_tokens {
+		payload.as_object_mut().unwrap().insert("max_tokens".to_string(), serde_json::json!(max));
+	}
+	if let Some(stop_seqs) = stop_sequences {
+		let stop_seqs_str: Vec<String> = stop_seqs.into_iter().map(|s| s.as_ref().to_string()).collect();
+		payload
+			.as_object_mut()
+			.unwrap()
+			.insert("stop_sequences".to_string(), serde_json::json!(stop_seqs_str));
+	}
 
 	let client = Client::new();
 	let response = client.post(url).headers(headers).json(&payload).send().expect("Failed to send request");

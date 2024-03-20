@@ -1,7 +1,5 @@
 use anyhow::{Error, Result};
-use dirs;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
-use std::convert::AsRef;
 use std::str::FromStr;
 use std::{path::Path, path::PathBuf};
 
