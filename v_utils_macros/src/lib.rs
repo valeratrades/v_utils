@@ -143,7 +143,6 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 				Ok(#name {
 					#(#map_fields_to_chars)*
 				})
-
 			}
 		}
 
@@ -164,7 +163,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 }
 
 /// Put on a struct with optional fields, each of which implements FromStr
-///BUG: may write to the wrong field, if any of the child structs share the same acronym and same fields. In reality, shouldn't happen.
+///BUG: may write to the wrong field, if any of the child structs share the same acronym AND same fields. In reality, shouldn't happen.
 #[proc_macro_derive(FromVecStr)]
 pub fn derive_from_vec_str(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
