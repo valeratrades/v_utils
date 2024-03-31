@@ -74,7 +74,6 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 /// assert_eq!(params_str, sar_write);
 ///}
 ///```
-
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
@@ -164,8 +163,8 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 /// Put on a struct with optional fields, each of which implements FromStr
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym AND same fields. In reality, shouldn't happen.
-#[proc_macro_derive(FromVecStr)]
-pub fn derive_from_vec_str(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(OptionalFieldsFromVecStr)]
+pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 	let fields = if let syn::Data::Struct(syn::DataStruct {
@@ -208,7 +207,7 @@ pub fn derive_from_vec_str(input: TokenStream) -> TokenStream {
 
 		quote! {
 			if #field_name.is_none() {
-				if let std::result::Result::Ok(value) = s.as_ref().to_str().unwrap_or("").parse::<#field_type>() {
+				if let std::result::Result::Ok(value) = s.as_ref().parse::<#field_type>() {
 					#field_name = core::option::Option::Some(value);
 					continue;
 				}
@@ -217,11 +216,84 @@ pub fn derive_from_vec_str(input: TokenStream) -> TokenStream {
 	});
 
 	let expanded = quote! {
-		impl<S: AsRef<std::ffi::OsStr>> TryFrom<Vec<S>> for #name {
+		impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
 			type Error = &'static str;
 
 			fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
 				#(#init_nones)*
+
+				for s in strings {
+					#(#conversions)*
+
+					return std::result::Result::Err("Could not parse string");
+				}
+
+				std::result::Result::Ok(#name {
+					#(#write_fields)*
+				})
+			}
+		}
+	};
+
+	expanded.into()
+}
+
+#[proc_macro_derive(VecFieldsFromVecStr)]
+pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	let init_empty_vecs = fields.iter().map(|f| {
+		let ident = &f.ident;
+		let ty = &f.ty;
+		quote! {
+			let mut #ident: #ty = Vec::new();
+		}
+	});
+
+	let write_fields = fields.iter().map(|f| {
+		let ident = &f.ident;
+		quote! {
+			#ident,
+		}
+	});
+
+	let conversions = fields.iter().map(|field| {
+		let field_name = &field.ident;
+		let field_type = match &field.ty {
+			syn::Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Vec" => {
+				let generic_arg = match type_path.path.segments.last().unwrap().arguments {
+					syn::PathArguments::AngleBracketed(ref args) => &args.args[0],
+					_ => panic!("Expected generic argument for Vec"),
+				};
+				quote! { #generic_arg }
+			}
+			_ => panic!("All fields must be of type Vec<T>"),
+		};
+
+		quote! {
+			if let std::result::Result::Ok(value) = s.as_ref().parse::<#field_type>() {
+				#field_name.push(value);
+				continue;
+			}
+		}
+	});
+
+	let expanded = quote! {
+		impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
+			type Error = &'static str;
+
+			fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
+				#(#init_empty_vecs)*
 
 				for s in strings {
 					#(#conversions)*
