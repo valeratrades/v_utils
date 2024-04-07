@@ -100,6 +100,15 @@ impl Response {
 		let extracted = self.extract_codeblocks(extension)?; // because performance does not matter. Could use `find` here over `filter` there, but ehh
 		Ok(extracted[0].clone())
 	}
+
+	pub fn extract_html_tag(&self, tag_name: &str) -> Result<String> {
+		let opening_tag = format!("<{}>", tag_name);
+		let closing_tag = format!("</{}>", tag_name);
+		let from_start = self.text.split_once(&opening_tag).unwrap().1; //TODO: handle error
+		let extracted = from_start.split_once(&closing_tag).unwrap().0; //TODO: handle error
+
+		Ok(extracted.to_string())
+	}
 }
 
 trait LlmResponse {
