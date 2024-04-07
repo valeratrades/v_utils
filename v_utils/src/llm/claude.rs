@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client;
+use futures::stream::{StreamExt, TryStreamExt};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::llm::{Conversation, LlmConversation, LlmResponse, Model, Response, Role};
 
@@ -91,7 +91,7 @@ impl LlmConversation for ClaudeConversation {
 }
 
 ///docs: https://docs.anthropic.com/claude/reference/messages_post
-pub fn ask_claude<T: AsRef<str>>(
+pub async fn ask_claude<T: AsRef<str>>(
 	conversation: &Conversation,
 	model: Model,
 	max_tokens: Option<usize>,
@@ -123,6 +123,7 @@ pub fn ask_claude<T: AsRef<str>>(
 	let mut payload = json!({
 		"model": ClaudeModel::from_general(model.clone()).to_str(),
 		"temperature": 0.0,
+		"stream": true,
 		"max_tokens": max_tokens,
 		"messages": conversation.messages
 	});
@@ -137,17 +138,64 @@ pub fn ask_claude<T: AsRef<str>>(
 		payload.as_object_mut().unwrap().insert("system".to_string(), serde_json::json!(system_message));
 	}
 
-	let client = Client::new();
-	let response = client.post(url).headers(headers).json(&payload).send()?;
+	let mut response_stream = reqwest::Client::new().post(url).headers(headers).json(&payload).send().await?.bytes_stream();
 
-	let response_raw = response.text()?;
-	let response: ClaudeResponse =
-		serde_json::from_str(&response_raw).map_err(|_| anyhow!("Failed to read response from anthropic api: {}", &response_raw))?;
-	Ok(response.to_general_form())
+	let mut accumulated_message = String::new();
+
+	//TODO!!!: switch to using a lib
+	fn parse_sse(bytes: bytes::Bytes) -> String {
+		let s = String::from_utf8((&bytes).to_vec()).expect("Found invalid UTF-8");
+		let mut parsed_string = String::new();
+
+		let split = s
+			.split("event: content_block_delta\ndata: ")
+			.map(|s| s.split("\n\nevent: ").collect::<Vec<&str>>().get(0).unwrap().to_string())
+			.collect::<Vec<String>>();
+
+		for s in split {
+			if let Ok(v) = serde_json::from_str::<DeltaContentBlock>(&s) {
+				if v.response_type == "content_block_delta" || v.delta.delta_type == "text_delta" {
+					parsed_string.push_str(&v.delta.text);
+				}
+			}
+		}
+		parsed_string
+	}
+
+	while let Some(events_batch) = response_stream.next().await {
+		let events_batch = events_batch?;
+
+		let parsed = parse_sse(events_batch);
+		accumulated_message.push_str(&parsed);
+	}
+
+	// this was before stream. Now will need to be rewritten, but that's a problem for later.
+	//let response: ClaudeResponse =
+	//	serde_json::from_str(&accumulated_message).map_err(|_| anyhow!("Failed to read response from anthropic api: {}", &accumulated_message))?;
+	//Ok(response.to_general_form())
+	let dummy_response = Response {
+		text: accumulated_message,
+		cost_cents: 0.0,
+	};
+	Ok(dummy_response)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Delta {
+	text: String,
+	#[serde(rename = "type")]
+	delta_type: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct DeltaContentBlock {
+	delta: Delta,
+	index: u32,
+	#[serde(rename = "type")]
+	response_type: String,
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)] // Default is temporary
 pub struct ClaudeResponse {
 	id: String,
 	#[serde(rename = "type")]
@@ -188,7 +236,7 @@ struct ClaudeContent {
 	content_type: String,
 	text: String,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)] // Default is temporary
 struct ClaudeUsage {
 	input_tokens: u32,
 	output_tokens: u32,

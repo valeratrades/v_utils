@@ -3,16 +3,18 @@ use serde::Serialize;
 
 //TODO: add reading conversation from json file or directory of json files
 
+mod blocking;
 mod claude;
 
-pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
+pub async fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
 	let mut conv = Conversation::new();
 	conv.add(Role::User, message);
-	conversation(&conv, model, None, None)
+	conversation(&conv, model, None, None).await
 }
 
-pub fn conversation(conv: &Conversation, model: Model, max_tokens: Option<usize>, stop_sequences: Option<Vec<&str>>) -> Result<Response> {
-	claude::ask_claude(conv, model, max_tokens, stop_sequences)
+//TODO!: determine whether streaming is in order based on the length of the input. Or just always streaem.
+pub async fn conversation(conv: &Conversation, model: Model, max_tokens: Option<usize>, stop_sequences: Option<Vec<&str>>) -> Result<Response> {
+	claude::ask_claude(conv, model, max_tokens, stop_sequences).await
 }
 
 #[derive(Clone, Debug)]
@@ -114,7 +116,7 @@ mod tests {
 
 	#[test]
 	fn test_oneshot() {
-		let response = oneshot("What is the cost of a haiku?", Model::Fast).unwrap();
+		let response = blocking::oneshot("What is the cost of a haiku?", Model::Fast).unwrap();
 		println!("{:?}", response);
 	}
 
@@ -122,7 +124,7 @@ mod tests {
 	fn test_conversation() {
 		let mut conv = Conversation::new_with_system("Today is January 1, 1950");
 		conv.add(Role::User, "What day is today?");
-		let response = conversation(&conv, Model::Fast, Some(10), Some(vec![";"])).unwrap();
+		let response = blocking::conversation(&conv, Model::Fast, Some(10), Some(vec![";"])).unwrap();
 		println!("{:?}", response);
 	}
 }
