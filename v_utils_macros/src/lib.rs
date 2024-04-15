@@ -310,3 +310,112 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 
 	expanded.into()
 }
+
+// Private Values {{{
+// makes a helper with all String values swapped to PrivateValue
+#[proc_macro_derive(PrivateValues)]
+pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	let (helper_fields, init_fields): (Vec<_>, Vec<_>) = fields
+		.iter()
+		.map(|f| {
+			let ident = &f.ident;
+			let ty = &f.ty;
+			let type_string = quote! { #ty }.to_string();
+
+			match type_string == "String" {
+				true => dbg!((
+					quote! { #ident: PrivateValue },
+					quote! { #ident: helper.#ident.into_string().map_err(|e| serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? }
+				)),
+				false => dbg!((quote! { #ident: #ty }, quote! { #ident: helper.#ident })),
+			}
+		})
+		.unzip();
+
+	let gen = quote! {
+		impl<'de> Deserialize<'de> for #name {
+			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+			where
+				D: serde::Deserializer<'de>,
+			{
+			use anyhow::{Context};
+				#[derive(Clone, Debug)]
+				enum PrivateValue {
+					String(String),
+					Env { env: String },
+				}
+				impl PrivateValue {
+					pub fn into_string(&self) -> anyhow::Result<String> {
+						match self {
+							PrivateValue::String(s) => Ok(s.clone()),
+							PrivateValue::Env { env } => std::env::var(env).with_context(|| format!("Environment variable '{}' not found", env)),
+						}
+					}
+				}
+				impl<'de> Deserialize<'de> for PrivateValue {
+					fn deserialize<D>(deserializer: D) -> Result<PrivateValue, D::Error>
+				where
+						D: serde::de::Deserializer<'de>,
+					{
+						struct PrivateValueVisitor;
+
+						impl<'de> serde::de::Visitor<'de> for PrivateValueVisitor {
+							type Value = PrivateValue;
+
+							fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+								formatter.write_str("a string or a map with a single key 'env'")
+							}
+
+							fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+						where
+								E: serde::de::Error,
+							{
+								Ok(PrivateValue::String(value.to_owned()))
+							}
+
+							fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+						where
+								M: serde::de::MapAccess<'de>,
+							{
+								let key: String = access.next_key()?.ok_or_else(|| serde::de::Error::custom("expected a key"))?;
+								if key == "env" {
+									let value: String = access.next_value()?;
+									Ok(PrivateValue::Env { env: value })
+								} else {
+									Err(serde::de::Error::custom("expected key to be 'env'"))
+								}
+							}
+						}
+
+						deserializer.deserialize_any(PrivateValueVisitor)
+					}
+				}
+
+
+				#[derive(Deserialize)]
+				struct Helper {
+					#(#helper_fields),*
+				}
+				let helper = Helper::deserialize(deserializer)?;
+
+				Ok(#name {
+					#(#init_fields),*
+				})
+			}
+		}
+	};
+
+	gen.into()
+}
