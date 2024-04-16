@@ -313,7 +313,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 
 // Private Values {{{
 // makes a helper with all String values swapped to PrivateValue
-#[proc_macro_derive(PrivateValues)]
+#[proc_macro_derive(MyConfigPrimitives)]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -334,12 +334,16 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			let ty = &f.ty;
 			let type_string = quote! { #ty }.to_string();
 
-			match type_string == "String" {
-				true => dbg!((
+			match type_string.as_str() {
+				"String" => (
 					quote! { #ident: PrivateValue },
 					quote! { #ident: helper.#ident.into_string().map_err(|e| serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? }
-				)),
-				false => dbg!((quote! { #ident: #ty }, quote! { #ident: helper.#ident })),
+				),
+				"PathBuf" => (
+					quote! { #ident: v_utils::io::ExpandedPath },
+					quote! { #ident: helper.#ident.0 }
+				),
+				_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
 			}
 		})
 		.unzip();

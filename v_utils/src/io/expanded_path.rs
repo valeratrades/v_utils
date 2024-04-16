@@ -11,7 +11,6 @@ impl<'de> Deserialize<'de> for ExpandedPath {
 		D: Deserializer<'de>,
 	{
 		let path = String::deserialize(deserializer)?;
-		//TODO!!!!!!!!!: implement the D::Error::custom
 		let _p = expand_tilde(&path).map_err(|e| SerdeError::custom(e.to_string()))?;
 		Ok(ExpandedPath(_p))
 	}
