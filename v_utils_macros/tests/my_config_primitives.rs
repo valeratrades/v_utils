@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use std::path::PathBuf;
 use v_utils_macros::MyConfigPrimitives;
 

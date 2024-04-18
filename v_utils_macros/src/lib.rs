@@ -349,10 +349,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 		.unzip();
 
 	let gen = quote! {
-		impl<'de> Deserialize<'de> for #name {
+		impl<'de> serde::Deserialize<'de> for #name {
 			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 			where
-				D: serde::Deserializer<'de>,
+				D: serde::de::Deserializer<'de>,
 			{
 			use anyhow::{Context};
 				#[derive(Clone, Debug)]
@@ -368,7 +368,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 						}
 					}
 				}
-				impl<'de> Deserialize<'de> for PrivateValue {
+				impl<'de> serde::Deserialize<'de> for PrivateValue {
 					fn deserialize<D>(deserializer: D) -> Result<PrivateValue, D::Error>
 				where
 						D: serde::de::Deserializer<'de>,
@@ -408,7 +408,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				}
 
 
-				#[derive(Deserialize)]
+				#[derive(serde::Deserialize)]
 				struct Helper {
 					#(#helper_fields),*
 				}
