@@ -7,12 +7,12 @@ use std::io::{self, Write};
 ///		println!("Opening order...");
 ///}
 ///```
-//TODO!: make it take anything "stringable". valera_lib might have an example.
-pub fn confirm(message: &str) -> bool {
+//? abort after 30s without response?
+pub fn confirm<T: AsRef<str>>(message: T) -> bool {
 	let stdin = io::stdin();
 	let mut stdout = io::stdout();
 
-	print!("{}. Proceed? [Y/n] ", message);
+	print!("{}. Proceed? [Y/n] ", message.as_ref());
 	stdout.flush().unwrap();
 
 	let mut input = String::new();
