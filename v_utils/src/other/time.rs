@@ -2,7 +2,7 @@ use anyhow::{Context, Error, Result};
 use serde::{de, Deserialize, Serialize};
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default)]
 pub struct Timelike(pub u32);
 impl Timelike {
 	pub fn inner(&self) -> u32 {
@@ -22,6 +22,15 @@ impl std::fmt::Display for Timelike {
 impl AsRef<u32> for Timelike {
 	fn as_ref(&self) -> &u32 {
 		&self.0
+	}
+}
+
+impl<'de> Serialize for Timelike {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.serialize_str(&self.to_string())
 	}
 }
 
@@ -109,16 +118,16 @@ mod tests {
 		let time = Timelike(30);
 		assert_eq!(time.to_string(), "30");
 
-		let time = Timelike(45296);
-		assert_eq!(time.to_string(), "12:34:56");
-
 		let time = Timelike(2096);
 		assert_eq!(time.to_string(), "34:56");
 
-		let time = Timelike(0);
-		assert_eq!(&json!(time).to_string(), r#"0"#);
-
 		let time = Timelike(3600);
 		assert_eq!(time.to_string(), "1:00:00");
+
+		let time = Timelike(0);
+		assert_eq!(&json!(time).to_string(), "\"00\"");
+
+		let time = Timelike(45296);
+		assert_eq!(&json!(time).to_string(), "\"12:34:56\"");
 	}
 }
