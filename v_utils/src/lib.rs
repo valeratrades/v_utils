@@ -1,5 +1,5 @@
 mod other;
-use other::*;
+pub use other::*;
 
 #[cfg(feature = "io")]
 pub mod io;
