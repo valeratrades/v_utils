@@ -1,9 +1,8 @@
 use anyhow::{Context, Error, Result};
 use serde::{de, Deserialize, Serialize};
-use std::str::FromStr;
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct Timelike(pub u32);
 impl Timelike {
 	pub fn into(self) -> u32 {
@@ -14,9 +13,9 @@ impl Timelike {
 impl std::fmt::Display for Timelike {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self.0 {
-			0..=59 => write!(f, "{}", self.0),
-			60..=3599 => write!(f, "{}:{}", self.0 / 60, self.0 % 60),
-			_ => write!(f, "{}:{}:{}", self.0 / 3600, (self.0 % 3600) / 60, self.0 % 60),
+			0..=59 => write!(f, "{:02}", self.0),
+			60..=3599 => write!(f, "{:02}:{:02}", self.0 / 60, self.0 % 60),
+			_ => write!(f, "{}:{:02}:{:02}", self.0 / 3600, (self.0 % 3600) / 60, self.0 % 60),
 		}
 	}
 }
@@ -90,6 +89,7 @@ fn time_to_units(time: &str) -> Result<u32> {
 mod tests {
 	use super::*;
 	use claim::assert_err;
+	use serde_json::json;
 
 	#[test]
 	fn test_time_de() {
@@ -105,7 +105,7 @@ mod tests {
 		assert_err!(serde_json::from_str::<Timelike>(r#""12:34:56:78""#));
 	}
 	#[test]
-	fn test_time_display() {
+	fn test_time_ser() {
 		let time = Timelike(30);
 		assert_eq!(time.to_string(), "30");
 
@@ -114,5 +114,11 @@ mod tests {
 
 		let time = Timelike(2096);
 		assert_eq!(time.to_string(), "34:56");
+
+		let time = Timelike(0);
+		assert_eq!(&json!(time).to_string(), r#"0"#);
+
+		let time = Timelike(3600);
+		assert_eq!(time.to_string(), "1:00:00");
 	}
 }
