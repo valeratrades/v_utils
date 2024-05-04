@@ -2,7 +2,7 @@ use anyhow::{Context, Error, Result};
 use serde::{de, Deserialize, Serialize};
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
 pub struct Timelike(pub u32);
 impl Timelike {
 	pub fn inner(&self) -> u32 {
