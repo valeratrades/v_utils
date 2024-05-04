@@ -3,7 +3,7 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer};
 use std::str::FromStr;
 use std::{path::Path, path::PathBuf};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, derive_new::new)]
 pub struct ExpandedPath(pub PathBuf);
 impl<'de> Deserialize<'de> for ExpandedPath {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
