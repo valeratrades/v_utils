@@ -5,7 +5,7 @@ use serde::{de, Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Timelike(pub u32);
 impl Timelike {
-	pub fn inner(self) -> u32 {
+	pub fn inner(&self) -> u32 {
 		self.0
 	}
 }
