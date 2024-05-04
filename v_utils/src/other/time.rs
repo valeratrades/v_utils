@@ -5,7 +5,7 @@ use serde::{de, Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Timelike(pub u32);
 impl Timelike {
-	pub fn into(self) -> u32 {
+	pub fn inner(self) -> u32 {
 		self.0
 	}
 }
@@ -94,13 +94,13 @@ mod tests {
 	#[test]
 	fn test_time_de() {
 		let time: Timelike = serde_json::from_str(r#""12:34""#).unwrap();
-		assert_eq!(time.into(), 754);
+		assert_eq!(time.inner(), 754);
 
 		let time: Timelike = serde_json::from_str(r#""12:34:56""#).unwrap();
-		assert_eq!(time.into(), 45296);
+		assert_eq!(time.inner(), 45296);
 
 		let time: Timelike = serde_json::from_str(r#""34:56""#).unwrap();
-		assert_eq!(time.into(), 2096);
+		assert_eq!(time.inner(), 2096);
 
 		assert_err!(serde_json::from_str::<Timelike>(r#""12:34:56:78""#));
 	}
