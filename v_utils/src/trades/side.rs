@@ -1,7 +1,7 @@
-use serde::{Deserialize, Deserializer, Seialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum Side {
 	Buy,
 	Sell,
