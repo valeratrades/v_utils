@@ -12,3 +12,6 @@ pub extern crate v_utils_macros as macros;
 
 #[cfg(feature = "llm")]
 pub mod llm;
+
+#[cfg(feature = "utils")]
+pub mod utils;
