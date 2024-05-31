@@ -69,7 +69,7 @@ jobs:
       #- run: cargo check --locked
       - run: cargo update
       - run: cargo check
-      - run: NO_SLOW_TESTS=1 cargo test # heavy heart on this one. Should figure out how to ensure this is guaranteed to run occasionally. (a more precise flag, then special job on changes to v_utils/llms?)
+      - run: cargo test
       #TODO: figure this out
       #  if: matrix.os == 'ubuntu' && matrix.rust == 'nightly'
       #- run: cargo run -- expand --manifest-path tests/Cargo.toml > expand.rs && diff tests/lib.expand.rs expand.rs
