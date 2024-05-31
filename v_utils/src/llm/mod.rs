@@ -123,12 +123,14 @@ trait LlmConversation: Serialize {
 mod tests {
 	use super::*;
 
+	#[cfg(slow_tests)]
 	#[test]
 	fn test_oneshot() {
 		let response = blocking::oneshot("What is the cost of a haiku?", Model::Fast).unwrap();
 		println!("{:?}", response);
 	}
 
+	#[cfg(slow_tests)]
 	#[test]
 	fn test_conversation() {
 		let mut conv = Conversation::new_with_system("Today is January 1, 1950");
