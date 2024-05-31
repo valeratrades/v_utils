@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 use v_utils_macros::MyConfigPrimitives;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, MyConfigPrimitives)]
 pub struct Test {
 	alpaca_key: String,
-	alpaca_secret: String,
+	whoami: String,
 	a_random_non_string: i32,
 	path: PathBuf,
 }
@@ -12,7 +13,7 @@ pub struct Test {
 fn main() {
 	let toml_str = r#"
 	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
-alpaca_secret = { env = "ALPACA_API_SECRET" }
+whoami = { env = "USERNAME" }
 a_random_non_string = 1
 path = "~/.config/a_test_path"
 "#;
