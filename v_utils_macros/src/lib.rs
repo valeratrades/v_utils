@@ -1,3 +1,4 @@
+#![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
@@ -66,13 +67,11 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///	 pub timeframe: Timeframe,
 ///}
 ///
-///fn main() {
-///	let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
-///	let params_str = "sar:s0.07:i0.02:m0.15:t5m";
-///	assert_eq!(sar, params_str.parse::<SAR>().unwrap());
-/// let sar_write = sar.to_string();
-/// assert_eq!(params_str, sar_write);
-///}
+///let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
+///let params_str = "sar:s0.07:i0.02:m0.15:t5m";
+///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
+///let sar_write = sar.to_string();
+///assert_eq!(params_str, sar_write);
 ///```
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
@@ -90,7 +89,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 	let mut first_chars: Vec<char> = Vec::new();
 	for field in fields {
-		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap().clone();
+		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap();
 		if !first_chars.contains(&first_char) {
 			first_chars.push(first_char);
 		} else {

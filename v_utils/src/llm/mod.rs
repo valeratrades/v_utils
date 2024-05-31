@@ -23,12 +23,13 @@ pub enum Model {
 	Medium,
 	Slow,
 }
-
+#[derive(Clone, Debug)]
 pub enum Role {
 	System,
 	User,
 	Assistant,
 }
+#[derive(Debug, Clone)]
 pub struct Message {
 	role: Role,
 	content: String,
@@ -42,6 +43,7 @@ impl Message {
 	}
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct Conversation(pub Vec<Message>);
 
 impl Conversation {
