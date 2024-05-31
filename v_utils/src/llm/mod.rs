@@ -122,7 +122,7 @@ trait LlmConversation: Serialize {
 }
 
 #[cfg(test)]
-mod tests {
+mod llm_tests {
 	use super::*;
 
 	#[cfg(llm_test)]
