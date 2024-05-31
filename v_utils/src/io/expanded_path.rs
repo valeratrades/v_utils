@@ -1,9 +1,9 @@
 use anyhow::{Error, Result};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 use std::{path::Path, path::PathBuf};
 
-#[derive(Clone, Debug, Default, derive_new::new)]
+#[derive(Clone, Debug, Default, derive_new::new, Serialize, PartialEq, Eq)]
 pub struct ExpandedPath(pub PathBuf);
 impl<'de> Deserialize<'de> for ExpandedPath {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -43,5 +43,15 @@ impl std::fmt::Display for ExpandedPath {
 impl AsRef<Path> for ExpandedPath {
 	fn as_ref(&self) -> &Path {
 		self.0.as_ref()
+	}
+}
+
+impl ExpandedPath {
+	pub fn inner(self) -> PathBuf {
+		self.0
+	}
+
+	pub fn to_string(&self) -> String {
+		self.0.to_string_lossy().to_string()
 	}
 }
