@@ -8,7 +8,6 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
 
-
 [dev-dependencies]
 trybuild = { version = "^1.0.96", features = ["diff"]}
 v_utils_macros = { path = "../v_utils_macros" }
