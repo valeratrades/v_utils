@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
 
-/// returns Vec<String> of the ways to refer to a struct name
+/// returns `Vec<String>` of the ways to refer to a struct name
 #[proc_macro]
 pub fn graphemics(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as syn::Ident);
