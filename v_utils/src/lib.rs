@@ -1,3 +1,7 @@
+#![allow(clippy::get_first)]
+#![allow(clippy::len_zero)]
+#![allow(clippy::tabs_in_doc_comments)]
+
 mod other;
 pub use other::*;
 

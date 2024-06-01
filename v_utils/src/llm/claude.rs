@@ -97,7 +97,7 @@ pub async fn ask_claude<T: AsRef<str>>(
 	max_tokens: Option<usize>,
 	stop_sequences: Option<Vec<T>>,
 ) -> Result<Response> {
-	let mut conversation = ClaudeConversation::new(&conversation);
+	let mut conversation = ClaudeConversation::new(conversation);
 
 	let api_key = std::env::var("CLAUDE_TOKEN").expect("CLAUDE_TOKEN environment variable not set");
 	let url = "https://api.anthropic.com/v1/messages";
@@ -115,10 +115,7 @@ pub async fn ask_claude<T: AsRef<str>>(
 		false => None,
 	};
 
-	let max_tokens = match max_tokens {
-		Some(max) => max,
-		None => 4096, // on 3rd generaltion of claude, this is maximum output size for every one of the models
-	};
+	let max_tokens = max_tokens.unwrap_or(4096); // on 3rd generaltion of claude, this is maximum output size for every one of the models
 
 	let mut payload = json!({
 		"model": ClaudeModel::from_general(model.clone()).to_str(),
@@ -144,7 +141,7 @@ pub async fn ask_claude<T: AsRef<str>>(
 
 	//TODO!!!: switch to using a lib
 	fn parse_sse(bytes: bytes::Bytes) -> String {
-		let s = String::from_utf8((&bytes).to_vec()).expect("Found invalid UTF-8");
+		let s = String::from_utf8(bytes.to_vec()).expect("Found invalid UTF-8");
 		let mut parsed_string = String::new();
 
 		let split = s

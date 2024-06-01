@@ -25,7 +25,7 @@ impl AsRef<u32> for Timelike {
 	}
 }
 
-impl<'de> Serialize for Timelike {
+impl Serialize for Timelike {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -84,7 +84,7 @@ fn time_to_units(time: &str) -> Result<u32> {
 		None => first * 60 + second,
 	};
 
-	if let Some(_) = split.next() {
+	if split.next().is_some() {
 		return Err(Error::msg(format!(
 			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
 			time

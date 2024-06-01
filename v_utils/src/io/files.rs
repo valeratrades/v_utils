@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use std::{path::PathBuf, process::Command};
+use std::{
+	path::{Path, PathBuf},
+	process::Command,
+};
 
 pub enum OpenMode {
 	Normal,
@@ -7,7 +10,7 @@ pub enum OpenMode {
 	Readonly,
 }
 
-pub fn open_with_mode(path: &PathBuf, mode: OpenMode) -> Result<()> {
+pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 	let p = path.display();
 	match mode {
 		OpenMode::Normal => {
@@ -85,6 +88,6 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 }
 
 /// Convenience function.
-pub fn open(path: &PathBuf) -> Result<()> {
+pub fn open(path: &Path) -> Result<()> {
 	open_with_mode(path, OpenMode::Normal)
 }

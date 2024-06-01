@@ -30,22 +30,6 @@ impl TimeframeDesignator {
 		}
 	}
 
-	/// All characters could be in any casee, except for m:minutes and M:months
-	pub fn from_str(s: &str) -> Result<Self> {
-		match s {
-			"s" => Ok(TimeframeDesignator::Seconds),
-			"m" => Ok(TimeframeDesignator::Minutes),
-			"h" => Ok(TimeframeDesignator::Hours),
-			"H" => Ok(TimeframeDesignator::Hours),
-			"d" => Ok(TimeframeDesignator::Days),
-			"D" => Ok(TimeframeDesignator::Days),
-			"w" => Ok(TimeframeDesignator::Weeks),
-			"W" => Ok(TimeframeDesignator::Weeks),
-			"M" => Ok(TimeframeDesignator::Months),
-			_ => Err(anyhow::anyhow!("Invalid timeframe designator: {}", s)),
-		}
-	}
-
 	/// My prefered definition matches that of Binance.
 	pub fn as_str(&self) -> &'static str {
 		self.as_str_binance()
@@ -69,6 +53,26 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Weeks => "W",
 			TimeframeDesignator::Months => "M",
 			_ => panic!("Invalid timeframe designator for Bybit: {:?}", self),
+		}
+	}
+}
+
+impl FromStr for TimeframeDesignator {
+	type Err = anyhow::Error;
+
+	/// All characters could be in any casee, except for m:minutes and M:months
+	fn from_str(s: &str) -> Result<Self> {
+		match s {
+			"s" => Ok(TimeframeDesignator::Seconds),
+			"m" => Ok(TimeframeDesignator::Minutes),
+			"h" => Ok(TimeframeDesignator::Hours),
+			"H" => Ok(TimeframeDesignator::Hours),
+			"d" => Ok(TimeframeDesignator::Days),
+			"D" => Ok(TimeframeDesignator::Days),
+			"w" => Ok(TimeframeDesignator::Weeks),
+			"W" => Ok(TimeframeDesignator::Weeks),
+			"M" => Ok(TimeframeDesignator::Months),
+			_ => Err(anyhow::anyhow!("Invalid timeframe designator: {}", s)),
 		}
 	}
 }
@@ -107,7 +111,7 @@ impl Timeframe {
 
 	pub fn format_bybit(&self) -> Result<String> {
 		let tf_string = match self.n {
-			1 if self.designator != TimeframeDesignator::Minutes => format!("{}", self.designator.as_str_bybit()),
+			1 if self.designator != TimeframeDesignator::Minutes => self.designator.as_str_bybit().to_string(),
 			_ => format!("{}{}", self.n, self.designator.as_str_bybit()),
 		};
 		let valid_values = vec!["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
@@ -128,7 +132,7 @@ impl std::fmt::Display for Timeframe {
 }
 
 fn parse_timeframe(s: &str) -> Result<Timeframe> {
-	let (n_str, designator_str) = match s.char_indices().rev().next() {
+	let (n_str, designator_str) = match s.char_indices().next_back() {
 		Some((idx, _)) => s.split_at(idx),
 		None => {
 			return Err(anyhow!(

@@ -1,3 +1,5 @@
+#![allow(clippy::get_first)]
+#![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro;
 

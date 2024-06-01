@@ -50,8 +50,4 @@ impl ExpandedPath {
 	pub fn inner(self) -> PathBuf {
 		self.0
 	}
-
-	pub fn to_string(&self) -> String {
-		self.0.to_string_lossy().to_string()
-	}
 }

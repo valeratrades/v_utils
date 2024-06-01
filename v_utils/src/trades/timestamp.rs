@@ -76,7 +76,9 @@ impl From<u32> for Timestamp {
 }
 impl From<&str> for Timestamp {
 	fn from(timestamp: &str) -> Self {
-		let dt = timestamp.parse::<DateTime<Utc>>().expect(&format!("Invalid ISO format: {}", timestamp));
+		let dt = timestamp
+			.parse::<DateTime<Utc>>()
+			.unwrap_or_else(|_| panic!("Invalid ISO format: {}", timestamp));
 		let ns = dt.timestamp_nanos_opt().unwrap();
 		Timestamp::from_ns(ns)
 	}
