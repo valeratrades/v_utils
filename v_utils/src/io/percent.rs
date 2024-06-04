@@ -40,6 +40,17 @@ impl std::fmt::Display for Percent {
 	}
 }
 
+impl PartialEq<f64> for Percent {
+	fn eq(&self, other: &f64) -> bool {
+		self.0 == *other
+	}
+}
+impl PartialOrd<f64> for Percent {
+	fn partial_cmp(&self, other: &f64) -> Option<std::cmp::Ordering> {
+		self.0.partial_cmp(other)
+	}
+}
+
 impl Percent {
 	pub fn inner(self) -> f64 {
 		self.0
@@ -66,5 +77,13 @@ mod tests {
 
 		let p = Percent::from_str("0.5%").unwrap();
 		assert_eq!(p.0, 0.005);
+	}
+
+	#[test]
+	fn compare() {
+		let p = Percent::from_str("50%").unwrap();
+		assert!(p < 0.51);
+		assert_eq!(p, 0.5);
+		assert!(p > 0.49);
 	}
 }
