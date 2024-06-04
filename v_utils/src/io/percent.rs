@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Clone, Debug, Default, derive_new::new, Serialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, derive_new::new, Serialize, PartialEq)]
 pub struct Percent(pub f64);
 impl<'de> Deserialize<'de> for Percent {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
