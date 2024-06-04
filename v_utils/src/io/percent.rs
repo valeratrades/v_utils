@@ -9,8 +9,38 @@ impl<'de> Deserialize<'de> for Percent {
 	where
 		D: Deserializer<'de>,
 	{
-		let s = String::deserialize(deserializer)?;
-		FromStr::from_str(&s).map_err(de::Error::custom)
+		struct PercentVisitor;
+
+		impl<'de> de::Visitor<'de> for PercentVisitor {
+			type Value = Percent;
+
+			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+				formatter.write_str("a float, an integer, or a string representing a percentage")
+			}
+
+			fn visit_f64<E>(self, value: f64) -> Result<Percent, E>
+			where
+				E: de::Error,
+			{
+				Ok(Percent(value))
+			}
+
+			fn visit_u64<E>(self, value: u64) -> Result<Percent, E>
+			where
+				E: de::Error,
+			{
+				Ok(Percent(value as f64 / 100.0))
+			}
+
+			fn visit_str<E>(self, value: &str) -> Result<Percent, E>
+			where
+				E: de::Error,
+			{
+				Percent::from_str(value).map_err(de::Error::custom)
+			}
+		}
+
+		deserializer.deserialize_any(PercentVisitor)
 	}
 }
 impl FromStr for Percent {
@@ -77,6 +107,21 @@ mod tests {
 
 		let p = Percent::from_str("0.5%").unwrap();
 		assert_eq!(p.0, 0.005);
+	}
+
+	#[test]
+	fn json() {
+		let float_json = r#"0.5"#;
+		let p: Percent = serde_json::from_str(float_json).unwrap();
+		assert_eq!(p.0, 0.5);
+
+		let usize_json = r#"50"#;
+		let p: Percent = serde_json::from_str(usize_json).unwrap();
+		assert_eq!(p.0, 0.5);
+
+		let string_json = r#""50%""#;
+		let p: Percent = serde_json::from_str(string_json).unwrap();
+		assert_eq!(p.0, 0.5);
 	}
 
 	#[test]
