@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Copy, Clone, Debug, Default, derive_new::new, Serialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, derive_new::new, PartialEq)]
 pub struct Percent(pub f64);
 impl<'de> Deserialize<'de> for Percent {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -61,6 +61,21 @@ impl FromStr for Percent {
 		};
 
 		Ok(Percent(percent))
+	}
+}
+
+//? still not sure if I like `"xx%"` other the default derive (that is `0.xx`)
+impl Serialize for Percent {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let percent_number = self.0 * 100.;
+		let s = match percent_number.fract() == 0. {
+			true => format!("{}%", percent_number as usize),
+			false => format!("{}%", percent_number),
+		};
+		s.serialize(serializer)
 	}
 }
 
