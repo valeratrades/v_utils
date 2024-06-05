@@ -49,9 +49,9 @@ impl FromStr for Percent {
 	fn from_str(s: &str) -> Result<Self> {
 		let stripped = s.trim_end_matches("%");
 
-		let percent = if let Some(u) = stripped.parse::<usize>().ok() {
+		let percent = if let Ok(u) = stripped.parse::<usize>() {
 			u as f64 / 100.
-		} else if let Some(f) = stripped.parse::<f64>().ok() {
+		} else if let Ok(f) = stripped.parse::<f64>() {
 			match s.ends_with("%") {
 				true => f / 100.,
 				false => f,

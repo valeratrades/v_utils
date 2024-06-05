@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone)]
@@ -22,8 +22,7 @@ impl Timestamp {
 		let s = ns / 1_000_000_000;
 		let ms = ns / 1_000_000;
 		let us = ns / 1_000;
-		let naive_datetime = NaiveDateTime::from_timestamp_micros(us).unwrap();
-		let dt = DateTime::<Utc>::from_naive_utc_and_offset(naive_datetime, Utc);
+		let dt = DateTime::from_timestamp_micros(us).unwrap();
 		let iso = dt.to_rfc3339();
 		Timestamp { ns, s, ms, us, dt, iso }
 	}

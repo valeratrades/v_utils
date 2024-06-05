@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports, unexpected_cfgs)]
 use anyhow::Result;
 use serde::Serialize;
 
