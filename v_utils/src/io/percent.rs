@@ -49,7 +49,7 @@ impl FromStr for Percent {
 	fn from_str(s: &str) -> Result<Self> {
 		let stripped = s.trim_end_matches("%");
 
-		let percent = if let Ok(u) = stripped.parse::<usize>() {
+		let percent = if let Ok(u) = stripped.parse::<isize>() {
 			u as f64 / 100.
 		} else if let Ok(f) = stripped.parse::<f64>() {
 			match s.ends_with("%") {
@@ -72,7 +72,7 @@ impl Serialize for Percent {
 	{
 		let percent_number = self.0 * 100.;
 		let s = match percent_number.fract() == 0. {
-			true => format!("{}%", percent_number as usize),
+			true => format!("{}%", percent_number as isize),
 			false => format!("{}%", percent_number),
 		};
 		s.serialize(serializer)
@@ -107,9 +107,9 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn usize() {
-		let p = Percent::from_str("50").unwrap();
-		assert_eq!(p.0, 0.5);
+	fn isize() {
+		let p = Percent::from_str("-50").unwrap();
+		assert_eq!(p.0, -0.5);
 
 		let p = Percent::from_str("50%").unwrap();
 		assert_eq!(p.0, 0.5);
@@ -130,8 +130,8 @@ mod tests {
 		let p: Percent = serde_json::from_str(float_json).unwrap();
 		assert_eq!(p.0, 0.5);
 
-		let usize_json = r#"50"#;
-		let p: Percent = serde_json::from_str(usize_json).unwrap();
+		let isize_json = r#"50"#;
+		let p: Percent = serde_json::from_str(isize_json).unwrap();
 		assert_eq!(p.0, 0.5);
 
 		let string_json = r#""50%""#;
