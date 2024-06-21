@@ -2,6 +2,7 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro;
+extern crate serde;
 
 use proc_macro::TokenStream;
 use quote::quote;

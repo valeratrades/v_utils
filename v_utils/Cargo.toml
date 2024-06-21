@@ -20,10 +20,8 @@ serde = { version = "^1.0.203", features = ["derive"] }
 serde_json = "^1.0.117"
 dirs = { version = "^5.0.1", optional = true }
 chrono = { version = "^0.4.38", optional = true }
-proc-macro2 = { version = "^1.0.84", optional = true }
-syn = { version = "^2.0.66", features = ["full"], optional = true }
 quote = { version = "^1.0.36", optional = true }
-reqwest = { version = "^0.12.4", features = ["json", "blocking", "stream"], optional = true }
+reqwest = { version = "^0.12.5", features = ["json", "blocking", "stream"], optional = true }
 futures = { version = "^0.3.30", optional = true }
 tokio = { version = "^1.38.0", features = ["full", "io-util"], optional = true }
 async-sse = { version = "^5.1.0", optional = true }
@@ -35,7 +33,7 @@ tracing-subscriber = { version = "^0.3.18", features = ["fmt", "json", "registry
 #tracing-log = { version = "^0.2.0", optional = true }
 
 
-v_utils_macros = { path = "../v_utils_macros", version = "^1.2.2", optional = true }
+v_utils_macros = { path = "../v_utils_macros", version = "^1.2.3", optional = true }
 
 # amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
 [features]
