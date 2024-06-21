@@ -14,6 +14,8 @@ pub mod trades;
 #[cfg(feature = "macros")]
 pub extern crate v_utils_macros as macros;
 
+pub extern crate serde;
+
 #[cfg(feature = "llm")]
 pub mod llm;
 
