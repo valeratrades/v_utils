@@ -312,8 +312,6 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
-// Private Values {{{
-// makes a helper with all String values swapped to PrivateValue
 #[proc_macro_derive(MyConfigPrimitives)]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);

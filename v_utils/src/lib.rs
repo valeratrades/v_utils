@@ -16,8 +16,8 @@ pub extern crate v_utils_macros as macros;
 
 #[doc(hidden)]
 pub mod __internal {
-	pub use anyhow;
-	pub use serde;
+	pub extern crate anyhow;
+	pub extern crate serde;
 }
 
 #[cfg(feature = "llm")]
