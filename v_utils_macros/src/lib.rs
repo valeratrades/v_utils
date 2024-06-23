@@ -408,6 +408,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 
 
 				#[derive(v_utils::__internal::serde::Deserialize)]
+				#[serde(crate = "v_utils::__internal::serde")]
 				struct Helper {
 					#(#helper_fields),*
 				}
