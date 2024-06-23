@@ -338,7 +338,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			match type_string.as_str() {
 				"String" => (
 					quote! { #ident: PrivateValue },
-					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? }
+					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? }
 				),
 				"PathBuf" => (
 					quote! { #ident: v_utils::io::ExpandedPath },
@@ -350,10 +350,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 		.unzip();
 
 	let gen = quote! {
-		impl<'de> v_utils::serde::Deserialize<'de> for #name {
+		impl<'de> v_utils::__internal::serde::Deserialize<'de> for #name {
 			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 			where
-				D: v_utils::serde::de::Deserializer<'de>,
+				D: v_utils::__internal::serde::de::Deserializer<'de>,
 			{
 			use anyhow::{Context};
 				#[derive(Clone, Debug)]
@@ -369,14 +369,14 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 						}
 					}
 				}
-				impl<'de> v_utils::serde::Deserialize<'de> for PrivateValue {
+				impl<'de> v_utils::__internal::serde::Deserialize<'de> for PrivateValue {
 					fn deserialize<D>(deserializer: D) -> Result<PrivateValue, D::Error>
 				where
-						D: v_utils::serde::de::Deserializer<'de>,
+						D: v_utils::__internal::serde::de::Deserializer<'de>,
 					{
 						struct PrivateValueVisitor;
 
-						impl<'de> v_utils::serde::de::Visitor<'de> for PrivateValueVisitor {
+						impl<'de> v_utils::__internal::serde::de::Visitor<'de> for PrivateValueVisitor {
 							type Value = PrivateValue;
 
 							fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -385,21 +385,21 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 
 							fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
 						where
-								E: v_utils::serde::de::Error,
+								E: v_utils::__internal::serde::de::Error,
 							{
 								Ok(PrivateValue::String(value.to_owned()))
 							}
 
 							fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
 						where
-								M: v_utils::serde::de::MapAccess<'de>,
+								M: v_utils::__internal::serde::de::MapAccess<'de>,
 							{
-								let key: String = access.next_key()?.ok_or_else(|| v_utils::serde::de::Error::custom("expected a key"))?;
+								let key: String = access.next_key()?.ok_or_else(|| v_utils::__internal::serde::de::Error::custom("expected a key"))?;
 								if key == "env" {
 									let value: String = access.next_value()?;
 									Ok(PrivateValue::Env { env: value })
 								} else {
-									Err(v_utils::serde::de::Error::custom("expected key to be 'env'"))
+									Err(v_utils::__internal::serde::de::Error::custom("expected key to be 'env'"))
 								}
 							}
 						}
@@ -409,7 +409,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				}
 
 
-				#[derive(v_utils::serde::Deserialize)]
+				#[derive(v_utils::__internal::serde::Deserialize)]
 				struct Helper {
 					#(#helper_fields),*
 				}
