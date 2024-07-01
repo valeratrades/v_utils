@@ -9,6 +9,7 @@ use tracing_subscriber::{
 };
 
 ///# Panics
+/// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber() {
 	{
 		let mut rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "".to_owned());
