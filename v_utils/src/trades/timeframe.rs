@@ -3,13 +3,13 @@ use chrono::Duration;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Timeframe {
 	pub designator: TimeframeDesignator,
 	pub n: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TimeframeDesignator {
 	Seconds,
 	Minutes,
