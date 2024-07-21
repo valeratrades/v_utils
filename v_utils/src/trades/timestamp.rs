@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, TimeZone, Utc};
 
 /// Doesn't support negative timestamps
-fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
+pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
 	// Try parsing as ISO 8601 format
 	if let Ok(dt) = timestamp.parse::<DateTime<Utc>>() {
 		return Ok(dt);
