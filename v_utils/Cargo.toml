@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 description = "My utils crate"
 rust-version = "1.75"
@@ -34,6 +34,7 @@ tracing-subscriber = { version = "^0.3.18", features = ["fmt", "json", "registry
 
 
 v_utils_macros = { path = "../v_utils_macros", version = "^1.2.7", optional = true }
+insta = "1.39.0"
 
 # amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
 [features]

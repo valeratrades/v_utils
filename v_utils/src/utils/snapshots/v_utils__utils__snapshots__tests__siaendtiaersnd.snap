@@ -1,0 +1,14 @@
+---
+source: v_utils/src/utils/snapshots.rs
+expression: "snapshot_plot_p(&data, 10, 10)"
+---
+        ██
+        ██
+      ▄▄██
+      ████
+      ████
+    ██████
+    ██████
+  ▄▄██████
+  ████████
+  ████████
