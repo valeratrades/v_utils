@@ -27,10 +27,8 @@ impl FromStr for ExpandedPath {
 					l if l > 2 => Ok(home_dir.join(&s[2..])),
 					_ => Err(Error::msg("Incorrect Path")),
 				}
-			},
-			false => {
-				Ok(PathBuf::from(s))
-			},
+			}
+			false => Ok(PathBuf::from(s)),
 		}?;
 
 		Ok(ExpandedPath(path_buf))
@@ -51,5 +49,9 @@ impl AsRef<Path> for ExpandedPath {
 impl ExpandedPath {
 	pub fn inner(self) -> PathBuf {
 		self.0
+	}
+
+	pub fn display(&self) -> std::path::Display {
+		self.0.display()
 	}
 }

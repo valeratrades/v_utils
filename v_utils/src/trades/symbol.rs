@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+//? do I want to keep any of this weird crap?
 
 /// Used by most requests::api endpoints
 ///_NB_: in the `.as_strings()` we don't check for validity of provided strings
