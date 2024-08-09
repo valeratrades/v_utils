@@ -80,6 +80,7 @@ pub fn ohlc_snapshot(ohlcs: &[Ohlc], indicator: &[f64]) -> Result<String> {
 }
 
 //? add oi, lsr, etc?
+/// Timestamp is often [unsafely converted](crate::timestamp::guess_timestamp_unsafe) from a string
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
 pub struct Kline {
 	pub ohlc: Ohlc,

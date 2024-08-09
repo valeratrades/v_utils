@@ -7,7 +7,7 @@ use std::{
 pub enum OpenMode {
 	Normal,
 	Force,
-	Readonly,
+	Read,
 }
 
 pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
@@ -30,7 +30,7 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 				.status()
 				.map_err(|_| anyhow!("$EDITOR env variable is not defined or permission lacking to create the file: {p}"))?;
 		}
-		OpenMode::Readonly => {
+		OpenMode::Read => {
 			if !path.exists() {
 				return Err(anyhow!("File does not exist"));
 			}
