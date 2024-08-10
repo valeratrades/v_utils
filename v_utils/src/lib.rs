@@ -24,3 +24,5 @@ pub mod llm;
 
 #[cfg(feature = "utils")]
 pub mod utils;
+
+pub mod prelude;

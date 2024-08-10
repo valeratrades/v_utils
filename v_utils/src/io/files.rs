@@ -42,7 +42,11 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 			if !path.exists() {
 				return Err(anyhow!("File does not exist"));
 			}
-			Command::new("sh").arg("-c").arg(format!("nvim -R {p}")).status()?;
+			Command::new("sh")
+				.arg("-c")
+				.arg(format!("nvim -R {p}"))
+				.status()
+				.map_err(|_| anyhow!("nvim is not found in path"))?;
 		}
 	}
 
