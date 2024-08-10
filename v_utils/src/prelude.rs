@@ -1,13 +1,13 @@
-#![allow(async_fn_in_trait)]
+use std::future::Future;
+use std::pin::Pin;
 pub use tokio::task::JoinSet;
 
 pub trait JoinSetExt {
-    async fn join_all(&mut self);
+	fn join_all(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>>;
 }
 
 impl<T: 'static> JoinSetExt for JoinSet<T> {
-    async fn join_all(&mut self) {
-        while (self.join_next().await).is_some() {}
-    }
+	fn join_all(&mut self) -> Pin<Box<dyn Future<Output = ()> + '_>> {
+		Box::pin(async move { while (self.join_next().await).is_some() {} })
+	}
 }
-
