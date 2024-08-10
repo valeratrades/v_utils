@@ -25,4 +25,7 @@ pub mod llm;
 #[cfg(feature = "utils")]
 pub mod utils;
 
+#[cfg(feature = "distributions")]
+pub mod distributions;
+
 pub mod prelude;
