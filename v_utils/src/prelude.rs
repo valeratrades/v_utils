@@ -1,4 +1,4 @@
-#![feature(async_fn_in_trait)]
+#![allow(async_fn_in_trait)]
 pub use tokio::task::JoinSet;
 
 pub trait JoinSetExt {

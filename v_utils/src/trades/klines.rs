@@ -26,7 +26,7 @@ pub fn p_to_ohlc(p: &[(f64, DateTime<Utc>)], timeframe: &Timeframe) -> Result<Ve
 		if timestamp >= current_start + duration {
 			ohlc_data.push(current_ohlc);
 			let duration_nanos = duration.num_nanoseconds().unwrap_or(0);
-			current_start = timestamp - Duration::nanoseconds(timestamp.timestamp_nanos() % duration_nanos);
+			current_start = timestamp - Duration::nanoseconds(timestamp.timestamp_nanos_opt().unwrap() % duration_nanos);
 			current_ohlc = Ohlc::new(price, price, price, price);
 		} else {
 			current_ohlc.high = current_ohlc.high.max(price);

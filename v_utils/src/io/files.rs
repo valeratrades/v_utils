@@ -37,7 +37,7 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 			}
 			Command::new("sh").arg("-c").arg(format!("less {p}")).status()?;
 		}
-		/// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
+		// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
 		OpenMode::Read => {
 			if !path.exists() {
 				return Err(anyhow!("File does not exist"));
