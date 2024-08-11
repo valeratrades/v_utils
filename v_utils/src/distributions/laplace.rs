@@ -43,7 +43,7 @@ mod tests {
 		let seed = Some(42);
 
 		let walk = super::laplace_random_walk(start, num_steps, scale, drift, seed);
-		let plot = crate::utils::snapshot_plot_p(&walk, 90, 12);
+		let plot = crate::utils::SnapshotP::build(walk).draw();
 
 		insta::assert_snapshot!(plot, @r###"
                                                                       ▂▃▄▃                  

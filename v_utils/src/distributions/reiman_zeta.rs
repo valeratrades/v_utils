@@ -41,7 +41,7 @@ impl ReimanZeta {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::utils::snapshot_plot_p;
+	use crate::utils::SnapshotP;
 
 	#[test]
 	fn test_reiman_zeta() {
@@ -51,7 +51,7 @@ mod tests {
 
 		let mut samples = (0..1000).map(|i| zeta.sample(Some(i)) as u32).collect::<Vec<u32>>();
 		samples.sort_by(|a, b| b.cmp(a));
-		let plot = snapshot_plot_p(&samples, 90, 12);
+		let plot = SnapshotP::build(samples).draw();
 		insta::assert_snapshot!(plot, @r###"
   █                                                                                         
   ██▄                                                                                       

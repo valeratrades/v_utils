@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use crate::trades::Timeframe;
-use crate::utils::snapshot_plot_p;
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 
@@ -64,21 +63,6 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 	ohlc_data
 }
 
-pub fn ohlc_snapshot(ohlcs: &[Ohlc], indicator: &[f64]) -> Result<String> {
-	assert_eq!(ohlcs.len(), indicator.len());
-
-	let closes = ohlcs.iter().map(|o| o.close).collect::<Vec<f64>>();
-
-	let price_plot = snapshot_plot_p(&closes, 90, 12);
-	let indicator_plot = snapshot_plot_p(indicator, 90, 8);
-
-	let separator = "─".repeat(90);
-
-	let combined_plot = format!("{}\n{}\n{}", price_plot, separator, indicator_plot);
-
-	Ok(combined_plot)
-}
-
 //? add oi, lsr, etc?
 /// Timestamp is often [unsafely converted](crate::timestamp::guess_timestamp_unsafe) from a string
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
@@ -92,6 +76,7 @@ pub struct Kline {
 mod tests {
 	use super::*;
 	use crate::distributions::laplace_random_walk;
+	use crate::utils::SnapshotP;
 	use insta::{assert_debug_snapshot, assert_snapshot};
 
 	#[test]
@@ -133,12 +118,14 @@ mod tests {
 	}
 
 	#[test]
-	fn test_ohlc_snapshot_laplace() {
+	fn test_snapshot_plotting_ohlc() {
 		let closes = laplace_random_walk(100.0, 1000, 0.1, 0.0, Some(1));
 		let ohlcs = mock_p_to_ohlc(&closes, 10);
-		let indicator = laplace_random_walk(100.0, 100, 0.1, 0.0, Some(2));
+		let ohlc_closes = ohlcs.iter().map(|o| o.close).collect::<Vec<f64>>();
+		let indicator = laplace_random_walk(100.0, 100, 0.1, 0.0, Some(2)).into_iter().map(|x| Some(x)).collect();
+		let plot = SnapshotP::build(ohlc_closes.clone()).secondary_pane_optional(indicator).draw();
 
-		assert_snapshot!(ohlc_snapshot(&ohlcs, &indicator).unwrap(), @r###"
+		assert_snapshot!(plot, @r###"
                                              ▃       █▆                                     
                  ▂▆                         ▁█       ██                                    ▄
                 ▁██                   ▂     ██     ▆ ██▂ ▅                                 █
@@ -152,14 +139,13 @@ mod tests {
    ██   █▃ █████████████████████████████████████████████████████████████████████████████████
   ███▁▅▄██▁█████████████████████████████████████████████████████████████████████████████████
   ──────────────────────────────────────────────────────────────────────────────────────────
-                ▂▂▁█▅▇█▁▆▃▃▃▆▄     ▅ ▁   ▁                                                  
-  ▃    ▁     ▅▃▃██████████████▇▆█▅▄███▂▁▃██▃ ▅▂                                             
-  █▆▇▅▆█▅▅▁  ███████████████████████████████▅███▄                                           
-  █████████▃█████████████████████████████████████▃  ▁                                       
-  █████████████████████████████████████████████████▅█▅▁▂▁▅▅▆                 ▁  ▃      ▁▁▃  
-  ██████████████████████████████████████████████████████████▂▃ ▂            ▆██▅█▁█▄█▅▅█████
-  ██████████████████████████████████████████████████████████████▇▁  ▁▃▅     ████████████████
-  ████████████████████████████████████████████████████████████████▆▆███▆▁▆▃▇████████████████
+                ▂▃▂█▆▇█▂▆▄▄▄▆▅  ▁  ▆▁▂   ▂▁                                                 
+  ▅▁▁ ▁▃     ▇▄▄███████████████▇█▇▆███▄▃▄██▄ ▆▃▂                                            
+  ███▇████▄ ▃███████████████████████████████▇███▇                                           
+  █████████▇█████████████████████████████████████▇▄▁▅▂   ▂▂▃                                
+  ████████████████████████████████████████████████████▆▇▆███ ▁              ▄▆▅▃▇ ▅▁▅▂▃▆▆▇▅▅
+  ████████████████████████████████████████████████████████████▆█▅    ▂▄     █████▇██████████
+  ████████████████████████████████████████████████████████████████▅▅███▅▁▅▃▆████████████████
   "###);
 	}
 }
