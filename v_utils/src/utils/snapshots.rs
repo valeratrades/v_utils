@@ -95,8 +95,13 @@ impl SnapshotP {
 		let min_val = non_empty_prices.iter().fold(f64::INFINITY, |a, &b| a.min(b));
 		let max_val = non_empty_prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
-		let max_str = max_val.to_string();
-		let min_str = min_val.to_string();
+		let min_step = (max_val - min_val) / 100.0;
+		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1]
+			.chars()
+			.take_while(|&c| c == '0')
+			.count() + 1;
+		let max_str = format!("{:.f_len$}", max_val).trim_end_matches(".0").to_string();
+		let min_str = format!("{:.f_len$}", min_val).trim_end_matches(".0").to_string();
 		let side_panel_width = max_str.len().max(min_str.len());
 		let mut side_panel = String::with_capacity(height * side_panel_width);
 		for i in 0..height {
