@@ -15,16 +15,16 @@ proc-macro = true
 
 [[test]]
 name = "tests"
-path = "tests/progress.rs"
+path = "tests/main.rs"
 
 [dev-dependencies]
-toml = "0.8.14"
-trybuild = { version = "^1.0.96", features = ["diff"]}
-v_utils = { path = "../v_utils" }
+toml = "0.8.19"
+trybuild = { version = "^1.0.99", features = ["diff"]}
+v_utils = { path = "../v_utils", features = ["io"]}
 
 [dependencies]
 proc-macro2 = { version = "^1.0.86" }
-syn = { version = "^2.0.67", features = ["full", "extra-traits"] }
+syn = { version = "^2.0.74", features = ["full", "extra-traits"] }
 quote = { version = "^1.0.36" }
 anyhow = "^1.0.86"
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.207", features = ["derive"] }
