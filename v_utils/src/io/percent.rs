@@ -95,6 +95,23 @@ impl PartialOrd<f64> for Percent {
 		self.0.partial_cmp(other)
 	}
 }
+impl std::ops::Deref for Percent {
+	type Target = f64;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+impl From<f64> for Percent {
+	fn from(f: f64) -> Self {
+		Percent(f)
+	}
+}
+impl From<Percent> for f64 {
+	fn from(percent: Percent) -> f64 {
+		percent.0
+	}
+}
 
 impl Percent {
 	pub fn inner(self) -> f64 {

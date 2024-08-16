@@ -8,6 +8,7 @@ use quote::quote;
 use syn::parse_macro_input;
 
 /// returns `Vec<String>` of the ways to refer to a struct name
+/// For some reason not a `HashSet`, no clue why.
 #[proc_macro]
 pub fn graphemics(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as syn::Ident);
@@ -35,18 +36,18 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 
 	let graphems = [acronym, acronym_caps, same_lower, same_upper, same, snake_case];
 	let mut unique_items = Vec::new();
-	let mut seen_items = std::collections::HashSet::new();
-	for item in graphems.iter() {
-		if seen_items.insert(item) {
+	for item in graphems.into_iter() {
+		if !unique_items.contains(&item) {
 			unique_items.push(item);
 		}
 	}
+	let unique_items_valid = unique_items.into_iter().filter(|s| s.len() != 1).collect::<Vec<String>>();
 
 	let expanded = quote! {
 		{
 			let mut result: Vec<&'static str> = Vec::new();
 			#(
-				result.push(#unique_items);
+				result.push(#unique_items_valid);
 			)*
 			result
 		}
@@ -58,8 +59,9 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
 /// Macro generates FromStr and Display; assuming this format.
 ///```rust
+///#[cfg(feature = "trades")] {
 ///use v_utils_macros::CompactFormat;
-///use v_utils::trades::{Timeframe, TimeframeDesignator};
+///	use v_utils::trades::{Timeframe, TimeframeDesignator};
 ///
 ///#[derive(CompactFormat, PartialEq, Debug)]
 ///pub struct SAR {
@@ -74,6 +76,7 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
 ///let sar_write = sar.to_string();
 ///assert_eq!(params_str, sar_write);
+///}
 ///```
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {

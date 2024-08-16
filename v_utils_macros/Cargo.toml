@@ -18,6 +18,7 @@ name = "tests"
 path = "tests/main.rs"
 
 [dev-dependencies]
+insta = "1.39.0"
 toml = "0.8.19"
 trybuild = { version = "^1.0.99", features = ["diff"]}
 v_utils = { path = "../v_utils", features = ["io"]}
