@@ -1,10 +1,10 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Serialize)]
 pub enum Side {
+	#[default] // not to be used almost ever, only here to allow for propagation of the trait
 	Buy,
-	#[default] // for testing mostly
 	Sell,
 }
 impl FromStr for Side {
