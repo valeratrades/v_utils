@@ -35,7 +35,7 @@ tracing-bunyan-formatter = { version = "^0.3.9", optional = true }
 tracing-subscriber = { version = "^0.3.18", features = ["fmt", "json", "registry", "env-filter"], optional = true }
 #tracing-log = { version = "^0.2.0", optional = true }
 
-v_utils_macros = { path = "../v_utils_macros", version = "^1.2.10", optional = true }
+v_utils_macros = { path = "../v_utils_macros", version = "^1.2.11", optional = true }
 
 # amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
 [features]
