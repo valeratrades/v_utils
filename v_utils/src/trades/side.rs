@@ -1,8 +1,9 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub enum Side {
+	#[default] // for testing mostly
 	Buy,
 	Sell,
 }
@@ -54,13 +55,6 @@ impl<'de> Deserialize<'de> for Side {
 		}
 
 		deserializer.deserialize_str(SideVisitor)
-	}
-}
-
-/// Never meant to be used, only here to allow derivation of Default for structs housing this.
-impl Default for Side {
-	fn default() -> Self {
-		Side::Buy
 	}
 }
 
