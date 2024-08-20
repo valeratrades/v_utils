@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub enum Side {
-	#[default] // for testing mostly
 	Buy,
+	#[default] // for testing mostly
 	Sell,
 }
 impl FromStr for Side {
