@@ -1,10 +1,6 @@
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::{rngs::StdRng, SeedableRng};
 
-fn zeta(s: f64, n: usize) -> f64 {
-	(1..=n).map(|k| 1.0 / (k as f64).powf(s)).sum()
-}
-
 pub struct ReimanZeta {
 	pub alpha: f64,
 	pub weights: Vec<f64>,
@@ -13,7 +9,7 @@ pub struct ReimanZeta {
 
 impl ReimanZeta {
 	pub fn new(alpha: f64, max_k: usize) -> ReimanZeta {
-		let normalization_constant = zeta(alpha, max_k);
+		let normalization_constant = (1..=max_k).map(|k| 1.0 / (k as f64).powf(alpha)).sum();
 
 		let mut weights = Vec::with_capacity(max_k);
 		for k in 1..=max_k {
