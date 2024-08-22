@@ -8,6 +8,7 @@ use std::io::{self, Write};
 ///}
 ///```
 //? abort after 30s without response?
+#[must_use]
 pub fn confirm<T: AsRef<str>>(message: T) -> bool {
 	let stdin = io::stdin();
 	let mut stdout = io::stdout();
