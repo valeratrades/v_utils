@@ -38,7 +38,7 @@ pub struct SnapshotP {
 }
 /// Very not DRY
 impl SnapshotP {
-	pub fn build<T: Into<f64> + Copy>(prices: Vec<T>) -> Self {
+	pub fn build<T: Into<f64> + Copy>(prices: &[T]) -> Self {
 		SnapshotP {
 			prices: prices.iter().map(|x| (*x).into()).collect(),
 			secondary_pane: None,
@@ -231,7 +231,7 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 	}
 	order_points.extend((last_order.0..prices.len()).map(|_| last_order.1));
 
-	SnapshotP::build(prices).secondary_pane_optional(order_points).draw()
+	SnapshotP::build(&prices).secondary_pane_optional(order_points).draw()
 }
 
 #[cfg(test)]
@@ -244,7 +244,7 @@ mod tests {
 	#[test]
 	fn test_snapshot_plot_p() {
 		let data = laplace_random_walk(100.0, 1000, 0.1, 0.0, Some(42));
-		let plot = SnapshotP::build(data.clone()).draw();
+		let plot = SnapshotP::build(&data).draw();
 
 		assert_snapshot!(plot, @r###"
                                                                       ▂▃▄▃                  103.50

@@ -40,7 +40,7 @@ mod tests {
 		let seed = Some(42);
 
 		let walk = normal_random_walk(start, num_steps, std_dev, drift, seed);
-		let plot = crate::utils::SnapshotP::build(walk).draw();
+		let plot = crate::utils::SnapshotP::build(&walk).draw();
 
 		insta::assert_snapshot!(plot, @r###"
                                                                        ▄                 ▂▄ 1.52

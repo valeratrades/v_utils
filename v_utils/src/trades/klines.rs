@@ -123,7 +123,7 @@ mod tests {
 		let ohlcs = mock_p_to_ohlc(&closes, 10);
 		let ohlc_closes = ohlcs.iter().map(|o| o.close).collect::<Vec<f64>>();
 		let indicator = laplace_random_walk(100.0, 100, 0.1, 0.0, Some(2)).into_iter().map(|x| Some(x)).collect();
-		let plot = SnapshotP::build(ohlc_closes.clone()).secondary_pane_optional(indicator).draw();
+		let plot = SnapshotP::build(&ohlc_closes).secondary_pane_optional(indicator).draw();
 
 		assert_snapshot!(plot, @r###"
                                              ▃       █▆                                     101.83

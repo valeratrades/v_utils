@@ -47,7 +47,7 @@ mod tests {
 
 		let mut samples = (0..1000).map(|i| zeta.sample(Some(i)) as u32).collect::<Vec<u32>>();
 		samples.sort_by(|a, b| b.cmp(a));
-		let plot = SnapshotP::build(samples).draw();
+		let plot = SnapshotP::build(&samples).draw();
 		insta::assert_snapshot!(plot, @r###"
   █                                                                                         991
   ██▄                                                                                          
