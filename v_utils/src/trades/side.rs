@@ -58,6 +58,17 @@ impl<'de> Deserialize<'de> for Side {
 	}
 }
 
+impl std::ops::Not for Side {
+	type Output = Side;
+
+	fn not(self) -> Self::Output {
+		match self {
+			Side::Buy => Side::Sell,
+			Side::Sell => Side::Buy,
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
