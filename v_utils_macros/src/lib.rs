@@ -152,7 +152,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 		impl std::fmt::Display for #name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				let graphemics = v_utils_macros::graphemics!(#name);
+				let graphemics = v_utils::macros::graphemics!(#name);
 				let a_struct_name = graphemics[0];
 				write!(f, "{}", a_struct_name)?;
 
