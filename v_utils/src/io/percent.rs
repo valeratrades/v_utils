@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use eyre::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
@@ -44,7 +44,7 @@ impl<'de> Deserialize<'de> for Percent {
 	}
 }
 impl FromStr for Percent {
-	type Err = anyhow::Error;
+	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
 		let stripped = s.trim_end_matches("%");

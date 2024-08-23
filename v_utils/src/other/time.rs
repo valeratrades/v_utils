@@ -1,4 +1,4 @@
-use anyhow::{Context, Error, Result};
+use eyre::{eyre, Result, WrapErr};
 use serde::{de, Deserialize, Serialize};
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
@@ -51,44 +51,28 @@ fn time_to_units(time: &str) -> Result<u32> {
 
 	let first = split
 		.next()
-		.ok_or(Error::msg(format!(
-			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-			time
-		)))?
+		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?
 		.parse::<u32>()
-		.context(Error::msg(format!(
-			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-			time
-		)))?;
+		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
 
 	let second = split
 		.next()
-		.ok_or(Error::msg(format!(
-			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-			time
-		)))?
+		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?
 		.parse::<u32>()
-		.context(Error::msg(format!(
-			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-			time
-		)))?;
+		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
 
 	let units = match split.next() {
 		Some(third) => {
-			let third = third.parse::<u32>().context(Error::msg(format!(
-				"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-				time
-			)))?;
+			let third = third
+				.parse::<u32>()
+				.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
 			first * 3600 + second * 60 + third
 		}
 		None => first * 60 + second,
 	};
 
 	if split.next().is_some() {
-		return Err(Error::msg(format!(
-			"Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'",
-			time
-		)));
+		return Err(eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time));
 	}
 
 	Ok(units)

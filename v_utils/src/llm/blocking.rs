@@ -1,5 +1,5 @@
 use crate::llm::{self, Conversation, Model, Response};
-use anyhow::Result;
+use eyre::Result;
 use tokio::runtime::Runtime;
 
 pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {

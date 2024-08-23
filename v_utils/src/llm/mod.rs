@@ -1,5 +1,5 @@
 #![allow(dead_code, unused_imports, unexpected_cfgs)]
-use anyhow::Result;
+use eyre::Result;
 use serde::Serialize;
 
 //TODO: add reading conversation from json file or directory of json files
@@ -91,7 +91,7 @@ impl Response {
 			})
 			.collect();
 		match extracted.is_empty() {
-			true => Err(anyhow::anyhow!(
+			true => Err(eyre::eyre!(
 				"Failed to find any {extension} codeblocks in the response:\nResponse: {}",
 				self.text
 			)),

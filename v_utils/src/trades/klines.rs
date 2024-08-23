@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::trades::Timeframe;
-use anyhow::Result;
+use eyre::Result;
 use chrono::{DateTime, Duration, Utc};
 
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]

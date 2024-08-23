@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use eyre::{eyre, Result, WrapErr};
 use std::{
 	path::{Path, PathBuf},
 	process::Command,
@@ -16,37 +16,37 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 	match mode {
 		OpenMode::Normal => {
 			if !path.exists() {
-				return Err(anyhow!("File does not exist"));
+				return Err(eyre!("File does not exist"));
 			}
 			Command::new("sh")
 				.arg("-c")
 				.arg(format!("$EDITOR {p}"))
 				.status()
-				.map_err(|_| anyhow!("$EDITOR env variable is not defined"))?;
+				.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
 		}
 		OpenMode::Force => {
 			Command::new("sh")
 				.arg("-c")
 				.arg(format!("$EDITOR {p}"))
 				.status()
-				.map_err(|_| anyhow!("$EDITOR env variable is not defined or permission lacking to create the file: {p}"))?;
+				.map_err(|_| eyre!("$EDITOR env variable is not defined or permission lacking to create the file: {p}"))?;
 		}
 		OpenMode::Pager => {
 			if !path.exists() {
-				return Err(anyhow!("File does not exist"));
+				return Err(eyre!("File does not exist"));
 			}
 			Command::new("sh").arg("-c").arg(format!("less {p}")).status()?;
 		}
 		// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
 		OpenMode::Read => {
 			if !path.exists() {
-				return Err(anyhow!("File does not exist"));
+				return Err(eyre!("File does not exist"));
 			}
 			Command::new("sh")
 				.arg("-c")
 				.arg(format!("nvim -R {p}"))
 				.status()
-				.map_err(|_| anyhow!("nvim is not found in path"))?;
+				.map_err(|_| eyre!("nvim is not found in path"))?;
 		}
 	}
 
@@ -62,7 +62,7 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 				std::fs::File::create(path).with_context(|| format!("Failed to force-create file at '{}'.\n{e}", path.display()))?;
 				std::fs::metadata(path).unwrap()
 			}
-			_ => anyhow::bail!(
+			_ => eyre::bail!(
 				"Failed to read metadata of file/directory at '{}', which means we do not have sufficient permissions or it does not exist",
 				path.display()
 			),

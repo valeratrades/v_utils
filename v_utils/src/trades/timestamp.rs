@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Result};
 use chrono::{DateTime, TimeZone, Utc};
+use eyre::{bail, Result};
 
 /// Doesn't support negative timestamps
 pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
@@ -16,10 +16,10 @@ pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
 			13 => num * 1_000_000,
 			16 => num * 1_000,
 			19 => num,
-			_ => return Err(anyhow!("Invalid timestamp length for guessing: {len}\nTimestamp: {timestamp}")),
+			_ => bail!("Invalid timestamp length for guessing: {len}\nTimestamp: {timestamp}"),
 		};
 		return Ok(Utc.timestamp_nanos(nanos as i64));
 	}
 
-	Err(anyhow!("Couldn't parse timestamp: {}", timestamp))
+	bail!("Couldn't parse timestamp: {}", timestamp)
 }

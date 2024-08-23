@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use eyre::{eyre, Result};
 use futures::stream::{StreamExt, TryStreamExt};
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
@@ -168,7 +168,7 @@ pub async fn ask_claude<T: AsRef<str>>(
 
 	// this was before stream. Now will need to be rewritten, but that's a problem for later.
 	//let response: ClaudeResponse =
-	//	serde_json::from_str(&accumulated_message).map_err(|_| anyhow!("Failed to read response from anthropic api: {}", &accumulated_message))?;
+	//	serde_json::from_str(&accumulated_message).map_err(|_| eyre!("Failed to read response from anthropic api: {}", &accumulated_message))?;
 	//Ok(response.to_general_form())
 	let dummy_response = Response {
 		text: accumulated_message,

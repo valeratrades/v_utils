@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use eyre::{eyre, Result};
 use chrono::Duration;
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
 use std::str::FromStr;
@@ -59,7 +59,7 @@ impl TimeframeDesignator {
 }
 
 impl FromStr for TimeframeDesignator {
-	type Err = anyhow::Error;
+	type Err = eyre::Report;
 
 	/// All characters could be in any casee, except for m:minutes and M:months
 	fn from_str(s: &str) -> Result<Self> {
@@ -73,7 +73,7 @@ impl FromStr for TimeframeDesignator {
 			"w" => Ok(TimeframeDesignator::Weeks),
 			"W" => Ok(TimeframeDesignator::Weeks),
 			"M" => Ok(TimeframeDesignator::Months),
-			_ => Err(anyhow::anyhow!("Invalid timeframe designator: {}", s)),
+			_ => Err(eyre::eyre!("Invalid timeframe designator: {}", s)),
 		}
 	}
 }
@@ -101,7 +101,7 @@ impl Timeframe {
 			"1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M",
 		];
 		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(anyhow!(
+			return Err(eyre!(
 				"The Timeframe '{}' does not match exactly any of the values accepted by Binance API",
 				tf_string
 			));
@@ -117,7 +117,7 @@ impl Timeframe {
 		};
 		let valid_values = vec!["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
 		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(anyhow!(
+			return Err(eyre!(
 				"The Timeframe does not match exactly any of the values accepted by Bybit API: {}",
 				tf_string
 			));
@@ -136,7 +136,7 @@ fn parse_timeframe(s: &str) -> Result<Timeframe> {
 	let (n_str, designator_str) = match s.char_indices().next_back() {
 		Some((idx, _)) => s.split_at(idx),
 		None => {
-			return Err(anyhow!(
+			return Err(eyre!(
 				"Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"
 			))
 		}
@@ -146,7 +146,7 @@ fn parse_timeframe(s: &str) -> Result<Timeframe> {
 		1
 	} else {
 		n_str.parse::<usize>().map_err(|_| {
-			anyhow!(
+			eyre!(
 				"Invalid number in timeframe '{}'. Expected a string representing a timeframe like '5s' or '3M'",
 				n_str
 			)
@@ -154,7 +154,7 @@ fn parse_timeframe(s: &str) -> Result<Timeframe> {
 	};
 
 	let designator = TimeframeDesignator::from_str(designator_str).map_err(|_| {
-		anyhow!(
+		eyre!(
 			"Invalid or missing timeframe designator '{}'. Expected a string representing a timeframe like '5s' or '3M'",
 			designator_str
 		)
@@ -164,7 +164,7 @@ fn parse_timeframe(s: &str) -> Result<Timeframe> {
 }
 
 impl FromStr for Timeframe {
-	type Err = anyhow::Error;
+	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
 		parse_timeframe(s)

@@ -1,4 +1,4 @@
-use anyhow::{Error, Result};
+use eyre::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 use std::{path::Path, path::PathBuf};
@@ -15,7 +15,7 @@ impl<'de> Deserialize<'de> for ExpandedPath {
 	}
 }
 impl FromStr for ExpandedPath {
-	type Err = anyhow::Error;
+	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
 		let path_buf = match s.starts_with("~") {
