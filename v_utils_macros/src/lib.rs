@@ -127,8 +127,9 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 			type Err = v_utils::__internal::anyhow::Error;
 
 			fn from_str(s: &str) -> v_utils::__internal::anyhow::Result<Self> {
-				let (name, params_part) = s.split_once(':').ok_or(v_utils::__internal::anyhow::anyhow!("Could not split string on ':'"))?;
-				let params_split = params_part.split(':').collect::<Vec<&str>>();
+				//let (name, params_part) = s.split_once(':').ok_or(v_utils::__internal::anyhow::anyhow!("Could not split string on ':'"))?;
+				let (name, params_part) = s.split_once(':').unwrap_or((s, ""));
+				let params_split = if (params_part == "" || params_part == "_" ) { Vec::new() } else { params_part.split(':').collect::<Vec<&str>>() };
 				if params_split.len() != #n_fields {
 					return Err(v_utils::__internal::anyhow::anyhow!("Expected {} fields, got {}", #n_fields, params_split.len()));
 				}

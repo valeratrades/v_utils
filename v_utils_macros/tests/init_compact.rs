@@ -7,6 +7,9 @@ pub struct TrailingStop {
 	pub some_other_field: u32,
 }
 
+#[derive(CompactFormat, Debug, PartialEq)]
+pub struct Empty {}
+
 fn main() {
 	{
 		let ts = TrailingStop {
@@ -30,5 +33,18 @@ fn main() {
 		);
 		let ts_write = ts_read.to_string();
 		assert_eq!(ts_str, ts_write);
+	}
+
+	{
+		let empty_str = "empty";
+		let empty_read = Empty::from_str(empty_str).unwrap();
+		assert_eq!(empty_read, Empty {});
+		let empty_write = empty_read.to_string();
+		insta::assert_snapshot!(empty_write, @r###"empty"###);
+
+		let empty_str_colon_nothing = "empty:";
+		let empty_str_explicit = "empty:_";
+		assert_eq!(Empty::from_str(empty_str_colon_nothing).unwrap(), empty_read);
+		assert_eq!(Empty::from_str(empty_str_explicit).unwrap(), empty_read);
 	}
 }
