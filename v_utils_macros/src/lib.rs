@@ -124,18 +124,17 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 	let expanded = quote! {
 		impl std::str::FromStr for #name {
-			type Err = v_utils::__internal::anyhow::Error;
+			type Err = v_utils::__internal::eyre::Report;
 
-			fn from_str(s: &str) -> v_utils::__internal::anyhow::Result<Self> {
-				//let (name, params_part) = s.split_once(':').ok_or(v_utils::__internal::anyhow::anyhow!("Could not split string on ':'"))?;
+			fn from_str(s: &str) -> v_utils::__internal::eyre::Result<Self> {
 				let (name, params_part) = s.split_once(':').unwrap_or((s, ""));
 				let params_split = if (params_part == "" || params_part == "_" ) { Vec::new() } else { params_part.split(':').collect::<Vec<&str>>() };
 				if params_split.len() != #n_fields {
-					return Err(v_utils::__internal::anyhow::anyhow!("Expected {} fields, got {}", #n_fields, params_split.len()));
+					v_utils::__internal::eyre::bail!("Expected {} fields, got {}", #n_fields, params_split.len());
 				}
 				let graphemics = v_utils::macros::graphemics!(#name);
 				if !graphemics.contains(&name) {
-					return Err(v_utils::__internal::anyhow::anyhow!("Incorrect name provided. Expected one of: {:?}", graphemics));
+					v_utils::__internal::eyre::bail!("Incorrect name provided. Expected one of: {:?}", graphemics);
 				}
 
 				let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();
@@ -358,17 +357,18 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			where
 				D: v_utils::__internal::serde::de::Deserializer<'de>,
 			{
-			use v_utils::__internal::anyhow::{Context};
+				use v_utils::__internal::eyre::WrapErr;
+
 				#[derive(Clone, Debug)]
 				enum PrivateValue {
 					String(String),
 					Env { env: String },
 				}
 				impl PrivateValue {
-					pub fn into_string(&self) -> v_utils::__internal::anyhow::Result<String> {
+					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {
 						match self {
 							PrivateValue::String(s) => Ok(s.clone()),
-							PrivateValue::Env { env } => std::env::var(env).with_context(|| format!("Environment variable '{}' not found", env)),
+							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
 						}
 					}
 				}
