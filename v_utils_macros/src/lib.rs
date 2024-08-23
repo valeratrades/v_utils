@@ -2,7 +2,6 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse_macro_input;
@@ -59,9 +58,10 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
 /// Macro generates FromStr and Display; assuming this format.
 ///```rust
+///#[cfg(feature = "macros")] {
 ///#[cfg(feature = "trades")] {
-///use v_utils_macros::CompactFormat;
-///	use v_utils::trades::{Timeframe, TimeframeDesignator};
+///use v_utils::macros::CompactFormat;
+///use v_utils::trades::{Timeframe, TimeframeDesignator};
 ///
 ///#[derive(CompactFormat, PartialEq, Debug)]
 ///pub struct SAR {
@@ -76,6 +76,7 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
 ///let sar_write = sar.to_string();
 ///assert_eq!(params_str, sar_write);
+///}
 ///}
 ///```
 #[proc_macro_derive(CompactFormat)]
@@ -123,17 +124,17 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 	let expanded = quote! {
 		impl std::str::FromStr for #name {
-			type Err = anyhow::Error;
+			type Err = v_utils::__internal::anyhow::Error;
 
-			fn from_str(s: &str) -> anyhow::Result<Self> {
-				let (name, params_part) = s.split_once(':').ok_or(anyhow::anyhow!("Could not split string on ':'"))?;
+			fn from_str(s: &str) -> v_utils::__internal::anyhow::Result<Self> {
+				let (name, params_part) = s.split_once(':').ok_or(v_utils::__internal::anyhow::anyhow!("Could not split string on ':'"))?;
 				let params_split = params_part.split(':').collect::<Vec<&str>>();
 				if params_split.len() != #n_fields {
-					return Err(anyhow::anyhow!("Expected {} fields, got {}", #n_fields, params_split.len()));
+					return Err(v_utils::__internal::anyhow::anyhow!("Expected {} fields, got {}", #n_fields, params_split.len()));
 				}
-				let graphemics = v_utils_macros::graphemics!(#name);
+				let graphemics = v_utils::macros::graphemics!(#name);
 				if !graphemics.contains(&name) {
-					return Err(anyhow::anyhow!("Incorrect name provided. Expected one of: {:?}", graphemics));
+					return Err(v_utils::__internal::anyhow::anyhow!("Incorrect name provided. Expected one of: {:?}", graphemics));
 				}
 
 				let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();

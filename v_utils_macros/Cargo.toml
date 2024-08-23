@@ -21,7 +21,7 @@ path = "tests/main.rs"
 insta = "1.39.0"
 toml = "0.8.19"
 trybuild = { version = "^1.0.99", features = ["diff"]}
-v_utils = { path = "../v_utils", features = ["io"]}
+v_utils = { path = "../v_utils", features = ["full"]}
 
 [dependencies]
 proc-macro2 = { version = "^1.0.86" }
