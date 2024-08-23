@@ -17,6 +17,7 @@ pub extern crate v_utils_macros as macros;
 #[doc(hidden)]
 pub mod __internal {
 	pub extern crate anyhow;
+	pub extern crate eyre;
 	pub extern crate serde;
 }
 

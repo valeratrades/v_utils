@@ -358,14 +358,14 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			where
 				D: v_utils::__internal::serde::de::Deserializer<'de>,
 			{
-			use anyhow::{Context};
+			use v_utils::__internal::anyhow::{Context};
 				#[derive(Clone, Debug)]
 				enum PrivateValue {
 					String(String),
 					Env { env: String },
 				}
 				impl PrivateValue {
-					pub fn into_string(&self) -> anyhow::Result<String> {
+					pub fn into_string(&self) -> v_utils::__internal::anyhow::Result<String> {
 						match self {
 							PrivateValue::String(s) => Ok(s.clone()),
 							PrivateValue::Env { env } => std::env::var(env).with_context(|| format!("Environment variable '{}' not found", env)),

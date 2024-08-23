@@ -21,6 +21,7 @@ bytes = { version = "^1.7.1", optional = true }
 chrono = { version = "^0.4.38", optional = true }
 derive-new = "^0.6.0"
 dirs = { version = "^5.0.1", optional = true }
+eyre = "0.6.12"
 futures = { version = "^0.3.30", optional = true }
 quote = { version = "^1.0.37", optional = true }
 rand = { version = "^0.8.5", optional = true }
