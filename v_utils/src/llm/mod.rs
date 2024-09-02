@@ -91,10 +91,7 @@ impl Response {
 			})
 			.collect();
 		match extracted.is_empty() {
-			true => Err(eyre::eyre!(
-				"Failed to find any {extension} codeblocks in the response:\nResponse: {}",
-				self.text
-			)),
+			true => Err(eyre::eyre!("Failed to find any {extension} codeblocks in the response:\nResponse: {}", self.text)),
 			false => Ok(extracted),
 		}
 	}

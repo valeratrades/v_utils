@@ -91,12 +91,7 @@ impl LlmConversation for ClaudeConversation {
 }
 
 ///docs: https://docs.anthropic.com/claude/reference/messages_post
-pub async fn ask_claude<T: AsRef<str>>(
-	conversation: &Conversation,
-	model: Model,
-	max_tokens: Option<usize>,
-	stop_sequences: Option<Vec<T>>,
-) -> Result<Response> {
+pub async fn ask_claude<T: AsRef<str>>(conversation: &Conversation, model: Model, max_tokens: Option<usize>, stop_sequences: Option<Vec<T>>) -> Result<Response> {
 	let mut conversation = ClaudeConversation::new(conversation);
 
 	let api_key = std::env::var("CLAUDE_TOKEN").expect("CLAUDE_TOKEN environment variable not set");
@@ -126,10 +121,7 @@ pub async fn ask_claude<T: AsRef<str>>(
 	});
 	if let Some(stop_seqs) = stop_sequences {
 		let stop_seqs_str: Vec<String> = stop_seqs.into_iter().map(|s| s.as_ref().to_string()).collect();
-		payload
-			.as_object_mut()
-			.unwrap()
-			.insert("stop_sequences".to_string(), serde_json::json!(stop_seqs_str));
+		payload.as_object_mut().unwrap().insert("stop_sequences".to_string(), serde_json::json!(stop_seqs_str));
 	}
 	if let Some(system_message) = system_message {
 		payload.as_object_mut().unwrap().insert("system".to_string(), serde_json::json!(system_message));

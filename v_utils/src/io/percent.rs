@@ -1,12 +1,10 @@
-use eyre::{Error, Result};
-use std::ops::Neg;
+use std::{
+	ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
+	str::FromStr,
+};
 
+use eyre::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::ops::{Add, AddAssign};
-use std::ops::{Div, DivAssign, Sub, SubAssign};
-use std::ops::{Mul, MulAssign};
-use std::ops::{Rem, RemAssign};
-use std::str::FromStr;
 
 #[derive(Copy, Clone, Debug, Default, derive_new::new, PartialEq)]
 pub struct Percent(pub f64);
@@ -19,8 +17,7 @@ impl Percent {
 impl<'de> Deserialize<'de> for Percent {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
-		D: Deserializer<'de>,
-	{
+		D: Deserializer<'de>, {
 		struct PercentVisitor;
 
 		impl<'de> de::Visitor<'de> for PercentVisitor {
@@ -32,22 +29,19 @@ impl<'de> Deserialize<'de> for Percent {
 
 			fn visit_f64<E>(self, value: f64) -> Result<Percent, E>
 			where
-				E: de::Error,
-			{
+				E: de::Error, {
 				Ok(Percent(value))
 			}
 
 			fn visit_u64<E>(self, value: u64) -> Result<Percent, E>
 			where
-				E: de::Error,
-			{
+				E: de::Error, {
 				Ok(Percent(value as f64 / 100.0))
 			}
 
 			fn visit_str<E>(self, value: &str) -> Result<Percent, E>
 			where
-				E: de::Error,
-			{
+				E: de::Error, {
 				Percent::from_str(value).map_err(de::Error::custom)
 			}
 		}
@@ -80,8 +74,7 @@ impl FromStr for Percent {
 impl Serialize for Percent {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: serde::Serializer,
-	{
+		S: serde::Serializer, {
 		let percent_number = self.0 * 100.;
 		let s = match percent_number.fract() == 0. {
 			true => format!("{}%", percent_number as isize),

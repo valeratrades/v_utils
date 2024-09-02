@@ -1,15 +1,17 @@
+use std::{
+	path::{Path, PathBuf},
+	str::FromStr,
+};
+
 use eyre::{Error, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::str::FromStr;
-use std::{path::Path, path::PathBuf};
 
 #[derive(Clone, Debug, Default, derive_new::new, Serialize, PartialEq, Eq)]
 pub struct ExpandedPath(pub PathBuf);
 impl<'de> Deserialize<'de> for ExpandedPath {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
-		D: Deserializer<'de>,
-	{
+		D: Deserializer<'de>, {
 		let s = String::deserialize(deserializer)?;
 		FromStr::from_str(&s).map_err(de::Error::custom)
 	}

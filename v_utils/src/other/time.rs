@@ -28,8 +28,7 @@ impl AsRef<u32> for Timelike {
 impl Serialize for Timelike {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		S: serde::Serializer,
-	{
+		S: serde::Serializer, {
 		serializer.serialize_str(&self.to_string())
 	}
 }
@@ -37,8 +36,7 @@ impl Serialize for Timelike {
 impl<'de> Deserialize<'de> for Timelike {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
-		D: de::Deserializer<'de>,
-	{
+		D: de::Deserializer<'de>, {
 		let time = String::deserialize(deserializer)?;
 		let units = time_to_units(&time).map_err(|e| de::Error::custom(e.to_string()))?;
 
@@ -80,9 +78,10 @@ fn time_to_units(time: &str) -> Result<u32> {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use claim::assert_err;
 	use serde_json::json;
+
+	use super::*;
 
 	#[test]
 	fn test_time_de() {

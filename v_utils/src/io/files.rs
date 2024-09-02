@@ -1,8 +1,9 @@
-use eyre::{eyre, Result, WrapErr};
 use std::{
 	path::{Path, PathBuf},
 	process::Command,
 };
+
+use eyre::{eyre, Result, WrapErr};
 
 pub enum OpenMode {
 	Normal,
@@ -73,19 +74,15 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 		false => path.parent().unwrap().display(),
 	};
 
-	Command::new("sh")
-		.arg("-c")
-		.arg(format!("git -C \"{sp}\" pull"))
-		.status()
-		.with_context(|| format!("Failed to pull from Git repository at '{}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.", sp))?;
+	Command::new("sh").arg("-c").arg(format!("git -C \"{sp}\" pull")).status().with_context(|| {
+		format!(
+			"Failed to pull from Git repository at '{}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.",
+			sp
+		)
+	})?;
 
 	if let Some(open_mode) = open_mode {
-		open_with_mode(path, open_mode).with_context(|| {
-			format!(
-				"Failed to open file at '{}'. Use `OpenMode::Force` and ensure you have necessary permissions",
-				path.display()
-			)
-		})?;
+		open_with_mode(path, open_mode).with_context(|| format!("Failed to open file at '{}'. Use `OpenMode::Force` and ensure you have necessary permissions", path.display()))?;
 	}
 
 	Command::new("sh")
@@ -93,7 +90,10 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 		.arg(format!("git -C \"{sp}\" add -A && git -C \"{sp}\" commit -m \".\" && git -C \"{sp}\" push"))
 		.status()
 		.with_context(|| {
-			format!("Failed to commit or push to Git repository at '{}'. Ensure you have the necessary permissions and the repository is correctly configured.", sp)
+			format!(
+				"Failed to commit or push to Git repository at '{}'. Ensure you have the necessary permissions and the repository is correctly configured.",
+				sp
+			)
 		})?;
 
 	Ok(())

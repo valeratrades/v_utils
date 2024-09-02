@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::fmt;
+
+use serde::{Deserialize, Serialize};
 //? do I want to keep any of this weird crap?
 
 /// Used by most requests::api endpoints
@@ -54,10 +55,7 @@ impl fmt::Debug for CoinmSymbol {
 
 impl std::convert::From<&str> for UsdtSymbol {
 	fn from(value: &str) -> Self {
-		if !["BUSD", "ETH", "BTC", "BNB", "USDC", "TUSD"]
-			.into_iter()
-			.all(|quote| !(value.ends_with(quote) && value != quote))
-		{
+		if !["BUSD", "ETH", "BTC", "BNB", "USDC", "TUSD"].into_iter().all(|quote| !(value.ends_with(quote) && value != quote)) {
 			panic!("UsdtSymbol must be quoted against USDT.\nHave: {}\nWant: BTCUSDT", value);
 		}
 

@@ -1,6 +1,7 @@
-use crate::llm::{self, Conversation, Model, Response};
 use eyre::Result;
 use tokio::runtime::Runtime;
+
+use crate::llm::{self, Conversation, Model, Response};
 
 pub fn oneshot<T: AsRef<str>>(message: T, model: Model) -> Result<Response> {
 	let runtime = tokio::runtime::Runtime::new().unwrap();

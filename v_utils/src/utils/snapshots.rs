@@ -96,10 +96,7 @@ impl SnapshotP {
 		let max_val = non_empty_prices.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
 		let min_step = (max_val - min_val) / 100.0;
-		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1]
-			.chars()
-			.take_while(|&c| c == '0')
-			.count() + 1;
+		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1].chars().take_while(|&c| c == '0').count() + 1;
 		let max_str = format!("{:.f_len$}", max_val).trim_end_matches(".0").to_string();
 		let min_str = format!("{:.f_len$}", min_val).trim_end_matches(".0").to_string();
 		let side_panel_width = max_str.len().max(min_str.len());
@@ -154,10 +151,7 @@ impl SnapshotP {
 		}
 
 		let min_step = (max_val - min_val) / 100.0;
-		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1]
-			.chars()
-			.take_while(|&c| c == '0')
-			.count() + 1;
+		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1].chars().take_while(|&c| c == '0').count() + 1;
 		let max_str = format!("{:.f_len$}", max_val).trim_end_matches(".0").to_string();
 		let min_str = format!("{:.f_len$}", min_val).trim_end_matches(".0").to_string();
 		let side_panel_width = max_str.len().max(min_str.len());
@@ -202,11 +196,7 @@ impl SnapshotP {
 
 fn join_str_blocks_v(left: String, right: String) -> String {
 	assert_eq!(left.split('\n').count(), right.split('\n').count());
-	left.lines()
-		.zip(right.lines())
-		.map(|(l, r)| format!("{}{}", l, r))
-		.collect::<Vec<String>>()
-		.join("\n")
+	left.lines().zip(right.lines()).map(|(l, r)| format!("{}{}", l, r)).collect::<Vec<String>>().join("\n")
 }
 
 /// # Panics
@@ -236,10 +226,11 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use crate::distributions::laplace_random_walk;
 	use insta::assert_snapshot;
 	use rand::{rngs::StdRng, Rng, SeedableRng};
+
+	use super::*;
+	use crate::distributions::laplace_random_walk;
 
 	#[test]
 	fn test_snapshot_plot_p() {

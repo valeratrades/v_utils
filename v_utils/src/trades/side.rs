@@ -1,5 +1,6 @@
-use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
+
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Default, Copy, PartialEq, Serialize)]
 pub enum Side {
@@ -35,8 +36,7 @@ impl std::fmt::Display for Side {
 impl<'de> Deserialize<'de> for Side {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
-		D: Deserializer<'de>,
-	{
+		D: Deserializer<'de>, {
 		struct SideVisitor;
 
 		impl<'de> serde::de::Visitor<'de> for SideVisitor {
@@ -48,8 +48,7 @@ impl<'de> Deserialize<'de> for Side {
 
 			fn visit_str<E>(self, value: &str) -> Result<Side, E>
 			where
-				E: serde::de::Error,
-			{
+				E: serde::de::Error, {
 				Side::from_str(value).map_err(serde::de::Error::custom)
 			}
 		}

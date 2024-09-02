@@ -1,7 +1,8 @@
+use std::str::FromStr;
+
 use chrono::Duration;
 use eyre::{eyre, Result};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Copy, Default)]
 pub struct Timeframe {
@@ -101,10 +102,7 @@ impl Timeframe {
 			"1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M",
 		];
 		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(eyre!(
-				"The Timeframe '{}' does not match exactly any of the values accepted by Binance API",
-				tf_string
-			));
+			return Err(eyre!("The Timeframe '{}' does not match exactly any of the values accepted by Binance API", tf_string));
 		}
 
 		Ok(tf_string)
@@ -117,10 +115,7 @@ impl Timeframe {
 		};
 		let valid_values = vec!["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
 		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(eyre!(
-				"The Timeframe does not match exactly any of the values accepted by Bybit API: {}",
-				tf_string
-			));
+			return Err(eyre!("The Timeframe does not match exactly any of the values accepted by Bybit API: {}", tf_string));
 		}
 
 		Ok(tf_string)
@@ -141,12 +136,9 @@ fn parse_timeframe(s: &str) -> Result<Timeframe> {
 	let n = if n_str.is_empty() {
 		1
 	} else {
-		n_str.parse::<usize>().map_err(|_| {
-			eyre!(
-				"Invalid number in timeframe '{}'. Expected a string representing a timeframe like '5s' or '3M'",
-				n_str
-			)
-		})?
+		n_str
+			.parse::<usize>()
+			.map_err(|_| eyre!("Invalid number in timeframe '{}'. Expected a string representing a timeframe like '5s' or '3M'", n_str))?
 	};
 
 	let designator = TimeframeDesignator::from_str(designator_str).map_err(|_| {
@@ -170,8 +162,7 @@ impl FromStr for Timeframe {
 impl<'de> Deserialize<'de> for Timeframe {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
-		D: Deserializer<'de>,
-	{
+		D: Deserializer<'de>, {
 		let s = String::deserialize(deserializer)?;
 		parse_timeframe(&s).map_err(|e| SerdeError::custom(e.to_string()))
 	}

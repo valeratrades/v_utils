@@ -1,6 +1,5 @@
 #![allow(dead_code, unused_imports)]
-use tracing::info;
-use tracing::{subscriber::set_global_default, Subscriber};
+use tracing::{info, subscriber::set_global_default, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer, Type};
 use tracing_subscriber::{
 	fmt::{self, MakeWriter},

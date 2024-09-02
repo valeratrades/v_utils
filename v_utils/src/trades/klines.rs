@@ -1,7 +1,8 @@
 #![allow(dead_code)]
-use crate::trades::Timeframe;
 use chrono::{DateTime, Duration, Utc};
 use eyre::Result;
+
+use crate::trades::Timeframe;
 
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
 pub struct Ohlc {
@@ -74,10 +75,10 @@ pub struct Kline {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	use crate::distributions::laplace_random_walk;
-	use crate::utils::SnapshotP;
 	use insta::{assert_debug_snapshot, assert_snapshot};
+
+	use super::*;
+	use crate::{distributions::laplace_random_walk, utils::SnapshotP};
 
 	#[test]
 	fn test_p_to_ohlc() {

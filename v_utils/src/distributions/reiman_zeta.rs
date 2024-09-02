@@ -1,5 +1,8 @@
-use rand::distributions::{Distribution, WeightedIndex};
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{
+	distributions::{Distribution, WeightedIndex},
+	rngs::StdRng,
+	SeedableRng,
+};
 
 pub struct ReimanZeta {
 	pub alpha: f64,

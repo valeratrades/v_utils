@@ -19,11 +19,7 @@ impl ProgressBar {
 		let bar_width: f64 = 133.0;
 		let timestamp_ms = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
 		let total = total as f64;
-		ProgressBar {
-			bar_width,
-			timestamp_ms,
-			total,
-		}
+		ProgressBar { bar_width, timestamp_ms, total }
 	}
 
 	pub fn progress(&mut self, i: usize) {
