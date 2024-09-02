@@ -7,6 +7,7 @@ use quote::quote;
 use syn::parse_macro_input;
 
 /// returns `Vec<String>` of the ways to refer to a struct name
+///
 /// For some reason not a `HashSet`, no clue why.
 #[proc_macro]
 pub fn graphemics(input: TokenStream) -> TokenStream {
@@ -55,7 +56,10 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
+/// cli-like string serialization format, with focus on compactness
+///
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
+///
 /// Macro generates FromStr and Display; assuming this format.
 ///```rust
 ///#[cfg(feature = "macros")] {
@@ -167,6 +171,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 }
 
 /// Put on a struct with optional fields, each of which implements FromStr
+///
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym AND same fields. In reality, shouldn't happen.
 #[proc_macro_derive(OptionalFieldsFromVecStr)]
 pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
@@ -340,12 +345,9 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			match type_string.as_str() {
 				"String" => (
 					quote! { #ident: PrivateValue },
-					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? }
+					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? },
 				),
-				"PathBuf" => (
-					quote! { #ident: v_utils::io::ExpandedPath },
-					quote! { #ident: helper.#ident.0 }
-				),
+				"PathBuf" => (quote! { #ident: v_utils::io::ExpandedPath }, quote! { #ident: helper.#ident.0 }),
 				_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
 			}
 		})
