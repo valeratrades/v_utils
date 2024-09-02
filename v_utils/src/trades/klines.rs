@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::trades::Timeframe;
-use eyre::Result;
 use chrono::{DateTime, Duration, Utc};
+use eyre::Result;
 
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
 pub struct Ohlc {

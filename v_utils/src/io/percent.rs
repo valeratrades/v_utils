@@ -1,9 +1,21 @@
 use eyre::{Error, Result};
+use std::ops::Neg;
+
 use serde::{de, Deserialize, Deserializer, Serialize};
+use std::ops::{Add, AddAssign};
+use std::ops::{Div, DivAssign, Sub, SubAssign};
+use std::ops::{Mul, MulAssign};
+use std::ops::{Rem, RemAssign};
 use std::str::FromStr;
 
 #[derive(Copy, Clone, Debug, Default, derive_new::new, PartialEq)]
 pub struct Percent(pub f64);
+impl Percent {
+	pub fn inner(self) -> f64 {
+		self.0
+	}
+}
+
 impl<'de> Deserialize<'de> for Percent {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
@@ -113,11 +125,208 @@ impl From<Percent> for f64 {
 	}
 }
 
-impl Percent {
-	pub fn inner(self) -> f64 {
-		self.0
+// Operators {{{
+// // Add
+impl Add for Percent {
+	type Output = Percent;
+
+	fn add(self, other: Percent) -> Percent {
+		Percent(self.0 + other.0)
 	}
 }
+
+impl Add<f64> for Percent {
+	type Output = Percent;
+
+	fn add(self, other: f64) -> Percent {
+		Percent(self.0 + other)
+	}
+}
+
+impl Add<Percent> for f64 {
+	type Output = f64;
+
+	fn add(self, other: Percent) -> f64 {
+		self + other.0
+	}
+}
+
+impl AddAssign for Percent {
+	fn add_assign(&mut self, other: Percent) {
+		self.0 += other.0;
+	}
+}
+
+impl AddAssign<f64> for Percent {
+	fn add_assign(&mut self, other: f64) {
+		self.0 += other;
+	}
+}
+//
+
+// // Mul
+impl Mul for Percent {
+	type Output = Percent;
+
+	fn mul(self, other: Percent) -> Percent {
+		Percent(self.0 * other.0)
+	}
+}
+
+impl Mul<f64> for Percent {
+	type Output = Percent;
+
+	fn mul(self, other: f64) -> Percent {
+		Percent(self.0 * other)
+	}
+}
+
+impl Mul<Percent> for f64 {
+	type Output = f64;
+
+	fn mul(self, other: Percent) -> f64 {
+		self * other.0
+	}
+}
+
+impl MulAssign for Percent {
+	fn mul_assign(&mut self, other: Percent) {
+		self.0 *= other.0;
+	}
+}
+
+impl MulAssign<f64> for Percent {
+	fn mul_assign(&mut self, other: f64) {
+		self.0 *= other;
+	}
+}
+//
+
+// // Sub
+impl Sub for Percent {
+	type Output = Percent;
+
+	fn sub(self, other: Percent) -> Percent {
+		Percent(self.0 - other.0)
+	}
+}
+
+impl Sub<f64> for Percent {
+	type Output = Percent;
+
+	fn sub(self, other: f64) -> Percent {
+		Percent(self.0 - other)
+	}
+}
+
+impl Sub<Percent> for f64 {
+	type Output = f64;
+
+	fn sub(self, other: Percent) -> f64 {
+		self - other.0
+	}
+}
+
+impl SubAssign for Percent {
+	fn sub_assign(&mut self, other: Percent) {
+		self.0 -= other.0;
+	}
+}
+
+impl SubAssign<f64> for Percent {
+	fn sub_assign(&mut self, other: f64) {
+		self.0 -= other;
+	}
+}
+//
+
+// // Div
+impl Div for Percent {
+	type Output = Percent;
+
+	fn div(self, other: Percent) -> Percent {
+		Percent(self.0 / other.0)
+	}
+}
+
+impl Div<f64> for Percent {
+	type Output = Percent;
+
+	fn div(self, other: f64) -> Percent {
+		Percent(self.0 / other)
+	}
+}
+
+impl Div<Percent> for f64 {
+	type Output = f64;
+
+	fn div(self, other: Percent) -> f64 {
+		self / other.0
+	}
+}
+
+impl DivAssign for Percent {
+	fn div_assign(&mut self, other: Percent) {
+		self.0 /= other.0;
+	}
+}
+
+impl DivAssign<f64> for Percent {
+	fn div_assign(&mut self, other: f64) {
+		self.0 /= other;
+	}
+}
+//
+
+// // Rem
+impl Rem for Percent {
+	type Output = Percent;
+
+	fn rem(self, other: Percent) -> Percent {
+		Percent(self.0 % other.0)
+	}
+}
+
+impl Rem<f64> for Percent {
+	type Output = Percent;
+
+	fn rem(self, other: f64) -> Percent {
+		Percent(self.0 % other)
+	}
+}
+
+impl Rem<Percent> for f64 {
+	type Output = f64;
+
+	fn rem(self, other: Percent) -> f64 {
+		self % other.0
+	}
+}
+
+impl RemAssign for Percent {
+	fn rem_assign(&mut self, other: Percent) {
+		self.0 %= other.0;
+	}
+}
+
+impl RemAssign<f64> for Percent {
+	fn rem_assign(&mut self, other: f64) {
+		self.0 %= other;
+	}
+}
+//
+
+// // Neg
+impl Neg for Percent {
+	type Output = Percent;
+
+	fn neg(self) -> Percent {
+		Percent(-self.0)
+	}
+}
+//
+
+//,}}}
 
 #[cfg(test)]
 mod tests {

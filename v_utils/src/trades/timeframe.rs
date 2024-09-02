@@ -1,5 +1,5 @@
-use eyre::{eyre, Result};
 use chrono::Duration;
+use eyre::{eyre, Result};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer};
 use std::str::FromStr;
 
@@ -135,11 +135,7 @@ impl std::fmt::Display for Timeframe {
 fn parse_timeframe(s: &str) -> Result<Timeframe> {
 	let (n_str, designator_str) = match s.char_indices().next_back() {
 		Some((idx, _)) => s.split_at(idx),
-		None => {
-			return Err(eyre!(
-				"Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"
-			))
-		}
+		None => return Err(eyre!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'")),
 	};
 
 	let n = if n_str.is_empty() {

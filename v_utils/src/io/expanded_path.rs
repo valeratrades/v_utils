@@ -45,6 +45,13 @@ impl AsRef<Path> for ExpandedPath {
 		self.0.as_ref()
 	}
 }
+//impl std::ops::Deref for ExpandedPath {
+//	type Target = PathBuf;
+//
+//	fn deref(&self) -> &Self::Target {
+//		&self.0
+//	}
+//}
 
 impl ExpandedPath {
 	pub fn inner(self) -> PathBuf {
