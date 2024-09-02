@@ -112,11 +112,6 @@ impl From<f64> for Percent {
 		Percent(f)
 	}
 }
-impl From<Percent> for f64 {
-	fn from(percent: Percent) -> f64 {
-		percent.0
-	}
-}
 
 // Operators {{{
 // // Add
@@ -133,14 +128,6 @@ impl Add<f64> for Percent {
 
 	fn add(self, other: f64) -> Percent {
 		Percent(self.0 + other)
-	}
-}
-
-impl Add<Percent> for f64 {
-	type Output = f64;
-
-	fn add(self, other: Percent) -> f64 {
-		self + other.0
 	}
 }
 
@@ -174,14 +161,6 @@ impl Mul<f64> for Percent {
 	}
 }
 
-impl Mul<Percent> for f64 {
-	type Output = f64;
-
-	fn mul(self, other: Percent) -> f64 {
-		self * other.0
-	}
-}
-
 impl MulAssign for Percent {
 	fn mul_assign(&mut self, other: Percent) {
 		self.0 *= other.0;
@@ -212,14 +191,6 @@ impl Sub<f64> for Percent {
 	}
 }
 
-impl Sub<Percent> for f64 {
-	type Output = f64;
-
-	fn sub(self, other: Percent) -> f64 {
-		self - other.0
-	}
-}
-
 impl SubAssign for Percent {
 	fn sub_assign(&mut self, other: Percent) {
 		self.0 -= other.0;
@@ -247,14 +218,6 @@ impl Div<f64> for Percent {
 
 	fn div(self, other: f64) -> Percent {
 		Percent(self.0 / other)
-	}
-}
-
-impl Div<Percent> for f64 {
-	type Output = f64;
-
-	fn div(self, other: Percent) -> f64 {
-		self / other.0
 	}
 }
 
