@@ -65,7 +65,7 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 }
 
 //? add oi, lsr, etc?
-/// Timestamp is often [unsafely converted](crate::timestamp::guess_timestamp_unsafe) from a string
+/// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
 pub struct Kline {
 	pub ohlc: Ohlc,
