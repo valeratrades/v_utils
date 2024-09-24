@@ -13,7 +13,7 @@ pub fn confirm<T: AsRef<str>>(message: T) -> bool {
 	let stdin = io::stdin();
 	let mut stdout = io::stdout();
 
-	print!("{}. Proceed? [Y/n] ", message.as_ref());
+	print!("{} [Y/n] ", message.as_ref());
 	stdout.flush().unwrap();
 
 	let mut input = String::new();
