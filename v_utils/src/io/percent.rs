@@ -86,7 +86,11 @@ impl Serialize for Percent {
 
 impl std::fmt::Display for Percent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
+		let percent_number = self.0 * 100.;
+		match percent_number.fract() == 0. {
+			true => write!(f, "{}%", percent_number as isize),
+			false => write!(f, "{}%", percent_number),
+		}
 	}
 }
 
@@ -110,6 +114,41 @@ impl std::ops::Deref for Percent {
 impl From<f64> for Percent {
 	fn from(f: f64) -> Self {
 		Percent(f)
+	}
+}
+impl From<f32> for Percent {
+	fn from(f: f32) -> Self {
+		Percent(f as f64)
+	}
+}
+impl From<isize> for Percent {
+	fn from(i: isize) -> Self {
+		Percent(i as f64 / 100.)
+	}
+}
+impl From<usize> for Percent {
+	fn from(i: usize) -> Self {
+		Percent(i as f64 / 100.)
+	}
+}
+impl From<i32> for Percent {
+	fn from(i: i32) -> Self {
+		Percent(i as f64 / 100.)
+	}
+}
+impl From<i64> for Percent {
+	fn from(i: i64) -> Self {
+		Percent(i as f64 / 100.)
+	}
+}
+impl From<u32> for Percent {
+	fn from(i: u32) -> Self {
+		Percent(i as f64 / 100.)
+	}
+}
+impl From<u64> for Percent {
+	fn from(i: u64) -> Self {
+		Percent(i as f64 / 100.)
 	}
 }
 

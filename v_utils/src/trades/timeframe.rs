@@ -19,6 +19,8 @@ pub enum TimeframeDesignator {
 	Days,
 	Weeks,
 	Months,
+	Quarters,
+	Years,
 }
 impl TimeframeDesignator {
 	pub fn as_seconds(&self) -> usize {
@@ -28,7 +30,9 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Hours => 60 * 60,
 			TimeframeDesignator::Days => 24 * 60 * 60,
 			TimeframeDesignator::Weeks => 7 * 24 * 60 * 60,
-			TimeframeDesignator::Months => 30 * 24 * 60 * 60, //NB: is approximate
+			TimeframeDesignator::Months => 30 * 24 * 60 * 60,       //NB: is approximate
+			TimeframeDesignator::Quarters => 30 * 24 * 60 * 60 * 3, //NB: is approximate
+			TimeframeDesignator::Years => 30 * 24 * 60 * 60 * 12,   //NB: is approximate
 		}
 	}
 
@@ -45,6 +49,8 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Days => "d",
 			TimeframeDesignator::Weeks => "w",
 			TimeframeDesignator::Months => "M",
+			TimeframeDesignator::Quarters => "Q",
+			TimeframeDesignator::Years => "y",
 		}
 	}
 
@@ -74,6 +80,10 @@ impl FromStr for TimeframeDesignator {
 			"w" => Ok(TimeframeDesignator::Weeks),
 			"W" => Ok(TimeframeDesignator::Weeks),
 			"M" => Ok(TimeframeDesignator::Months),
+			"q" => Ok(TimeframeDesignator::Quarters),
+			"Q" => Ok(TimeframeDesignator::Quarters),
+			"y" => Ok(TimeframeDesignator::Years),
+			"Y" => Ok(TimeframeDesignator::Years),
 			_ => Err(eyre::eyre!("Invalid timeframe designator: {}", s)),
 		}
 	}
