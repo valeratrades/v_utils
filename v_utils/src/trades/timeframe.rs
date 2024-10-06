@@ -183,7 +183,7 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn timeframe_to_str() {
+	fn to_str() {
 		let tf = Timeframe {
 			designator: TimeframeDesignator::Seconds,
 			n: 5,
@@ -191,10 +191,18 @@ mod tests {
 		assert_eq!(tf.display(), "5s".to_owned());
 	}
 	#[test]
-	fn timeframe_deserialize() {
+	fn deserialize() {
 		let json_str = "\"5s\"";
 		let tf: Timeframe = serde_json::from_str(json_str).unwrap();
 		assert_eq!(tf.designator, TimeframeDesignator::Seconds);
 		assert_eq!(tf.n, 5);
+	}
+
+	#[test]
+	fn deser_quarters() {
+		let json_str = "\"3Q\"";
+		let tf: Timeframe = serde_json::from_str(json_str).unwrap();
+		assert_eq!(tf.designator, TimeframeDesignator::Quarters);
+		assert_eq!(tf.n, 3);
 	}
 }
