@@ -111,6 +111,8 @@ impl std::ops::Deref for Percent {
 		&self.0
 	}
 }
+
+// Froms {{{
 impl From<f64> for Percent {
 	fn from(f: f64) -> Self {
 		Percent(f)
@@ -151,6 +153,12 @@ impl From<u64> for Percent {
 		Percent(i as f64 / 100.)
 	}
 }
+impl From<&str> for Percent {
+	fn from(s: &str) -> Self {
+		Percent::from_str(s).unwrap()
+	}
+}
+//,}}}
 
 // Operators {{{
 // // Add
