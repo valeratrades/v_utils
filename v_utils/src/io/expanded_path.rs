@@ -37,6 +37,22 @@ impl FromStr for ExpandedPath {
 	}
 }
 
+impl From<&str> for ExpandedPath {
+	fn from(s: &str) -> Self {
+		ExpandedPath::from_str(s).unwrap()
+	}
+}
+impl From<String> for ExpandedPath {
+	fn from(s: String) -> Self {
+		ExpandedPath::from_str(&s).unwrap()
+	}
+}
+impl From<PathBuf> for ExpandedPath {
+	fn from(p: PathBuf) -> Self {
+		ExpandedPath(p)
+	}
+}
+
 impl std::fmt::Display for ExpandedPath {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.0.display())
@@ -47,13 +63,13 @@ impl AsRef<Path> for ExpandedPath {
 		self.0.as_ref()
 	}
 }
-//impl std::ops::Deref for ExpandedPath {
-//	type Target = PathBuf;
-//
-//	fn deref(&self) -> &Self::Target {
-//		&self.0
-//	}
-//}
+impl std::ops::Deref for ExpandedPath {
+	type Target = PathBuf;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
 
 impl ExpandedPath {
 	pub fn inner(self) -> PathBuf {
