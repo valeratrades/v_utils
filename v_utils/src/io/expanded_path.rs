@@ -79,4 +79,12 @@ impl ExpandedPath {
 	pub fn display(&self) -> std::path::Display {
 		self.0.display()
 	}
+
+	pub fn parent(&self) -> Option<ExpandedPath> {
+		self.0.parent().map(|p| ExpandedPath(p.to_path_buf()))
+	}
+
+	pub fn join<P: AsRef<Path>>(&self, path: P) -> ExpandedPath {
+		ExpandedPath(self.0.join(path))
+	}
 }
