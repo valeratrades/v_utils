@@ -1,25 +1,8 @@
-use std::{
-	fs::File,
-	io::Write,
-	path::Path,
-	sync::{atomic::Ordering, Arc},
-	time::Duration,
-};
+use std::{io::Write, path::Path};
 
-use eyre::{bail, eyre, Report, Result, WrapErr};
-use serde::{de::DeserializeOwned, Deserializer};
-use tokio::{runtime::Runtime, time::sleep};
-use tracing::{error, info, instrument, subscriber::set_global_default, warn, Subscriber};
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer, Type};
+use tracing::{info, Subscriber};
 use tracing_error::ErrorLayer;
-use tracing_log::LogTracer;
-use tracing_subscriber::{
-	fmt::{self, MakeWriter},
-	layer::SubscriberExt as _,
-	prelude::*,
-	util::SubscriberInitExt as _,
-	EnvFilter, Registry,
-};
+use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, util::SubscriberInitExt as _, Registry};
 
 /// # Panics
 /// Set "TEST_LOG=1" to redirect to stdout
@@ -73,7 +56,7 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 		}
 	};
 
-	trace_the_init();
+	//trace_the_init();
 }
 
 use std::{
