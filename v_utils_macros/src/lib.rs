@@ -4,7 +4,10 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::{Parse, ParseStream}, parse_macro_input, token, Expr, Ident, LitInt, Token};
+use syn::{
+	parse::{Parse, ParseStream},
+	parse_macro_input, token, Ident, LitInt, Token,
+};
 
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
@@ -493,6 +496,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 //	TokenStream::from(expanded)
 //}
 
+/// Structure to hold the entire macro input
 struct Field {
 	index: LitInt,
 	dtype: Ident,
@@ -521,8 +525,6 @@ struct DataFrameDef {
 	_arrow: Token![=>],
 	fields: Vec<Field>,
 }
-
-// Parsing implementation for DataFrameDef
 impl Parse for DataFrameDef {
 	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
 		let format: Ident = input.parse()?;
@@ -530,14 +532,13 @@ impl Parse for DataFrameDef {
 
 		let mut fields = Vec::new();
 		while !input.is_empty() {
-			fields.push(input.parse()?);
+			//fields.push(input.parse()?);
+			fields.push(input.parse::<Field>()?);
+			// Try to parse a comma if it exists, but don't fail if it doesn't
+			let _ = input.parse::<Token![,]>();
 		}
 
-		Ok(DataFrameDef {
-			format,
-			_arrow,
-			fields,
-		})
+		Ok(DataFrameDef { format, _arrow, fields })
 	}
 }
 
@@ -545,22 +546,15 @@ impl Parse for DataFrameDef {
 pub fn make_df(input: TokenStream) -> TokenStream {
 	let DataFrameDef { format, fields, .. } = parse_macro_input!(input as DataFrameDef);
 
-	// Convert each field to a string
 	let mut result = format.to_string();
 	for field in fields {
 		result.push('\n');
-		result.push_str(&format!(
-			"({}, {}, {})",
-			field.index,
-			field.dtype,
-			field.name
-		));
+		result.push_str(&format!("({}, {}, {})", field.index, field.dtype, field.name));
 	}
 
-	// Generate the output TokenStream
 	let result_str = result.to_string();
 	quote! {
 		#result_str
 	}
-		.into()
+	.into()
 }

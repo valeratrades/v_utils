@@ -1,6 +1,5 @@
-use v_utils_macros::make_df;
 use insta::assert_snapshot;
-
+use v_utils_macros::make_df;
 
 fn main() {
 	let expected_code = r#"
@@ -35,5 +34,10 @@ fn main() {
 		(4, f64, close)
 		(5, f64, volume)
 	];
-	assert_snapshot!(df, @r###""###);
+	assert_snapshot!(df, @r#"
+ json
+ (0, i64, open_time)
+ (4, f64, close)
+ (5, f64, volume)
+ "#);
 }
