@@ -27,5 +27,5 @@ v_utils = { path = "../v_utils", features = ["full"]}
 proc-macro2 = { version = "^1.0.86" }
 syn = { version = "^2.0.74", features = ["full", "extra-traits"] }
 quote = { version = "^1.0.36" }
-anyhow = "^1.0.86"
-serde = { version = "1.0.207", features = ["derive"] }
+serde.workspace = true
+eyre.workspace = true

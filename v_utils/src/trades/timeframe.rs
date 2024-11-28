@@ -169,6 +169,13 @@ impl FromStr for Timeframe {
 	}
 }
 
+/// # Panics
+impl From<&str> for Timeframe {
+	fn from(s: &str) -> Self {
+		Timeframe::from_str(s).unwrap()
+	}
+}
+
 impl<'de> Deserialize<'de> for Timeframe {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where

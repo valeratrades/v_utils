@@ -4,3 +4,7 @@ members = [
 	"v_utils_*",
 ]
 resolver = "1"
+
+[workspace.dependencies]
+eyre = { version = "0.6.12" } # not color-eyre, that one is for client-side
+serde = { version = "1.0.207", features = ["derive"] }

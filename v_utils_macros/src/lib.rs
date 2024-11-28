@@ -4,7 +4,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
+use syn::{parse::{Parse, ParseStream}, parse_macro_input, token, Expr, Ident, LitInt, Token};
 
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
@@ -47,8 +47,8 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 		{
 			let mut result: Vec<&'static str> = Vec::new();
 			#(
-				result.push(#unique_items_valid);
-			)*
+			result.push(#unique_items_valid);
+		)*
 			result
 		}
 	};
@@ -150,7 +150,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 				}
 				Ok(#name {
 					#(#map_fields_to_chars)*
-				})
+			})
 			}
 		}
 
@@ -226,21 +226,21 @@ pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
 	});
 
 	let expanded = quote! {
-		impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
-			type Error = &'static str;
+	impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
+		type Error = &'static str;
 
-			fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
-				#(#init_nones)*
+		fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
+			#(#init_nones)*
 
-				for s in strings {
-					#(#conversions)*
+			for s in strings {
+				#(#conversions)*
 
-					return std::result::Result::Err("Could not parse string");
-				}
+				return std::result::Result::Err("Could not parse string");
+			}
 
 				std::result::Result::Ok(#name {
 					#(#write_fields)*
-				})
+			})
 			}
 		}
 	};
@@ -299,21 +299,21 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	});
 
 	let expanded = quote! {
-		impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
-			type Error = &'static str;
+	impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
+		type Error = &'static str;
 
-			fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
-				#(#init_empty_vecs)*
+		fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
+			#(#init_empty_vecs)*
 
-				for s in strings {
-					#(#conversions)*
+			for s in strings {
+				#(#conversions)*
 
-					return std::result::Result::Err("Could not parse string");
-				}
+				return std::result::Result::Err("Could not parse string");
+			}
 
 				std::result::Result::Ok(#name {
 					#(#write_fields)*
-				})
+			})
 			}
 		}
 	};
@@ -356,7 +356,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let gen = quote! {
 		impl<'de> v_utils::__internal::serde::Deserialize<'de> for #name {
 			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-			where
+		where
 				D: v_utils::__internal::serde::de::Deserializer<'de>,
 			{
 				use v_utils::__internal::eyre::WrapErr;
@@ -429,4 +429,138 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	};
 
 	gen.into()
+}
+
+//#[proc_macro]
+//pub fn make_df(input: TokenStream) -> TokenStream {
+//	let input = parse_macro_input!(input as syn::ExprArray);
+//
+//	let mut columns = Vec::new();
+//	let mut code = Vec::new();
+//
+//	for elem in input.elems {
+//		if let Expr::Tuple(tuple) = elem {
+//			let nth = &tuple.elems[0]; // The index (nth) of the column
+//			let col_type = &tuple.elems[1]; // The type (col_type)
+//			let col_name = &tuple.elems[2]; // The name (col_name)
+//
+//			let nth = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(lit), .. }) = nth {
+//				lit.base10_parse::<usize>().unwrap()
+//			} else {
+//				panic!("The index must be an integer literal");
+//			};
+//
+//			let col_type_ident = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) = col_type {
+//				Ident::new(&lit.value(), lit.span())
+//			} else {
+//				panic!("Column type must be a string literal representing a type");
+//			};
+//
+//			let col_name_ident = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) = col_name {
+//				Ident::new(&lit.value(), lit.span())
+//			} else {
+//				panic!("Column name must be a string literal");
+//			};
+//
+//			// Generate code for each column
+//			code.push(quote! {
+//				let mut #col_name_ident = Vec::new();
+//			});
+//
+//			columns.push(quote! {
+//				stringify!(#col_name_ident) => #col_name_ident
+//			});
+//
+//			code.push(quote! {
+//				for obj in $values {
+//					if let Some(#col_name_ident) = kline.get(#nth) {
+//						#col_name_ident.push(#col_name_ident.as_str().unwrap().parse::<#col_type_ident>().unwrap());
+//					}
+//				}
+//			});
+//		}
+//	}
+//
+//	let expanded = quote! {
+//		#(#code)*
+//			let df = df![
+//			#(#columns),*
+//		]
+//				.expect("Failed to create DataFrame");
+//		df
+//	};
+//
+//	TokenStream::from(expanded)
+//}
+
+struct Field {
+	index: LitInt,
+	dtype: Ident,
+	name: Ident,
+	_comma1: Token![,],
+	_comma2: Token![,],
+	_paren1: token::Paren,
+}
+impl Parse for Field {
+	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+		let content;
+		Ok(Field {
+			_paren1: syn::parenthesized!(content in input),
+			index: content.parse()?,
+			_comma1: content.parse()?,
+			dtype: content.parse()?,
+			_comma2: content.parse()?,
+			name: content.parse()?,
+		})
+	}
+}
+
+/// Structure to hold the entire macro input
+struct DataFrameDef {
+	format: Ident,
+	_arrow: Token![=>],
+	fields: Vec<Field>,
+}
+
+// Parsing implementation for DataFrameDef
+impl Parse for DataFrameDef {
+	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+		let format: Ident = input.parse()?;
+		let _arrow: Token![=>] = input.parse()?;
+
+		let mut fields = Vec::new();
+		while !input.is_empty() {
+			fields.push(input.parse()?);
+		}
+
+		Ok(DataFrameDef {
+			format,
+			_arrow,
+			fields,
+		})
+	}
+}
+
+#[proc_macro]
+pub fn make_df(input: TokenStream) -> TokenStream {
+	let DataFrameDef { format, fields, .. } = parse_macro_input!(input as DataFrameDef);
+
+	// Convert each field to a string
+	let mut result = format.to_string();
+	for field in fields {
+		result.push('\n');
+		result.push_str(&format!(
+			"({}, {}, {})",
+			field.index,
+			field.dtype,
+			field.name
+		));
+	}
+
+	// Generate the output TokenStream
+	let result_str = result.to_string();
+	quote! {
+		#result_str
+	}
+		.into()
 }

@@ -56,7 +56,7 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 		}
 	};
 
-	//trace_the_init();
+	//trace_the_init(); //? is there ever a case where we want this, actually?
 }
 
 use std::{

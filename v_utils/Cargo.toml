@@ -10,24 +10,26 @@ repository = "https://github.com/valeratrades/v_utils"
 
 [dev-dependencies]
 claim = "^0.5.0"
-insta = "^1.40.0"
-trybuild = { version = "^1.0.99", features = ["diff"] }
+insta = "^1.41.1"
+trybuild = { version = "^1.0.101", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
 
 [dependencies]
 # unconditional
-eyre = "^0.6.12" # not color-eyre, that one is for client-side
+eyre.workspace = true
+serde.workspace = true
 tracing = { version = "^0.1.40", features = ["log", "std", "async-await"] }
 derive-new = "^0.7.0"
-serde = { version = "^1.0.210", features = ["derive"] }
-serde_json = "^1.0.128"
-tokio = { version = "^1.40.0", features = ["full", "io-util"] }
+serde_json = "^1.0.133"
+tokio = { version = "^1.41.1", features = ["full", "io-util"] }
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
+num = "^0.4.3" # same thing as `function_name` - this is used by `utlils` mod
+thiserror = "2.0.3"
 
 # # optional
 async-sse = { version = "^5.1.0", optional = true }
-bytes = { version = "^1.7.2", optional = true }
-reqwest = { version = "^0.12.8", features = ["json", "blocking", "stream"], optional = true }
+bytes = { version = "^1.8.0", optional = true }
+reqwest = { version = "^0.12.9", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
 chrono = { version = "^0.4.38", optional = true }
 dirs = { version = "^5.0.1", optional = true }
 futures = { version = "^0.3.31", optional = true }
@@ -39,7 +41,7 @@ tracing-bunyan-formatter = { version = "^0.3.9", optional = true }
 tracing-subscriber = { version = "^0.3.18", features = ["fmt", "json", "registry", "env-filter"], optional = true }
 tracing-log = { version = "^0.2.0", optional = true }
 tracing-error = { version = "^0.2.0", optional = true }
-console-subscriber = { version = "0.4.0", optional = true }
+console-subscriber = { version = "0.4.1", optional = true }
 #
 
 v_utils_macros = { path = "../v_utils_macros", version = "^1.5.1", optional = true }
@@ -57,3 +59,6 @@ tracing = ["dep:tracing-bunyan-formatter", "dep:tracing-subscriber", "dep:tracin
 distributions = ["rand", "rand_distr"]
 
 full = ["io", "macros", "trades", "llm", "tracing", "distributions"]
+
+# dev only
+slow_tests = []
