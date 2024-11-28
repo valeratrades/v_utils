@@ -1,8 +1,8 @@
 use std::{io::Write, path::Path};
 
-use tracing::{info, Subscriber};
+use tracing::info;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, util::SubscriberInitExt as _, Registry};
+use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
 /// # Panics
 /// Set "TEST_LOG=1" to redirect to stdout
@@ -56,7 +56,7 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 		}
 	};
 
-	//trace_the_init(); //? is there ever a case where we want this, actually?
+	trace_the_init(); //? Should I make this a trace?
 }
 
 use std::{

@@ -1,43 +1,28 @@
-use insta::assert_snapshot;
+use serde_json::Value;
 use v_utils_macros::make_df;
 
 fn main() {
-	let expected_code = r#"
-				let mut open_time = Vec::new();
-				let mut close = Vec::new();
-				let mut volume = Vec::new();
+	// return of binance klines api call
+	let json = r###"[[1732651500000, "91528.00000000", "91984.13000000", "91400.00000000", "91921.37000000", "525.71352000", 1732651799999, "48185528.57939470", 65086, "221.15735000", "20280719.30190460", "0"], [1732651800000, "91921.38000000", "92040.00000000", "91550.77000000", "91595.99000000", "333.69821000", 1732652099999, "30617737.30693690", 46547, "159.40022000", "14629327.52486640", "0"], [1732652100000, "91596.00000000", "91698.42000000", "91285.79000000", "91305.18000000", "301.81948000", 1732652399999, "27612503.10080310", 54974, "145.54252000", "13318854.47177950", "0"]]"###;
+	let values: Vec<Vec<Value>> = serde_json::from_str(json).expect("Failed to parse JSON as an array of arrays");
 
-				for kline in json {
-						if let Some(open_time) = kline.get(0) {
-								open_time.push(open_time.as_str().unwrap().parse::<i64>().unwrap());
-						}
-						if let Some(close) = kline.get(4) {
-								close.push(close.as_str().unwrap().parse::<f64>().unwrap());
-						}
-						if let Some(volume) = kline.get(5) {
-								volume.push(volume.as_str().unwrap().parse::<f64>().unwrap());
-						}
-				}
-
-				let df = df![
-						"open_time" => open_time,
-						"close" => close,
-						"volume" => volume
-				]
-				.expect("Failed to create DataFrame");
-				df
-				"#;
 
 	let df = make_df![
-		json =>
+		values =>
 		(0, i64, open_time)
 		(4, f64, close)
 		(5, f64, volume)
 	];
-	assert_snapshot!(df, @r#"
- json
- (0, i64, open_time)
- (4, f64, close)
- (5, f64, volume)
+	insta::assert_debug_snapshot!(df, @r#"
+ shape: (3, 3)
+ ┌───────────────┬──────────┬───────────┐
+ │ open_time     ┆ close    ┆ volume    │
+ │ ---           ┆ ---      ┆ ---       │
+ │ i64           ┆ f64      ┆ f64       │
+ ╞═══════════════╪══════════╪═══════════╡
+ │ 1732651500000 ┆ 91921.37 ┆ 525.71352 │
+ │ 1732651800000 ┆ 91595.99 ┆ 333.69821 │
+ │ 1732652100000 ┆ 91305.18 ┆ 301.81948 │
+ └───────────────┴──────────┴───────────┘
  "#);
 }

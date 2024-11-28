@@ -434,82 +434,21 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	gen.into()
 }
 
-//#[proc_macro]
-//pub fn make_df(input: TokenStream) -> TokenStream {
-//	let input = parse_macro_input!(input as syn::ExprArray);
-//
-//	let mut columns = Vec::new();
-//	let mut code = Vec::new();
-//
-//	for elem in input.elems {
-//		if let Expr::Tuple(tuple) = elem {
-//			let nth = &tuple.elems[0]; // The index (nth) of the column
-//			let col_type = &tuple.elems[1]; // The type (col_type)
-//			let col_name = &tuple.elems[2]; // The name (col_name)
-//
-//			let nth = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(lit), .. }) = nth {
-//				lit.base10_parse::<usize>().unwrap()
-//			} else {
-//				panic!("The index must be an integer literal");
-//			};
-//
-//			let col_type_ident = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) = col_type {
-//				Ident::new(&lit.value(), lit.span())
-//			} else {
-//				panic!("Column type must be a string literal representing a type");
-//			};
-//
-//			let col_name_ident = if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) = col_name {
-//				Ident::new(&lit.value(), lit.span())
-//			} else {
-//				panic!("Column name must be a string literal");
-//			};
-//
-//			// Generate code for each column
-//			code.push(quote! {
-//				let mut #col_name_ident = Vec::new();
-//			});
-//
-//			columns.push(quote! {
-//				stringify!(#col_name_ident) => #col_name_ident
-//			});
-//
-//			code.push(quote! {
-//				for obj in $values {
-//					if let Some(#col_name_ident) = kline.get(#nth) {
-//						#col_name_ident.push(#col_name_ident.as_str().unwrap().parse::<#col_type_ident>().unwrap());
-//					}
-//				}
-//			});
-//		}
-//	}
-//
-//	let expanded = quote! {
-//		#(#code)*
-//			let df = df![
-//			#(#columns),*
-//		]
-//				.expect("Failed to create DataFrame");
-//		df
-//	};
-//
-//	TokenStream::from(expanded)
-//}
-
+// make_df! {{{
 /// Structure to hold the entire macro input
 struct Field {
+	_parens: token::Paren,
 	index: LitInt,
-	dtype: Ident,
-	name: Ident,
 	_comma1: Token![,],
+	dtype: Ident,
 	_comma2: Token![,],
-	_paren1: token::Paren,
+	name: Ident,
 }
 impl Parse for Field {
 	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
 		let content;
 		Ok(Field {
-			_paren1: syn::parenthesized!(content in input),
+			_parens: syn::parenthesized!(content in input),
 			index: content.parse()?,
 			_comma1: content.parse()?,
 			dtype: content.parse()?,
@@ -521,40 +460,99 @@ impl Parse for Field {
 
 /// Structure to hold the entire macro input
 struct DataFrameDef {
-	format: Ident,
+	values_vec: Ident,
 	_arrow: Token![=>],
 	fields: Vec<Field>,
 }
 impl Parse for DataFrameDef {
 	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-		let format: Ident = input.parse()?;
+		let values_vec: Ident = input.parse()?;
 		let _arrow: Token![=>] = input.parse()?;
 
 		let mut fields = Vec::new();
+		//TODO!: add optional comma at the end
 		while !input.is_empty() {
-			//fields.push(input.parse()?);
-			fields.push(input.parse::<Field>()?);
-			// Try to parse a comma if it exists, but don't fail if it doesn't
-			let _ = input.parse::<Token![,]>();
+			fields.push(input.parse()?);
 		}
 
-		Ok(DataFrameDef { format, _arrow, fields })
+		Ok(DataFrameDef { values_vec, _arrow, fields })
 	}
 }
 
 #[proc_macro]
 pub fn make_df(input: TokenStream) -> TokenStream {
-	let DataFrameDef { format, fields, .. } = parse_macro_input!(input as DataFrameDef);
+	let DataFrameDef { values_vec, fields, .. } = parse_macro_input!(input as DataFrameDef);
 
-	let mut result = format.to_string();
-	for field in fields {
-		result.push('\n');
-		result.push_str(&format!("({}, {}, {})", field.index, field.dtype, field.name));
+	fn vec_name(name: &Ident) -> Ident {
+		let vec_name = format!("{name}s");
+		syn::Ident::new(&vec_name, name.span())
 	}
 
-	let result_str = result.to_string();
+	let vec_declarations = fields.iter().map(|field| {
+		let vec_ident = vec_name(&field.name);
+		let ty = &field.dtype;
+		quote! {
+			let mut #vec_ident: Vec<#ty> = Vec::new();
+		}
+	});
+
+	// Generate tuple of indices for pattern matching
+	let indices = fields.iter().map(|field| {
+		let idx = &field.index;
+		quote! {
+			value.get(#idx)
+		}
+	});
+
+	// Generate push statements with appropriate type conversion
+	let push_statements = fields.iter().map(|field| {
+		let name = &field.name;
+		let vec_name = vec_name(name);
+		let dtype = &field.dtype;
+
+		// might not cover all the polars as methods correctly, may need to be updated to an explicit match statement through them.
+		let as_method = syn::Ident::new(
+			&format!("as_{dtype}"),
+			dtype.span()
+		);
+
+		quote! {
+			// inefficient but that's data-analysis, don't think I care
+			// unwrap_or would be preferrable as we expect this line to be taken ~50% of the time, but it breaks expected type (maybe it's still possible - try again later)
+			#vec_name.push(#name.#as_method().unwrap_or_else(|| #name.as_str().unwrap().parse::<#dtype>().unwrap()));
+		}
+	});
+
+	let df_fields = fields.iter().map(|field| {
+		let vec_name = vec_name(&field.name);
+		let name_str = &field.name.to_string();
+		quote! {
+			#name_str => #vec_name
+		}
+	});
+
+	// pretty sure there is a better way to do this, but eh
+	let temp_vars = fields.iter().map(|field| {
+		let name = format!("{}", field.name);
+		syn::Ident::new(&name, proc_macro2::Span::call_site())
+	}).collect::<Vec<_>>();
+
 	quote! {
-		#result_str
+	{
+		#(#vec_declarations)*
+
+		for value in #values_vec {
+			if let (#(Some(#temp_vars)),*) = (#(#indices),*) {
+				#(#push_statements;)*
+			}
+			}
+
+			let df = polars::df![
+			#(#df_fields),*
+		].expect("Failed to create DataFrame");
+			df
+		}
 	}
-	.into()
+		.into()
 }
+//,}}}

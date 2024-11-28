@@ -18,14 +18,16 @@ name = "tests"
 path = "tests/main.rs"
 
 [dev-dependencies]
-insta = "1.39.0"
+insta = "1.41.1"
+polars = { version = "0.44.2", default-features = false, features = ["fmt"] } # pains me to add this entire dep for one test. Maybe I'll figure out a way to get rid of this at some point.
+serde_json = "1.0.133"
 toml = "0.8.19"
-trybuild = { version = "^1.0.99", features = ["diff"]}
+trybuild = { version = "^1.0.101", features = ["diff"]}
 v_utils = { path = "../v_utils", features = ["full"]}
 
 [dependencies]
-proc-macro2 = { version = "^1.0.86" }
-syn = { version = "^2.0.74", features = ["full", "extra-traits"] }
-quote = { version = "^1.0.36" }
+proc-macro2 = { version = "^1.0.92" }
+syn = { version = "^2.0.89", features = ["full", "extra-traits"] }
+quote = { version = "^1.0.37" }
 serde.workspace = true
 eyre.workspace = true
