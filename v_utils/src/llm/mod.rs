@@ -123,7 +123,6 @@ trait LlmConversation: Serialize {
 mod llm_tests {
 	use super::*;
 
-	//#[cfg(slow_tests)]
 	#[cfg(feature = "slow_tests")]
 	#[test]
 	fn test_oneshot() {
@@ -131,7 +130,6 @@ mod llm_tests {
 		println!("{:?}", response);
 	}
 
-	//#[cfg(slow_tests)]
 	#[cfg(feature = "slow_tests")]
 	#[test]
 	fn test_conversation() {
