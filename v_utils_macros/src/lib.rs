@@ -511,10 +511,7 @@ pub fn make_df(input: TokenStream) -> TokenStream {
 		let dtype = &field.dtype;
 
 		// might not cover all the polars as methods correctly, may need to be updated to an explicit match statement through them.
-		let as_method = syn::Ident::new(
-			&format!("as_{dtype}"),
-			dtype.span()
-		);
+		let as_method = syn::Ident::new(&format!("as_{dtype}"), dtype.span());
 
 		quote! {
 			// inefficient but that's data-analysis, don't think I care
@@ -532,10 +529,13 @@ pub fn make_df(input: TokenStream) -> TokenStream {
 	});
 
 	// pretty sure there is a better way to do this, but eh
-	let temp_vars = fields.iter().map(|field| {
-		let name = format!("{}", field.name);
-		syn::Ident::new(&name, proc_macro2::Span::call_site())
-	}).collect::<Vec<_>>();
+	let temp_vars = fields
+		.iter()
+		.map(|field| {
+			let name = format!("{}", field.name);
+			syn::Ident::new(&name, proc_macro2::Span::call_site())
+		})
+		.collect::<Vec<_>>();
 
 	quote! {
 	{
@@ -553,6 +553,6 @@ pub fn make_df(input: TokenStream) -> TokenStream {
 			df
 		}
 	}
-		.into()
+	.into()
 }
 //,}}}

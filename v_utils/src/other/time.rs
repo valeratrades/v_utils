@@ -24,6 +24,20 @@ impl AsRef<u32> for Timelike {
 		&self.0
 	}
 }
+impl std::ops::Deref for Timelike {
+	type Target = u32;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TimelikeHelper {
+	String(String),
+	Number(u32),
+}
 
 impl Serialize for Timelike {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -37,14 +51,20 @@ impl<'de> Deserialize<'de> for Timelike {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: de::Deserializer<'de>, {
-		let time = String::deserialize(deserializer)?;
-		let units = time_to_units(&time).map_err(|e| de::Error::custom(e.to_string()))?;
-
-		Ok(Timelike(units))
+		let helper = TimelikeHelper::deserialize(deserializer)?;
+		match helper {
+			TimelikeHelper::String(time) => time_to_units(&time).map_err(|e| de::Error::custom(e.to_string())).map(Timelike),
+			TimelikeHelper::Number(units) => Ok(Timelike(units)),
+		}
 	}
 }
 
 fn time_to_units(time: &str) -> Result<u32> {
+	// If there are no colons, try to parse as seconds directly
+	if !time.contains(':') {
+		return time.parse().wrap_err_with(|| eyre!("Invalid time format: Could not parse '{}' as seconds", time));
+	}
+
 	let mut split = time.split(':');
 
 	let first = split
@@ -85,32 +105,20 @@ mod tests {
 
 	#[test]
 	fn test_time_de() {
-		let time: Timelike = serde_json::from_str(r#""12:34""#).unwrap();
-		assert_eq!(time.inner(), 754);
-
-		let time: Timelike = serde_json::from_str(r#""12:34:56""#).unwrap();
-		assert_eq!(time.inner(), 45296);
-
-		let time: Timelike = serde_json::from_str(r#""34:56""#).unwrap();
-		assert_eq!(time.inner(), 2096);
-
+		assert_eq!(serde_json::from_str::<Timelike>(r#""12:34""#).unwrap().inner(), 754);
+		assert_eq!(serde_json::from_str::<Timelike>(r#""12:34:56""#).unwrap().inner(), 45296);
+		assert_eq!(serde_json::from_str::<Timelike>(r#""34:56""#).unwrap().inner(), 2096);
+		assert_eq!(serde_json::from_str::<Timelike>("754").unwrap().inner(), 754);
+		assert_eq!(serde_json::from_str::<Timelike>(r#""34""#).unwrap().inner(), 34);
 		assert_err!(serde_json::from_str::<Timelike>(r#""12:34:56:78""#));
 	}
+
 	#[test]
 	fn test_time_ser() {
-		let time = Timelike(30);
-		assert_eq!(time.to_string(), "30");
-
-		let time = Timelike(2096);
-		assert_eq!(time.to_string(), "34:56");
-
-		let time = Timelike(3600);
-		assert_eq!(time.to_string(), "1:00:00");
-
-		let time = Timelike(0);
-		assert_eq!(&json!(time).to_string(), "\"00\"");
-
-		let time = Timelike(45296);
-		assert_eq!(&json!(time).to_string(), "\"12:34:56\"");
+		assert_eq!(Timelike(30).to_string(), "30");
+		assert_eq!(Timelike(2096).to_string(), "34:56");
+		assert_eq!(Timelike(3600).to_string(), "1:00:00");
+		assert_eq!(&json!(Timelike(0)).to_string(), "\"00\"");
+		assert_eq!(&json!(Timelike(45296)).to_string(), "\"12:34:56\"");
 	}
 }
