@@ -1,6 +1,5 @@
 use std::{io::Write, path::Path};
 
-use tracing::info;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
@@ -66,7 +65,7 @@ use std::{
 fn trace_the_init() {
 	let args: Vec<_> = args_os().collect();
 	let vars: BTreeMap<_, _> = vars_os().collect();
-	info!("Executed as {exe:?} in {dir:?}\n", exe = current_exe(), dir = current_dir(),);
-	info!("Arguments: {args:#?}\n", args = args);
-	info!("Environment: {vars:#?}\n", vars = vars);
+	tracing::debug!("Executed as {exe:?} in {dir:?}\n", exe = current_exe(), dir = current_dir(),);
+	tracing::debug!("Arguments: {args:#?}\n", args = args);
+	tracing::debug!("Environment: {vars:#?}\n", vars = vars);
 }
