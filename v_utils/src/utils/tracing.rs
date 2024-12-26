@@ -1,12 +1,24 @@
 use std::{io::Write, path::Path};
 
-use tracing::Level;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
+#[derive(Clone, Debug, Default)]
+pub enum LogDestination {
+	#[default]
+	Stdout,
+	File(Box<Path>),
+	XdgDataHome(String),
+}
+impl LogDestination {
+	pub fn xdg_data_home<S: Into<String>>(name: S) -> Self {
+		LogDestination::XdgDataHome(name.into())
+	}
+}
+
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
-pub fn init_subscriber(log_path: Option<Box<Path>>) {
+pub fn init_subscriber(log_destination: LogDestination) {
 	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
 	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
@@ -38,8 +50,8 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 		//  .init();
 	};
 
-	match log_path {
-		Some(path) => {
+	match log_destination {
+		LogDestination::File(path) => {
 			let path = path.to_owned();
 
 			// Truncate the file before setting up the logger
@@ -55,8 +67,11 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 				Box::new(file) as Box<dyn Write>
 			}));
 		}
-		None => {
+		LogDestination::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())));
+		}
+		LogDestination::XdgDataHome(name) => {
+			todo!()
 		}
 	};
 
