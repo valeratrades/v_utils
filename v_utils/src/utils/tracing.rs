@@ -14,6 +14,7 @@ pub enum LogDestination {
 	XdgDataHome(String),
 }
 impl LogDestination {
+	/// Helper for creating [XdgDataHome](LogDestination::XdgDataHome) variant
 	pub fn xdg_data_home<S: Into<String>>(name: S) -> Self {
 		LogDestination::XdgDataHome(name.into())
 	}
