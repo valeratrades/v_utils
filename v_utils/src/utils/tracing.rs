@@ -3,7 +3,7 @@ use std::{io::Write, path::Path};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
-/// # Panics
+/// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_path: Option<Box<Path>>) {
 	let setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
@@ -37,12 +37,10 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 
 			// Truncate the file before setting up the logger
 			{
-				let _ = std::fs::OpenOptions::new()
-					.create(true)
-					.write(true)
-					.truncate(true)
-					.open(&path)
-					.expect("Failed to truncate log file");
+				let _ = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&path).expect(&format!(
+					"Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first",
+					path.display(),
+				));
 			}
 
 			setup(Box::new(move || {
@@ -65,7 +63,7 @@ use std::{
 fn trace_the_init() {
 	let args: Vec<_> = args_os().collect();
 	let vars: BTreeMap<_, _> = vars_os().collect();
-	tracing::debug!("Executed as {exe:?} in {dir:?}\n", exe = current_exe(), dir = current_dir(),);
-	tracing::debug!("Arguments: {args:#?}\n", args = args);
-	tracing::debug!("Environment: {vars:#?}\n", vars = vars);
+	tracing::trace!("Executed as {exe:?} in {dir:?}\n", exe = current_exe(), dir = current_dir(),);
+	tracing::trace!("Arguments: {args:#?}\n", args = args);
+	tracing::trace!("Environment: {vars:#?}\n", vars = vars);
 }
