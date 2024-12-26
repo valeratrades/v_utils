@@ -1,18 +1,21 @@
 use std::{io::Write, path::Path};
 
+use tracing::Level;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_path: Option<Box<Path>>) {
-	let setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
+	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
+	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
 		let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or({
-			tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to info level logging");
-			dbg!("thing above is not logged");
+			logs_during_init.push(Box::new(|| {
+				tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to info level logging")
+			}));
 			tracing_subscriber::EnvFilter::new("debug")
 		});
 		//let env_filter = env_filter
@@ -56,6 +59,10 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 			setup(Box::new(|| Box::new(std::io::stdout())));
 		}
 	};
+
+	for log in logs_during_init {
+		log();
+	}
 
 	trace_the_init(); //? Should I make this a trace?
 }
