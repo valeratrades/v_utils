@@ -10,7 +10,11 @@ pub fn init_subscriber(log_path: Option<Box<Path>>) {
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
-		let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or(tracing_subscriber::EnvFilter::new("info"));
+		let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or({
+			tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to info level logging");
+			dbg!("thing above is not logged");
+			tracing_subscriber::EnvFilter::new("debug")
+		});
 		//let env_filter = env_filter
 		//      .add_directive("tokio=off".parse().unwrap())
 		//      .add_directive("runtime=off".parse().unwrap());
