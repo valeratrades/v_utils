@@ -1,4 +1,7 @@
-use std::{io::Write, path::Path};
+use std::{
+	io::Write,
+	path::{Path, PathBuf},
+};
 
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
@@ -50,28 +53,38 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//  .init();
 	};
 
+	fn destination_is_path<F, P>(path: P, setup: F)
+	where
+		P: Into<PathBuf> + Sized,
+		//F: FnOnce() -> Box<dyn Write> + 'static, {
+		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>) -> (), {
+		let path = path.into();
+
+		// Truncate the file before setting up the logger
+		{
+			let _ = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&path).expect(&format!(
+				"Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first",
+				path.display(),
+			));
+		}
+
+		setup(Box::new(move || {
+			let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).expect("Failed to open log file");
+			Box::new(file) as Box<dyn Write>
+		}));
+	}
+
 	match log_destination {
 		LogDestination::File(path) => {
-			let path = path.to_owned();
-
-			// Truncate the file before setting up the logger
-			{
-				let _ = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&path).expect(&format!(
-					"Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first",
-					path.display(),
-				));
-			}
-
-			setup(Box::new(move || {
-				let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).expect("Failed to open log file");
-				Box::new(file) as Box<dyn Write>
-			}));
+			destination_is_path(path, setup);
 		}
 		LogDestination::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())));
 		}
 		LogDestination::XdgDataHome(name) => {
-			todo!()
+			let associated_data_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_data_directory("").unwrap();
+			let log_path = associated_data_home.join(".log");
+			destination_is_path(log_path, setup);
 		}
 	};
 
