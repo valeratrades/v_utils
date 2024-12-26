@@ -1,6 +1,6 @@
 [package]
 name = "v_utils_macros"
-version = "1.6.2"
+version = "1.7.0"
 edition = "2021"
 description = "Macros for my utils crate"
 rust-version = "1.75"
