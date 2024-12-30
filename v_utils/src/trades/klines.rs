@@ -64,13 +64,16 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 	ohlc_data
 }
 
-//? add oi, lsr, etc?
 /// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
 #[derive(Clone, Debug, Default, derive_new::new, Copy)]
 pub struct Kline {
+	pub open_time: DateTime<Utc>,
 	pub ohlc: Ohlc,
-	pub timestamp: DateTime<Utc>,
-	pub volume: f64,
+	/// later on I'm likely to graduate to having everything normalized to USDT, or, even better, to actual inflation-adjusted USD dollars, but for now mark this as explicitly `quote`-denominated
+	pub volume_quote: f64,
+	pub trades: Option<usize>,
+	pub taker_buy_volume_quote: Option<usize>,
+	pub close_time: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]

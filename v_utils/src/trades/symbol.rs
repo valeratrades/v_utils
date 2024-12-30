@@ -23,6 +23,7 @@ impl Symbols {
 }
 
 /// So functions can say they just want any symbol. Could use enum, but community suggested following logic: `likely to add more structs ? use trait : likely to implement more functionality on each ? use enum`
+#[deprecated(note = "use `Pair` instead")]
 pub trait Symbol {
 	fn inner(&self) -> String;
 }

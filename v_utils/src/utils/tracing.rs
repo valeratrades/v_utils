@@ -3,6 +3,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use tracing::info;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
 
@@ -11,12 +12,12 @@ pub enum LogDestination {
 	#[default]
 	Stdout,
 	File(Box<Path>),
-	XdgDataHome(String),
+	Xdg(String),
 }
 impl LogDestination {
 	/// Helper for creating [XdgDataHome](LogDestination::XdgDataHome) variant
-	pub fn xdg_data_home<S: Into<String>>(name: S) -> Self {
-		LogDestination::XdgDataHome(name.into())
+	pub fn xdg<S: Into<String>>(name: S) -> Self {
+		LogDestination::Xdg(name.into())
 	}
 }
 
@@ -58,15 +59,17 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	where
 		P: Into<PathBuf> + Sized,
 		//F: FnOnce() -> Box<dyn Write> + 'static, {
-		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>) -> (), {
+		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>), {
 		let path = path.into();
 
 		// Truncate the file before setting up the logger
 		{
-			let _ = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(&path).expect(&format!(
-				"Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first",
-				path.display(),
-			));
+			let _ = std::fs::OpenOptions::new()
+				.create(true)
+				.write(true)
+				.truncate(true)
+				.open(&path)
+				.unwrap_or_else(|_| panic!("Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first", path.display()));
 		}
 
 		setup(Box::new(move || {
@@ -82,8 +85,8 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		LogDestination::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())));
 		}
-		LogDestination::XdgDataHome(name) => {
-			let associated_data_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_data_directory("").unwrap();
+		LogDestination::Xdg(name) => {
+			let associated_data_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_state_directory("").unwrap();
 			let log_path = associated_data_home.join(".log");
 			destination_is_path(log_path, setup);
 		}
@@ -92,6 +95,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	for log in logs_during_init {
 		log();
 	}
+	info!("Starting ...");
 
 	trace_the_init(); //? Should I make this a trace?
 }

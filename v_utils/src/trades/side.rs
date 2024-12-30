@@ -39,7 +39,7 @@ impl<'de> Deserialize<'de> for Side {
 		D: Deserializer<'de>, {
 		struct SideVisitor;
 
-		impl<'de> serde::de::Visitor<'de> for SideVisitor {
+		impl serde::de::Visitor<'_> for SideVisitor {
 			type Value = Side;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

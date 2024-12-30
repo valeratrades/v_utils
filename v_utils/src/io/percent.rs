@@ -20,7 +20,7 @@ impl<'de> Deserialize<'de> for Percent {
 		D: Deserializer<'de>, {
 		struct PercentVisitor;
 
-		impl<'de> de::Visitor<'de> for PercentVisitor {
+		impl de::Visitor<'_> for PercentVisitor {
 			type Value = Percent;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
