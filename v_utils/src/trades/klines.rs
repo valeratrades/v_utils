@@ -72,7 +72,7 @@ pub struct Kline {
 	/// later on I'm likely to graduate to having everything normalized to USDT, or, even better, to actual inflation-adjusted USD dollars, but for now mark this as explicitly `quote`-denominated
 	pub volume_quote: f64,
 	pub trades: Option<usize>,
-	pub taker_buy_volume_quote: Option<usize>,
+	pub taker_buy_volume_quote: Option<f64>,
 	pub close_time: Option<DateTime<Utc>>,
 }
 

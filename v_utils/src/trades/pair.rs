@@ -1,29 +1,55 @@
-#[derive(Clone, Debug, Default)]
-/// In reality fields can hardly ever even fill 8 bytes, but there is hardly a price to having a safety margin here.
-pub struct Pair {
-	pub base: [u8; 16],
-	pub quote: [u8; 16],
+#[derive(Clone, Default, Copy, PartialEq, Eq, Hash)]
+pub struct Asset(pub [u8; 16]);
+impl Asset {
+	pub fn new<S: AsRef<str>>(s: S) -> Self {
+		let mut bytes = [0; 16];
+		bytes[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
+		Self(bytes)
+	}
 }
-impl Pair {
-	//HACK: suboptimal implementation
-	pub fn new<S: Into<String>>(base: S, quote: S) -> Self {
-		let base = base.into().to_uppercase();
-		let quote = quote.into().to_uppercase();
-		let mut base_bytes = [0; 16];
-		let mut quote_bytes = [0; 16];
-		base_bytes[..base.len()].copy_from_slice(base.as_bytes());
-		quote_bytes[..quote.len()].copy_from_slice(quote.as_bytes());
-		Self {
-			base: base_bytes,
-			quote: quote_bytes,
-		}
+impl std::fmt::Display for Asset {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		let s = std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0');
+		write!(f, "{s}")
+	}
+}
+impl std::fmt::Debug for Asset {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		let s = std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0');
+		write!(f, "{s}")
+	}
+}
+impl From<&str> for Asset {
+	fn from(s: &str) -> Self {
+		Self::new(s)
+	}
+}
+impl From<String> for Asset {
+	fn from(s: String) -> Self {
+		Self::new(s)
 	}
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Pair {
+	base: Asset,
+	quote: Asset,
+}
+impl Pair {
+	pub fn new<S: Into<Asset>>(base: S, quote: S) -> Self {
+		Self {
+			base: base.into(),
+			quote: quote.into(),
+		}
+	}
+}
+impl<A: Into<Asset>> From<(A, A)> for Pair {
+	fn from((base, quote): (A, A)) -> Self {
+		Self::new(base, quote)
+	}
+}
 impl std::fmt::Display for Pair {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		let base = std::str::from_utf8(&self.base).unwrap();
-		let quote = std::str::from_utf8(&self.quote).unwrap();
-		write!(f, "{}{}", base, quote)
+		write!(f, "{}{}", self.base, self.quote)
 	}
 }

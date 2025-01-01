@@ -4,6 +4,9 @@ pub use eyre::*;
 pub mod snapshots;
 pub use snapshots::*;
 
+pub mod serde;
+pub use serde::*;
+
 #[cfg(feature = "tracing")]
 pub mod tracing;
 #[cfg(feature = "tracing")]
