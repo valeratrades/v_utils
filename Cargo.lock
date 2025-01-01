@@ -3164,7 +3164,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils_macros"
-version = "1.8.0"
+version = "0.8.0"
 dependencies = [
  "eyre",
  "insta",
