@@ -581,7 +581,6 @@ pub fn wrap_new(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
-//TODO!!!: finish and test
 #[proc_macro_derive(ScreamIt)]
 pub fn scream_it(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
