@@ -16,11 +16,11 @@ pub enum OrderType {
 
 #[test]
 fn test_scream_it() {
-	let order = OrderType::from_str("LIMIT").unwrap();
-	assert_debug_snapshot!(order, @"Limit");
+	let order = OrderType::from_str("STOP_MARKET").unwrap();
+	assert_debug_snapshot!(order, @"StopMarket");
 
-	let order_str = OrderType::Market.to_string();
-	assert_debug_snapshot!(order_str, @r#""MARKET""#);
+	let order_str = OrderType::TakeProfit.to_string();
+	assert_debug_snapshot!(order_str, @r#""TAKE_PROFIT""#);
 
 	let invalid_order = OrderType::from_str("INVALID");
 	assert_debug_snapshot!(invalid_order, @r#"

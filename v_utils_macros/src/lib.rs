@@ -2,11 +2,12 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro;
+use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
 	parse::{Parse, ParseStream},
-	parse_macro_input, token, Data, DeriveInput, Ident, LitInt, Token,
+	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
 };
 
 /// returns `Vec<String>` of the ways to refer to a struct name
@@ -88,10 +89,10 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///```
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
-	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
-	let fields = if let syn::Data::Struct(syn::DataStruct {
-		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
 		..
 	}) = ast.data
 	{
@@ -178,10 +179,10 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym AND same fields. In reality, shouldn't happen.
 #[proc_macro_derive(OptionalFieldsFromVecStr)]
 pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
-	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
-	let fields = if let syn::Data::Struct(syn::DataStruct {
-		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
 		..
 	}) = ast.data
 	{
@@ -581,6 +582,8 @@ pub fn wrap_new(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
+//BUG: doesn't convert to SCREAMING_SNAKE_CASE, but simply uppercases everything
+/// Implements Display and FromStr for variants of an enum, using SCREAMING_SNAKE_CASE
 #[proc_macro_derive(ScreamIt)]
 pub fn scream_it(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
@@ -597,7 +600,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 	let display_impl = {
 		let arms = variants.iter().map(|variant| {
 			let variant_name = &variant.ident;
-			let screamed_name = variant_name.to_string().to_uppercase();
+			let screamed_name = AsShoutySnakeCase(variant_name.to_string()).to_string();
 			quote! {
 				Self::#variant_name => write!(f, #screamed_name),
 			}
@@ -618,7 +621,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 	let from_str_impl = {
 		let arms = variants.iter().map(|variant| {
 			let variant_name = &variant.ident;
-			let screamed_name = variant_name.to_string().to_uppercase();
+			let screamed_name = AsShoutySnakeCase(variant_name.to_string()).to_string();
 			quote! {
 				#screamed_name => Ok(Self::#variant_name),
 			}

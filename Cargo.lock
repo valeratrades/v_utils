@@ -3156,6 +3156,7 @@ name = "v_utils_macros"
 version = "2.0.0"
 dependencies = [
  "eyre",
+ "heck",
  "insta",
  "polars",
  "proc-macro2",
