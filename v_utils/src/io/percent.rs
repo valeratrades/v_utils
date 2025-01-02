@@ -3,7 +3,7 @@ use std::{
 	str::FromStr,
 };
 
-use eyre::{Error, Result};
+use eyre::{eyre, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, derive_new::new, PartialEq)]
@@ -63,7 +63,7 @@ impl FromStr for Percent {
 				false => f,
 			}
 		} else {
-			return Err(Error::msg("Failed to parse \"{s}\" to percent"));
+			return Err(eyre!("Failed to parse \"{s}\" to percent"));
 		};
 
 		Ok(Percent(percent))
