@@ -14,8 +14,7 @@ pub enum OrderType {
 	TrailingStopMarket,
 }
 
-#[test]
-fn test_scream_it() {
+fn main() {
 	let order = OrderType::from_str("STOP_MARKET").unwrap();
 	assert_debug_snapshot!(order, @"StopMarket");
 
