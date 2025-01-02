@@ -6,4 +6,6 @@ fn tests() {
 	t.pass("tests/init_compact.rs");
 	t.pass("tests/my_config_primitives.rs");
 	t.pass("tests/make_df.rs");
+	t.pass("tests/wrap_new.rs");
+	t.pass("tests/scream_it.rs");
 }

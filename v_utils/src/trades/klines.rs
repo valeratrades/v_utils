@@ -4,7 +4,7 @@ use eyre::Result;
 
 use crate::trades::Timeframe;
 
-#[derive(Clone, Debug, Default, derive_new::new, Copy)]
+#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq)]
 pub struct Ohlc {
 	pub open: f64,
 	pub high: f64,
@@ -65,7 +65,7 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 }
 
 /// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
-#[derive(Clone, Debug, Default, derive_new::new, Copy)]
+#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq)]
 pub struct Kline {
 	pub open_time: DateTime<Utc>,
 	pub ohlc: Ohlc,

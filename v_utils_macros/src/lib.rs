@@ -6,7 +6,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
 	parse::{Parse, ParseStream},
-	parse_macro_input, token, Ident, LitInt, Token,
+	parse_macro_input, token, Data, DeriveInput, Ident, LitInt, Token,
 };
 
 /// returns `Vec<String>` of the ways to refer to a struct name
@@ -556,3 +556,93 @@ pub fn make_df(input: TokenStream) -> TokenStream {
 	.into()
 }
 //,}}}
+
+#[proc_macro_derive(WrapNew)]
+pub fn wrap_new(input: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	let name = &input.ident;
+
+	let inner_type = match &input.data {
+		Data::Struct(data) => match &data.fields {
+			syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => &fields.unnamed.first().unwrap().ty,
+			_ => panic!("NewWrapper can only be derived for tuple structs with one field"),
+		},
+		_ => panic!("NewWrapper can only be derived for tuple structs"),
+	};
+
+	let expanded = quote! {
+		impl #name {
+			pub fn new() -> Self {
+				Self(<#inner_type>::new())
+			}
+		}
+	};
+
+	TokenStream::from(expanded)
+}
+
+//TODO!!!: finish and test
+#[proc_macro_derive(ScreamIt)]
+pub fn scream_it(input: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	let name = &input.ident;
+
+	// Ensure it's an enum
+	let variants = if let Data::Enum(syn::DataEnum { variants, .. }) = &input.data {
+		variants
+	} else {
+		panic!("#[derive(ScreamIt)] can only be used on enums");
+	};
+
+	// Generate the Display implementation
+	let display_impl = {
+		let arms = variants.iter().map(|variant| {
+			let variant_name = &variant.ident;
+			let screamed_name = variant_name.to_string().to_uppercase();
+			quote! {
+				Self::#variant_name => write!(f, #screamed_name),
+			}
+		});
+
+		quote! {
+			impl std::fmt::Display for #name {
+				fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+					match self {
+						#(#arms)*
+					}
+				}
+			}
+		}
+	};
+
+	// Generate the FromStr implementation
+	let from_str_impl = {
+		let arms = variants.iter().map(|variant| {
+			let variant_name = &variant.ident;
+			let screamed_name = variant_name.to_string().to_uppercase();
+			quote! {
+				#screamed_name => Ok(Self::#variant_name),
+			}
+		});
+
+		quote! {
+			impl std::str::FromStr for #name {
+				type Err = ();
+
+				fn from_str(s: &str) -> Result<Self, Self::Err> {
+					match s {
+						#(#arms)*
+						_ => Err(()),
+					}
+				}
+			}
+		}
+	};
+
+	let expanded = quote! {
+		#display_impl
+		#from_str_impl
+	};
+
+	TokenStream::from(expanded)
+}
