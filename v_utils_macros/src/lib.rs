@@ -641,9 +641,34 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 		}
 	};
 
+	let serialize_impl = quote! {
+		impl serde::Serialize for #name {
+			fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+			where
+				S: serde::Serializer,
+			{
+				serializer.serialize_str(&self.to_string())
+			}
+		}
+	};
+
+	let deserialize_impl = quote! {
+		impl<'de> serde::Deserialize<'de> for #name {
+			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+			where
+				D: serde::Deserializer<'de>,
+			{
+				let s = String::deserialize(deserializer)?;
+				s.parse().map_err(|_| serde::de::Error::custom("invalid enum value"))
+			}
+		}
+	};
+
 	let expanded = quote! {
 		#display_impl
 		#from_str_impl
+		#serialize_impl
+		#deserialize_impl
 	};
 
 	TokenStream::from(expanded)

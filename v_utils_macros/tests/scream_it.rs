@@ -27,4 +27,10 @@ fn main() {
      (),
  )
  "#);
+
+	let deserialize_order = serde_json::from_str::<OrderType>(r#""TAKE_PROFIT""#).unwrap();
+	assert_debug_snapshot!(deserialize_order, @"TakeProfit");
+
+	let serialized_str = serde_json::to_string(&OrderType::TrailingStopMarket).unwrap();
+	assert_debug_snapshot!(serialized_str, @r#""\"TRAILING_STOP_MARKET\"""#);
 }
