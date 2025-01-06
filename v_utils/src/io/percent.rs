@@ -3,10 +3,13 @@ use std::{
 	str::FromStr,
 };
 
+use derive_more::{Deref, DerefMut};
 use eyre::{eyre, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-#[derive(Copy, Clone, Debug, Default, derive_new::new, PartialEq)]
+//TODO: allow deser from '<usize>x' format where `x` is multiplier of 100%
+
+#[derive(Clone, Debug, Default, Copy, derive_new::new, PartialEq, Deref, DerefMut)]
 pub struct Percent(pub f64);
 impl Percent {
 	pub fn inner(self) -> f64 {
@@ -24,7 +27,7 @@ impl<'de> Deserialize<'de> for Percent {
 			type Value = Percent;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-				formatter.write_str("a float, an integer, or a string representing a percentage")
+				formatter.write_str("a float, an integer, a string percentage, or '<number>x' format")
 			}
 
 			fn visit_f64<E>(self, value: f64) -> Result<Percent, E>
@@ -42,6 +45,12 @@ impl<'de> Deserialize<'de> for Percent {
 			fn visit_str<E>(self, value: &str) -> Result<Percent, E>
 			where
 				E: de::Error, {
+				if let Some(x_val) = value.strip_suffix('x') {
+					return match x_val.parse::<f64>() {
+						Ok(n) => Ok(Percent(n)),
+						Err(_) => Err(de::Error::custom(format!("Invalid 'x' format: {value}"))),
+					};
+				}
 				Percent::from_str(value).map_err(de::Error::custom)
 			}
 		}
@@ -102,13 +111,6 @@ impl PartialEq<f64> for Percent {
 impl PartialOrd<f64> for Percent {
 	fn partial_cmp(&self, other: &f64) -> Option<std::cmp::Ordering> {
 		self.0.partial_cmp(other)
-	}
-}
-impl std::ops::Deref for Percent {
-	type Target = f64;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
 	}
 }
 
@@ -386,5 +388,16 @@ mod tests {
 	fn allows_negative() {
 		let p = Percent::from_str("-50%").unwrap();
 		assert_eq!(p.0, -0.5);
+	}
+
+	#[test]
+	fn x_format() {
+		let json = r#""1.5x""#;
+		let p: Percent = serde_json::from_str(json).unwrap();
+		assert_eq!(p.0, 1.5);
+
+		let json = r#""0.5x""#;
+		let p: Percent = serde_json::from_str(json).unwrap();
+		assert_eq!(p.0, 0.5);
 	}
 }
