@@ -57,6 +57,21 @@ impl std::fmt::Display for Pair {
 	}
 }
 
+#[derive(thiserror::Error, Debug)]
+#[error("Invalid pair format '{provided_str}'. Expected two assets separated by one of: [{}]", allowed_delimiters.join(" "))]
+pub struct InvalidPairError {
+	provided_str: String,
+	allowed_delimiters: Vec<String>,
+}
+impl InvalidPairError {
+	pub fn new<S: Into<String>>(provided_str: &str, allowed_delimiters: impl IntoIterator<Item = S>) -> Self {
+		Self {
+			provided_str: provided_str.to_owned(),
+			allowed_delimiters: allowed_delimiters.into_iter().map(Into::into).collect(),
+		}
+	}
+}
+
 impl std::str::FromStr for Pair {
 	type Err = Report;
 
@@ -69,19 +84,11 @@ impl std::str::FromStr for Pair {
 				if parts.len() == 2 {
 					return Ok(Self::new(parts[0], parts[1]));
 				}
-				return Err(eyre::eyre!("Invalid pair format: {}", s));
+				return Err(InvalidPairError::new(s, delimiters.iter().map(|c| c.to_string())).into());
 			}
 		}
 
-		if !s.is_empty() && s.len() % 2 == 0 {
-			let mid = s.len() / 2;
-			let (base, quote) = s.split_at(mid);
-			if !base.is_empty() && !quote.is_empty() {
-				return Ok(Self::new(base, quote));
-			}
-		}
-
-		Err(eyre::eyre!("Invalid pair format: {}", s))
+		Err(InvalidPairError::new(s, delimiters.iter().map(|c| c.to_string())).into())
 	}
 }
 
@@ -96,11 +103,11 @@ mod tests {
 		assert_eq!("SOL_USDT".parse::<Pair>().unwrap(), Pair::new("SOL", "USDT"));
 		assert_eq!("XRP/USDC".parse::<Pair>().unwrap(), Pair::new("XRP", "USDC"));
 		assert_eq!("BTC - USD".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
-		assert_eq!("BTCUSD".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
 
+		assert!("BTCUSD".parse::<Pair>().is_err());
 		assert!("".parse::<Pair>().is_err());
 		assert!("BTC".parse::<Pair>().is_err());
-		assert!(dbg!("BTC-".parse::<Pair>()).is_err());
+		assert!("BTC-".parse::<Pair>().is_err());
 		assert!("-USD".parse::<Pair>().is_err());
 	}
 }
