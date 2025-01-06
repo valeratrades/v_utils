@@ -5,8 +5,9 @@ use eyre::Report;
 pub struct Asset(pub [u8; 16]);
 impl Asset {
 	pub fn new<S: AsRef<str>>(s: S) -> Self {
+		let s = s.as_ref().to_uppercase();
 		let mut bytes = [0; 16];
-		bytes[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
+		bytes[..s.len()].copy_from_slice(s.as_bytes());
 		Self(bytes)
 	}
 }
@@ -102,7 +103,7 @@ mod tests {
 		assert_eq!("ETH,USD".parse::<Pair>().unwrap(), Pair::new("ETH", "USD"));
 		assert_eq!("SOL_USDT".parse::<Pair>().unwrap(), Pair::new("SOL", "USDT"));
 		assert_eq!("XRP/USDC".parse::<Pair>().unwrap(), Pair::new("XRP", "USDC"));
-		assert_eq!("BTC - USD".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
+		assert_eq!("btc - usd".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
 
 		assert!("BTCUSD".parse::<Pair>().is_err());
 		assert!("".parse::<Pair>().is_err());
