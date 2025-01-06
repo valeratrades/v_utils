@@ -375,4 +375,16 @@ mod tests {
 		assert_eq!(p, 0.5);
 		assert!(p > 0.49);
 	}
+
+	#[test]
+	fn allows_above_100() {
+		let p = Percent::from_str("150%").unwrap();
+		assert_eq!(p.0, 1.5);
+	}
+
+	#[test]
+	fn allows_negative() {
+		let p = Percent::from_str("-50%").unwrap();
+		assert_eq!(p.0, -0.5);
+	}
 }
