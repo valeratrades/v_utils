@@ -34,7 +34,7 @@ impl From<String> for Asset {
 	}
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Hash)]
 pub struct Pair {
 	base: Asset,
 	quote: Asset,
@@ -78,6 +78,7 @@ impl std::str::FromStr for Pair {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let delimiters = [',', '-', '_', '/'];
+		let recognized_quotes = ["USD", "USDT", "USDC", "BTC", "ETH"];
 
 		for delimiter in delimiters {
 			if s.contains(delimiter) {
@@ -86,6 +87,14 @@ impl std::str::FromStr for Pair {
 					return Ok(Self::new(parts[0], parts[1]));
 				}
 				return Err(InvalidPairError::new(s, delimiters.iter().map(|c| c.to_string())).into());
+			}
+		}
+
+		if let Some(quote) = recognized_quotes.iter().find(|q| s.ends_with(*q)) {
+			let base_len = s.len() - quote.len();
+			if base_len > 0 {
+				let base = &s[..base_len];
+				return Ok(Self::new(base, *quote));
 			}
 		}
 
@@ -104,8 +113,9 @@ mod tests {
 		assert_eq!("SOL_USDT".parse::<Pair>().unwrap(), Pair::new("SOL", "USDT"));
 		assert_eq!("XRP/USDC".parse::<Pair>().unwrap(), Pair::new("XRP", "USDC"));
 		assert_eq!("btc - usd".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
+		assert_eq!("DOGEUSDT".parse::<Pair>().unwrap(), Pair::new("DOGE", "USDT"));
 
-		assert!("BTCUSD".parse::<Pair>().is_err());
+		assert!("something".parse::<Pair>().is_err());
 		assert!("".parse::<Pair>().is_err());
 		assert!("BTC".parse::<Pair>().is_err());
 		assert!("BTC-".parse::<Pair>().is_err());
