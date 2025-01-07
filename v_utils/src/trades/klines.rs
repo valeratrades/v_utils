@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use chrono::{DateTime, Duration, Utc};
+use derive_more::{Deref, DerefMut};
 use eyre::Result;
 
 use crate::trades::Timeframe;
@@ -67,9 +68,11 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 /// Standard candlestick data unit. Can only ever be full, - if an exchange returns partial data for an ongoing candle, or if trading/exchange is down leading to the associated data being cut, the [Kline] object is NOT created.
 /// # Other
 /// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
-#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq)]
+#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, Deref, DerefMut)]
 pub struct Kline {
 	pub open_time: DateTime<Utc>,
+	#[deref_mut]
+	#[deref]
 	pub ohlc: Ohlc,
 	/// later on I'm likely to graduate to having everything normalized to USDT, or, even better, to actual inflation-adjusted USD dollars, but for now mark this as explicitly `quote`-denominated
 	pub volume_quote: f64,
