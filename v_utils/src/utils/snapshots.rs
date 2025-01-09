@@ -224,6 +224,8 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 	SnapshotP::build(&prices).secondary_pane_optional(order_points).draw()
 }
 
+//TODO!!!!!: `plot_xy()`, that would have explicit axis markings in the expected locations (for now make strictly positive to avoid logic for dynamically positioning the axis).
+
 #[cfg(test)]
 mod tests {
 	use insta::assert_snapshot;

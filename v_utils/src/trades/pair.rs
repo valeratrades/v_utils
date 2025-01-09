@@ -10,17 +10,19 @@ impl Asset {
 		bytes[..s.len()].copy_from_slice(s.as_bytes());
 		Self(bytes)
 	}
+
+	fn fmt(&self) -> &str {
+		std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0')
+	}
 }
 impl std::fmt::Display for Asset {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		let s = std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0');
-		write!(f, "{s}")
+		write!(f, "{}", self.fmt())
 	}
 }
 impl std::fmt::Debug for Asset {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		let s = std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0');
-		write!(f, "{s}")
+		write!(f, "{}", self.fmt())
 	}
 }
 impl From<&str> for Asset {
@@ -31,6 +33,11 @@ impl From<&str> for Asset {
 impl From<String> for Asset {
 	fn from(s: String) -> Self {
 		Self::new(s)
+	}
+}
+impl AsRef<str> for Asset {
+	fn as_ref(&self) -> &str {
+		self.fmt()
 	}
 }
 
@@ -78,7 +85,7 @@ impl std::str::FromStr for Pair {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let delimiters = [',', '-', '_', '/'];
-		let recognized_quotes = ["USD", "USDT", "USDC", "BTC", "ETH"];
+		let recognized_quotes = ["USD", "EUR", "GBP", "USDT", "USDC", "BTC", "ETH"];
 
 		for delimiter in delimiters {
 			if s.contains(delimiter) {
@@ -99,6 +106,39 @@ impl std::str::FromStr for Pair {
 		}
 
 		Err(InvalidPairError::new(s, delimiters.iter().map(|c| c.to_string())).into())
+	}
+}
+impl TryFrom<&str> for Pair {
+	type Error = Report;
+
+	fn try_from(s: &str) -> Result<Self, Self::Error> {
+		s.parse()
+	}
+}
+impl TryFrom<String> for Pair {
+	type Error = Report;
+
+	fn try_from(s: String) -> Result<Self, Self::Error> {
+		s.parse()
+	}
+}
+impl From<Pair> for String {
+	fn from(pair: Pair) -> Self {
+		pair.to_string()
+	}
+}
+
+#[allow(clippy::cmp_owned)]
+impl PartialEq<Pair> for &str {
+	fn eq(&self, other: &Pair) -> bool {
+		*self == other.to_string()
+	}
+}
+
+#[allow(clippy::cmp_owned)]
+impl PartialEq<Pair> for str {
+	fn eq(&self, other: &Pair) -> bool {
+		self == other.to_string()
 	}
 }
 
