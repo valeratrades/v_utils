@@ -80,12 +80,36 @@ impl InvalidPairError {
 	}
 }
 
+/// function to prevent human error in the order of the prefixes, because I know sooner or later I'll mess it up. Will return false if say "WETH" is found _after_ "ETH"
+///HACK: couldn't figure out how to do this at compile time
+#[doc(hidden)]
+fn check_prefix_order<const N: usize>(arr: [&str; N]) -> eyre::Result<()> {
+	for i in 0..N {
+		for j in (i + 1)..N {
+			if arr[i].len() < arr[j].len() && arr[j].ends_with(arr[i]) {
+				eyre::bail!("{} is a suffix of {}", arr[i], arr[j]);
+			}
+		}
+	}
+	Ok(())
+}
+
 impl std::str::FromStr for Pair {
 	type Err = Report;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let delimiters = [',', '-', '_', '/'];
-		let recognized_quotes = ["USD", "EUR", "GBP", "USDT", "USDC", "BTC", "ETH"];
+		let currencies = [
+			"EURI", "EUR", "USD", "GBP", "USDP", "USDS", "PLN", "RON", "CZK", "TRY", "JPY", "BRL", "RUB", "AUD", "NGN", "MXN", "COP", "ARS", "BKRW", "IDRT", "UAH", "BIDR", "BVND",
+		];
+		let crypto = ["USDT", "USDC", "UST", "BTC", "WETH", "ETH", "BNB", "SOL", "XRP", "PAX", "DAI", "VAI"];
+		if let Err(e) = check_prefix_order(currencies) {
+			unreachable!("Invalid prefix order, I messed up bad: {e}");
+		}
+		if let Err(e) = check_prefix_order(crypto) {
+			unreachable!("Invalid prefix order, I messed up bad: {e}");
+		}
+		let recognized_quotes = [currencies.as_slice(), crypto.as_slice()].concat();
 
 		for delimiter in delimiters {
 			if s.contains(delimiter) {
@@ -128,6 +152,7 @@ impl From<Pair> for String {
 	}
 }
 
+//TODO: get working
 #[allow(clippy::cmp_owned)]
 impl PartialEq<Pair> for &str {
 	fn eq(&self, other: &Pair) -> bool {
