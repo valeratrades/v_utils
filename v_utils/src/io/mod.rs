@@ -1,11 +1,11 @@
 mod cli;
-mod expanded_path;
-mod files;
-mod percent;
-mod progress_bar;
-
 pub use cli::*;
+
+mod expanded_path;
 pub use expanded_path::*;
+
+mod files;
 pub use files::*;
-pub use percent::*;
+
+mod progress_bar;
 pub use progress_bar::*;

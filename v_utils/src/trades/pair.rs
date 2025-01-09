@@ -100,9 +100,9 @@ impl std::str::FromStr for Pair {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let delimiters = [',', '-', '_', '/'];
 		let currencies = [
-			"EURI", "EUR", "USD", "GBP", "USDP", "USDS", "PLN", "RON", "CZK", "TRY", "JPY", "BRL", "RUB", "AUD", "NGN", "MXN", "COP", "ARS", "BKRW", "IDRT", "UAH", "BIDR", "BVND",
+			"EURI", "EUR", "USD", "GBP", "USDP", "USDS", "PLN", "RON", "CZK", "TRY", "JPY", "BRL", "RUB", "AUD", "NGN", "MXN", "COP", "ARS", "BKRW", "IDRT", "UAH", "BIDR", "BVND", "ZAR",
 		];
-		let crypto = ["USDT", "USDC", "UST", "BTC", "WETH", "ETH", "BNB", "SOL", "XRP", "PAX", "DAI", "VAI"];
+		let crypto = ["USDT", "USDC", "UST", "BTC", "WETH", "ETH", "BNB", "SOL", "XRP", "PAX", "DAI", "VAI", "DOGE", "DOT", "TRX"];
 		if let Err(e) = check_prefix_order(currencies) {
 			unreachable!("Invalid prefix order, I messed up bad: {e}");
 		}
