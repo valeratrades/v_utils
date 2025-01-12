@@ -40,6 +40,16 @@ impl AsRef<str> for Asset {
 		self.fmt()
 	}
 }
+impl PartialEq<str> for Asset {
+	fn eq(&self, other: &str) -> bool {
+		self.fmt() == other
+	}
+}
+impl PartialEq<&str> for Asset {
+	fn eq(&self, other: &&str) -> bool {
+		&self.fmt() == other
+	}
+}
 
 #[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Hash)]
 pub struct Pair {
@@ -52,6 +62,10 @@ impl Pair {
 			base: base.into(),
 			quote: quote.into(),
 		}
+	}
+
+	pub fn is_usdt(&self) -> bool {
+		self.quote == "USDT" && self.base != "BTCST" /*Binance thing*/
 	}
 }
 impl<A: Into<Asset>> From<(A, A)> for Pair {
