@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "2.0.3"
+version = "2.0.4"
 edition = "2021"
 description = "My utils crate"
 rust-version = "1.75"
@@ -45,7 +45,7 @@ tracing-error = { version = "^0.2.1", optional = true }
 console-subscriber = { version = "0.4.1", optional = true }
 #
 
-v_utils_macros = { path = "../v_utils_macros", version = "^2.0.3", optional = true }
+v_utils_macros = { path = "../v_utils_macros", version = "^2.0.4", optional = true }
 xdg = "2.5.2"
 macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
 derive_more = { version = "1.0.0", features = ["full"] }
