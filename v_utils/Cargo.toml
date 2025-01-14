@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "2.0.4"
+version = "2.0.5"
 edition = "2021"
 description = "My utils crate"
 rust-version = "1.75"
@@ -25,14 +25,14 @@ serde_json = "^1.0.135"
 tokio = { version = "^1.43.0", features = ["full", "io-util"] }
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
 num = "^0.4.3" # same thing as `function_name` - this is used by `utlils` mod
-thiserror = "2.0.10"
+thiserror = "2.0.11"
 
 # # optional
 async-sse = { version = "^5.1.0", optional = true }
 bytes = { version = "^1.9.0", optional = true }
 reqwest = { version = "^0.12.12", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
 chrono = { version = "^0.4.39", optional = true }
-dirs = { version = "^5.0.1", optional = true }
+dirs = { version = "^6.0.0", optional = true }
 futures = { version = "^0.3.31", optional = true }
 quote = { version = "^1.0.38", optional = true }
 rand = { version = "^0.8.5", optional = true }

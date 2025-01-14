@@ -1,7 +1,7 @@
 use derive_more::{Deref, DerefMut};
 use eyre::Report;
 
-#[derive(Clone, Default, Copy, PartialEq, Eq, Hash, Deref, DerefMut)]
+#[derive(Clone, Default, Copy, PartialEq, Eq, Hash, Deref, DerefMut, PartialOrd, Ord)]
 pub struct Asset(pub [u8; 16]);
 impl Asset {
 	pub fn new<S: AsRef<str>>(s: S) -> Self {
@@ -51,7 +51,7 @@ impl PartialEq<&str> for Asset {
 	}
 }
 
-#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Pair {
 	base: Asset,
 	quote: Asset,
