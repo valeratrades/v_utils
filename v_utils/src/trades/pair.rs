@@ -17,7 +17,8 @@ impl Asset {
 }
 impl std::fmt::Display for Asset {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "{}", self.fmt())
+		let s = self.fmt();
+		f.pad(s)
 	}
 }
 impl std::fmt::Debug for Asset {
@@ -66,6 +67,14 @@ impl Pair {
 
 	pub fn is_usdt(&self) -> bool {
 		self.quote == "USDT" && self.base != "BTCST" /*Binance thing*/
+	}
+
+	pub fn base(&self) -> &Asset {
+		&self.base
+	}
+
+	pub fn quote(&self) -> &Asset {
+		&self.quote
 	}
 }
 impl<A: Into<Asset>> From<(A, A)> for Pair {

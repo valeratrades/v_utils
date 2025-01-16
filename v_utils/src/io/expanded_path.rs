@@ -55,7 +55,7 @@ impl From<PathBuf> for ExpandedPath {
 
 impl std::fmt::Display for ExpandedPath {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0.display())
+		f.pad(&self.0.to_string_lossy())
 	}
 }
 impl AsRef<Path> for ExpandedPath {

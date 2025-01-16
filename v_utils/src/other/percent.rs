@@ -96,10 +96,11 @@ impl Serialize for Percent {
 impl std::fmt::Display for Percent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let percent_number = self.0 * 100.;
-		match percent_number.fract() == 0. {
-			true => write!(f, "{}%", percent_number as isize),
-			false => write!(f, "{}%", percent_number),
-		}
+		let s = match percent_number.fract() == 0. {
+			true => format!("{}%", percent_number as isize),
+			false => format!("{}%", percent_number),
+		};
+		f.pad(&s)
 	}
 }
 
