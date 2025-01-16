@@ -8,7 +8,7 @@ impl std::fmt::Display for NowThen {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let diff = self.now - self.then;
 
-		let (now_f, now_suffix) = format_number_compactly(self.now, 0.035);
+		let (now_f, now_suffix) = format_number_compactly(self.now, 0.03);
 		let (diff_f, diff_suffix) = format_number_compactly(diff, 0.005);
 
 		let now_suffix = if now_suffix == diff_suffix { "" } else { now_suffix };
@@ -19,6 +19,7 @@ impl std::fmt::Display for NowThen {
 
 		//HACK: there is got to be a way to not allocate here
 		let s = format!("{}{}{}", now_str, diff_sign, diff_str);
+		dbg!(&s);
 		f.pad(&s)
 	}
 }
@@ -85,4 +86,25 @@ fn format_number_compactly(mut n: f64, precision: f64) -> (f64, &'static str) {
 		}
 	}
 	(n, suffix_from_n_thousands(thousands))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn display_1() {
+		let nt = NowThen::new(69420.0, 67000.0);
+		insta::assert_snapshot!(nt.to_string(), @"69+2.42K");
+	}
+	#[test]
+	fn display_2() {
+		let nt = NowThen::new(0.517563, 0.498);
+		insta::assert_snapshot!(nt.to_string(), @"0.52+0.0196");
+	}
+	#[test]
+	fn display_3() {
+		let nt = NowThen::new(0.527563, 0.498);
+		insta::assert_snapshot!(nt.to_string(), @"0.53+0.0296");
+	}
 }
