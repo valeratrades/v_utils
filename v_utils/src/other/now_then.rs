@@ -23,6 +23,12 @@ impl std::fmt::Display for NowThen {
 	}
 }
 
+impl std::fmt::LowerExp for NowThen {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		todo!()
+	}
+}
+
 fn format_number_compactly(mut n: f64, precision: f64) -> (f64, &'static str) {
 	assert!(precision >= 0.0, "Precision can't be negative, the hell? {:?}", precision);
 	let mut thousands = 0;

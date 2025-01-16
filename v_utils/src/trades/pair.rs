@@ -15,10 +15,10 @@ impl Asset {
 		std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0')
 	}
 }
+//HACK: should implement `pad`, but rust is broken (or skill issue). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
 impl std::fmt::Display for Asset {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		let s = self.fmt();
-		f.pad(s)
+		write!(f, "{}", self.fmt())
 	}
 }
 impl std::fmt::Debug for Asset {
@@ -82,6 +82,7 @@ impl<A: Into<Asset>> From<(A, A)> for Pair {
 		Self::new(base, quote)
 	}
 }
+//HACK: should implement `pad`, but rust is broken (or skill issue). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
 impl std::fmt::Display for Pair {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "{}{}", self.base, self.quote)
@@ -208,5 +209,10 @@ mod tests {
 		assert!("BTC".parse::<Pair>().is_err());
 		assert!("BTC-".parse::<Pair>().is_err());
 		assert!("-USD".parse::<Pair>().is_err());
+	}
+
+	#[test]
+	fn display_pairs() {
+		assert_eq!(Pair::new("BTC", "USDT").to_string(), "BTCUSDT");
 	}
 }
