@@ -19,7 +19,6 @@ impl std::fmt::Display for NowThen {
 
 		//HACK: there is got to be a way to not allocate here
 		let s = format!("{}{}{}", now_str, diff_sign, diff_str);
-		dbg!(&s);
 		f.pad(&s)
 	}
 }
