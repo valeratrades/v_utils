@@ -76,6 +76,18 @@ impl Pair {
 	pub fn quote(&self) -> &Asset {
 		&self.quote
 	}
+
+	pub fn fmt_binance(&self) -> String {
+		format!("{}{}", self.base, self.quote)
+	}
+
+	pub fn fmt_bybit(&self) -> String {
+		format!("{}{}", self.base, self.quote)
+	}
+
+	pub fn fmt_mexc(&self) -> String {
+		format!("{}_{}", self.base, self.quote)
+	}
 }
 impl<A: Into<Asset>> From<(A, A)> for Pair {
 	fn from((base, quote): (A, A)) -> Self {
