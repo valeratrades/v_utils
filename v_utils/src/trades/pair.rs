@@ -15,7 +15,7 @@ impl Asset {
 		std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0')
 	}
 }
-//HACK: should implement `pad`, but rust is broken (or skill issue). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
+//HACK: should implement `pad`, but rust is broken (or skill issue (upd: definitely broken)). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
 impl std::fmt::Display for Asset {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(f, "{}", self.fmt())

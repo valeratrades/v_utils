@@ -29,7 +29,7 @@ impl Side {
 }
 impl std::fmt::Display for Side {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.pad(self.to_str())
+		self.to_str().fmt(f)
 	}
 }
 

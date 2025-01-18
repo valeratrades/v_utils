@@ -12,12 +12,11 @@ impl Timelike {
 
 impl std::fmt::Display for Timelike {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let s = match self.0 {
-			0..=59 => format!("{:02}", self.0),
-			60..=3599 => format!("{:02}:{:02}", self.0 / 60, self.0 % 60),
-			_ => format!("{}:{:02}:{:02}", self.0 / 3600, (self.0 % 3600) / 60, self.0 % 60),
-		};
-		f.pad(&s)
+		match self.0 {
+			0..=59 => write!(f, "{:02}", self.0),
+			60..=3599 => write!(f, "{:02}:{:02}", self.0 / 60, self.0 % 60),
+			_ => write!(f, "{}:{:02}:{:02}", self.0 / 3600, (self.0 % 3600) / 60, self.0 % 60),
+		}
 	}
 }
 impl AsRef<u32> for Timelike {

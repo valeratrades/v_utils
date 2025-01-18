@@ -17,14 +17,13 @@ impl std::fmt::Display for NowThen {
 		let diff_str = format!("{}{}", diff_f, diff_suffix);
 		let now_str = format!("{}{}", now_f, now_suffix);
 
-		//HACK: there is got to be a way to not allocate here
-		let s = format!("{}{}{}", now_str, diff_sign, diff_str);
-		f.pad(&s)
+		write!(f, "{}{}{}", now_str, diff_sign, diff_str)
 	}
 }
 
 impl std::fmt::LowerExp for NowThen {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		//DO: take the `e` base of the `now`, express diff in that base
 		todo!()
 	}
 }

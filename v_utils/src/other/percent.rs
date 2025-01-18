@@ -1,15 +1,12 @@
-use std::{
-	ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
-	str::FromStr,
-};
+use std::str::FromStr;
 
-use derive_more::{Deref, DerefMut};
+use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign};
 use eyre::{eyre, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-//TODO: allow deser from '<usize>x' format where `x` is multiplier of 100%
-
-#[derive(Clone, Debug, Default, Copy, derive_new::new, PartialEq, Deref, DerefMut)]
+#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, PartialOrd, Deref, DerefMut, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, From, Into)]
+#[mul(forward)]
+#[div(forward)]
 pub struct Percent(pub f64);
 impl Percent {
 	pub fn inner(self) -> f64 {
@@ -79,7 +76,6 @@ impl FromStr for Percent {
 	}
 }
 
-//? still not sure if I like `"xx%"` other the default derive (that is `0.xx`)
 impl Serialize for Percent {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
@@ -98,9 +94,29 @@ impl std::fmt::Display for Percent {
 		let percent_number = self.0 * 100.;
 		let s = match percent_number.fract() == 0. {
 			true => format!("{}%", percent_number as isize),
-			false => format!("{}%", percent_number),
+			false => {
+				let num_string = match f.precision() {
+					Some(p) => format!("{:.*}", p, percent_number),
+					None => percent_number.to_string(),
+				};
+				format!("{}%", num_string)
+			}
 		};
-		f.pad(&s)
+
+		// these ones are default
+		if f.fill() != ' ' && f.fill() != '\0' {
+			unimplemented!("Specifying fill is not supported. Rust is letting us down, impossible to implement, call `to_string()` and use its implementation.");
+		}
+		if let Some(w) = f.width() {
+			match f.align() {
+				Some(std::fmt::Alignment::Left) => write!(f, "{:<width$}", s, width = w),
+				Some(std::fmt::Alignment::Right) => write!(f, "{:>width$}", s, width = w),
+				Some(std::fmt::Alignment::Center) => write!(f, "{:^width$}", s, width = w),
+				None => write!(f, "{:width$}", s, width = w),
+			}
+		} else {
+			write!(f, "{}", s)
+		}
 	}
 }
 
@@ -116,11 +132,6 @@ impl PartialOrd<f64> for Percent {
 }
 
 // Froms {{{
-impl From<f64> for Percent {
-	fn from(f: f64) -> Self {
-		Percent(f)
-	}
-}
 impl From<f32> for Percent {
 	fn from(f: f32) -> Self {
 		Percent(f as f64)
@@ -161,177 +172,6 @@ impl From<&str> for Percent {
 		Percent::from_str(s).unwrap()
 	}
 }
-//,}}}
-
-// Operators {{{
-// // Add
-impl Add for Percent {
-	type Output = Percent;
-
-	fn add(self, other: Percent) -> Percent {
-		Percent(self.0 + other.0)
-	}
-}
-
-impl Add<f64> for Percent {
-	type Output = Percent;
-
-	fn add(self, other: f64) -> Percent {
-		Percent(self.0 + other)
-	}
-}
-
-impl AddAssign for Percent {
-	fn add_assign(&mut self, other: Percent) {
-		self.0 += other.0;
-	}
-}
-
-impl AddAssign<f64> for Percent {
-	fn add_assign(&mut self, other: f64) {
-		self.0 += other;
-	}
-}
-//
-
-// // Mul
-impl Mul for Percent {
-	type Output = Percent;
-
-	fn mul(self, other: Percent) -> Percent {
-		Percent(self.0 * other.0)
-	}
-}
-
-impl Mul<f64> for Percent {
-	type Output = Percent;
-
-	fn mul(self, other: f64) -> Percent {
-		Percent(self.0 * other)
-	}
-}
-
-impl MulAssign for Percent {
-	fn mul_assign(&mut self, other: Percent) {
-		self.0 *= other.0;
-	}
-}
-
-impl MulAssign<f64> for Percent {
-	fn mul_assign(&mut self, other: f64) {
-		self.0 *= other;
-	}
-}
-//
-
-// // Sub
-impl Sub for Percent {
-	type Output = Percent;
-
-	fn sub(self, other: Percent) -> Percent {
-		Percent(self.0 - other.0)
-	}
-}
-
-impl Sub<f64> for Percent {
-	type Output = Percent;
-
-	fn sub(self, other: f64) -> Percent {
-		Percent(self.0 - other)
-	}
-}
-
-impl SubAssign for Percent {
-	fn sub_assign(&mut self, other: Percent) {
-		self.0 -= other.0;
-	}
-}
-
-impl SubAssign<f64> for Percent {
-	fn sub_assign(&mut self, other: f64) {
-		self.0 -= other;
-	}
-}
-//
-
-// // Div
-impl Div for Percent {
-	type Output = Percent;
-
-	fn div(self, other: Percent) -> Percent {
-		Percent(self.0 / other.0)
-	}
-}
-
-impl Div<f64> for Percent {
-	type Output = Percent;
-
-	fn div(self, other: f64) -> Percent {
-		Percent(self.0 / other)
-	}
-}
-
-impl DivAssign for Percent {
-	fn div_assign(&mut self, other: Percent) {
-		self.0 /= other.0;
-	}
-}
-
-impl DivAssign<f64> for Percent {
-	fn div_assign(&mut self, other: f64) {
-		self.0 /= other;
-	}
-}
-//
-
-// // Rem
-impl Rem for Percent {
-	type Output = Percent;
-
-	fn rem(self, other: Percent) -> Percent {
-		Percent(self.0 % other.0)
-	}
-}
-
-impl Rem<f64> for Percent {
-	type Output = Percent;
-
-	fn rem(self, other: f64) -> Percent {
-		Percent(self.0 % other)
-	}
-}
-
-impl Rem<Percent> for f64 {
-	type Output = f64;
-
-	fn rem(self, other: Percent) -> f64 {
-		self % other.0
-	}
-}
-
-impl RemAssign for Percent {
-	fn rem_assign(&mut self, other: Percent) {
-		self.0 %= other.0;
-	}
-}
-
-impl RemAssign<f64> for Percent {
-	fn rem_assign(&mut self, other: f64) {
-		self.0 %= other;
-	}
-}
-//
-
-// // Neg
-impl Neg for Percent {
-	type Output = Percent;
-
-	fn neg(self) -> Percent {
-		Percent(-self.0)
-	}
-}
-//
-
 //,}}}
 
 #[cfg(test)]
@@ -400,5 +240,26 @@ mod tests {
 		let json = r#""0.5x""#;
 		let p: Percent = serde_json::from_str(json).unwrap();
 		assert_eq!(p.0, 0.5);
+	}
+
+	#[test]
+	fn operators() {
+		let p = Percent::from_str("50%").unwrap();
+		let p2 = Percent::from_str("50%").unwrap();
+		assert_eq!(p + p2, Percent::from_str("100%").unwrap());
+		assert_eq!(p - p2, Percent::from_str("0%").unwrap());
+		assert_eq!(p * p2, Percent::from_str("25%").unwrap());
+		assert_eq!(p / p2, Percent::from_str("100%").unwrap());
+	}
+
+	#[test]
+	fn precision_and_alignment() {
+		let p = Percent::from_str("0.123456").unwrap();
+		assert_eq!(format!("{:.2}", p), "12.35%");
+		assert_eq!(format!("{:.0}", p), "12%");
+
+		//TODO!:
+		assert_eq!(format!("|{:<10}|", p), "|12.3456%  |");
+		assert_eq!(format!("|{:^15}|", p), "|   12.3456%    |");
 	}
 }

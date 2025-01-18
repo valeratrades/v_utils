@@ -133,7 +133,7 @@ impl Timeframe {
 }
 impl std::fmt::Display for Timeframe {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.pad(&self.display())
+		self.display().fmt(f)
 	}
 }
 
