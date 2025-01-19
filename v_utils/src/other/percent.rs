@@ -4,6 +4,8 @@ use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, M
 use eyre::{eyre, Result};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
+use crate::utils;
+
 #[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, PartialOrd, Deref, DerefMut, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, From, Into)]
 #[mul(forward)]
 #[div(forward)]
@@ -92,16 +94,20 @@ impl Serialize for Percent {
 impl std::fmt::Display for Percent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let percent_number = self.0 * 100.;
-		let s = match percent_number.fract() == 0. {
+		let mut s = match percent_number.fract() == 0. {
 			true => format!("{}%", percent_number as isize),
 			false => {
 				let num_string = match f.precision() {
 					Some(p) => format!("{:.*}", p, percent_number),
-					None => percent_number.to_string(),
+					None => utils::format_significant_digits(percent_number, 2),
 				};
 				format!("{}%", num_string)
 			}
 		};
+		if f.sign_plus() {
+			let sign = if self.0 >= 0. { "+" } else { "" };
+			s = format!("{}{}", sign, s);
+		}
 
 		// these ones are default
 		if f.fill() != ' ' && f.fill() != '\0' {

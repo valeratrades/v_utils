@@ -53,16 +53,17 @@ derive_more = { version = "1.0.0", features = ["full"] }
 
 # amazing cheatsheet: https://github.com/tokio-rs/tokio/blob/master/tokio/Cargo.toml
 [features]
-default = []
+default = ["lite"]
 
-io = ["dirs"] 
-trades = ["chrono"]
+io = ["dep:dirs"] 
+trades = ["dep:chrono"]
 macros = ["v_utils_macros"]
-llm = ["reqwest", "futures", "bytes"]
+llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
 tracing = ["dep:tracing-bunyan-formatter", "dep:tracing-subscriber", "dep:tracing-log", "dep:tracing-error", "dep:console-subscriber"]
-distributions = ["rand", "rand_distr"]
+distributions = ["dep:rand", "dep:rand_distr"]
 
-full = ["io", "macros", "trades", "llm", "tracing", "distributions"]
+lite = ["io", "macros", "trades", "tracing", "dep:futures"]
+full = ["lite", "llm", "distributions"]
 
 # dev only
 slow_tests = []

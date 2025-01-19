@@ -4,6 +4,9 @@ pub use eyre::*;
 pub mod snapshots;
 pub use snapshots::*;
 
+pub mod format;
+pub use format::*;
+
 pub mod serde;
 pub use serde::*;
 

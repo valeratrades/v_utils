@@ -6,6 +6,7 @@
 [![Lines Of Code](https://tokei.rs/b1/github/valeratrades/v_utils?category=code)](https://github.com/valeratrades/v_utils/tree/master/src)
 
 My utils crate. For personal use only. But maybe, just maybe, one day I will document it slightly more.
+`v_utils` is optimized for **developer productivity**, other concerns, including even performance, are secondary. Iteration speed above all.
 
 # Dev
 ## Testing

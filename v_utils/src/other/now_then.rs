@@ -1,3 +1,5 @@
+use crate::Percent;
+
 #[derive(Debug, Clone, Default, derive_new::new, Copy)]
 pub struct NowThen {
 	pub now: f64,
@@ -10,21 +12,20 @@ impl std::fmt::Display for NowThen {
 
 		let (now_f, now_suffix) = format_number_compactly(self.now, 0.03);
 		let (diff_f, diff_suffix) = format_number_compactly(diff, 0.005);
-
 		let now_suffix = if now_suffix == diff_suffix { "" } else { now_suffix };
-		let diff_sign = if diff > 0.0 { "+" } else { "" };
 
-		let diff_str = format!("{}{}", diff_f, diff_suffix);
+		let diff_str = format!("{:+}{}", diff_f, diff_suffix);
 		let now_str = format!("{}{}", now_f, now_suffix);
+		let s = format!("{}{}", now_str, diff_str);
 
-		write!(f, "{}{}{}", now_str, diff_sign, diff_str)
+		crate::fmt_with_width!(f, s)
 	}
 }
 
 impl std::fmt::LowerExp for NowThen {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		//DO: take the `e` base of the `now`, express diff in that base
-		todo!()
+		let diff = Percent::from((self.now - self.then) / self.then);
+		write!(f, "{:e}{:+}", self.now, diff)
 	}
 }
 
@@ -94,15 +95,17 @@ mod tests {
 	fn display_1() {
 		let nt = NowThen::new(69420.0, 67000.0);
 		insta::assert_snapshot!(nt.to_string(), @"69+2.42K");
-	}
-	#[test]
-	fn display_2() {
+
 		let nt = NowThen::new(0.517563, 0.498);
 		insta::assert_snapshot!(nt.to_string(), @"0.52+0.0196");
-	}
-	#[test]
-	fn display_3() {
+
 		let nt = NowThen::new(0.527563, 0.498);
 		insta::assert_snapshot!(nt.to_string(), @"0.53+0.0296");
+	}
+
+	#[test]
+	fn lower_exp() {
+		let nt = NowThen::new(69420.0, 67000.0);
+		insta::assert_snapshot!(format!("{:e}", nt), @"6.942e4+3.6%");
 	}
 }
