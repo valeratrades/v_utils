@@ -265,7 +265,7 @@ mod tests {
 		assert_eq!(format!("{:.0}", p), "12%");
 
 		//TODO!:
-		assert_eq!(format!("|{:<10}|", p), "|12.3456%  |");
-		assert_eq!(format!("|{:^15}|", p), "|   12.3456%    |");
+		assert_eq!(format!("|{:<10.4}|", p), "|12.3456%  |");
+		assert_eq!(format!("|{:^15.4}|", p), "|   12.3456%    |");
 	}
 }
