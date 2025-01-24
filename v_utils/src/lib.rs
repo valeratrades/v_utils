@@ -6,7 +6,7 @@
 mod other;
 pub use other::*;
 
-mod prelude;
+pub mod prelude;
 #[cfg(feature = "lite")]
 pub use prelude::{clientside as prelude_clientside, libside as prelude_libside};
 // of course it's included unconditionally - the crate itself is called "v_utils"

@@ -1,5 +1,6 @@
 //Q: not sure this is even desirable. Think of eyre, for example: trying to expose eyre::{Result, bail, eyre} like this will lead to conflicts between color_eyre::eyre and eyre
 // I guess I could split the preludes to `{client,library}-side`s
+//Q: color-eyre/eyre argument is nivilated, does anything else prevent me from having a joined prelude?
 
 pub use std::{
 	collections::{BTreeMap, BTreeSet, HashMap, HashSet},
@@ -7,6 +8,8 @@ pub use std::{
 	str::FromStr as _,
 };
 
+pub use chrono::{DateTime, Utc};
+pub use eyre::{bail, eyre, Report, Result, WrapErr as _};
 pub use futures::future::join_all;
 pub use serde::{
 	de::{DeserializeOwned, Deserializer},
@@ -17,16 +20,15 @@ pub use serde_json::{json, Value};
 //use serde_with::{serde_as, DisplayFromStr};
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
-pub use crate::{io::ExpandedPath, other::*, trades::*};
+pub use crate::{clientside, io::ExpandedPath, other::*, trades::*};
+
+#[deprecated(note = "Use main `prelude` instead")]
 pub mod clientside {
 	pub use super::*;
-	// don't want to import color_eyre just for this
-	//pub use color_eyre::eyre::{bail, eyre, Result};
 	pub use crate::clientside;
 }
 
+#[deprecated(note = "Use main `prelude` instead")]
 pub mod libside {
-	pub use eyre::{bail, eyre, Result};
-
 	pub use super::*;
 }

@@ -6,3 +6,6 @@ pub use time::Timelike;
 
 pub mod now_then;
 pub use now_then::NowThen;
+
+pub mod pretty;
+pub use pretty::PrettyPrint;
