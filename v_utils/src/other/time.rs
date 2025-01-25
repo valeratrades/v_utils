@@ -1,5 +1,5 @@
-use eyre::{eyre, Result, WrapErr};
-use serde::{de, Deserialize, Serialize};
+use eyre::{Result, WrapErr, eyre};
+use serde::{Deserialize, Serialize, de};
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Copy)]
@@ -98,7 +98,6 @@ fn time_to_units(time: &str) -> Result<u32> {
 
 #[cfg(test)]
 mod tests {
-	use claim::assert_err;
 	use serde_json::json;
 
 	use super::*;
@@ -110,7 +109,7 @@ mod tests {
 		assert_eq!(serde_json::from_str::<Timelike>(r#""34:56""#).unwrap().inner(), 2096);
 		assert_eq!(serde_json::from_str::<Timelike>("754").unwrap().inner(), 754);
 		assert_eq!(serde_json::from_str::<Timelike>(r#""34""#).unwrap().inner(), 34);
-		assert_err!(serde_json::from_str::<Timelike>(r#""12:34:56:78""#));
+		assert!(serde_json::from_str::<Timelike>(r#""12:34:56:78""#).is_err());
 	}
 
 	#[test]
