@@ -15,6 +15,7 @@ pub mod tracing;
 #[cfg(feature = "tracing")]
 pub use tracing::*;
 
+#[cfg(feature = "tracing")]
 #[macro_export]
 macro_rules! clientside {
 	() => {

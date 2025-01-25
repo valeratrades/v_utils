@@ -5,7 +5,7 @@ use std::{
 
 use tracing::info;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{layer::SubscriberExt as _, prelude::*, Registry};
+use tracing_subscriber::{Registry, layer::SubscriberExt as _, prelude::*};
 
 #[derive(Clone, Debug, Default)]
 pub enum LogDestination {
@@ -30,10 +30,11 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
 		let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or({
+			const DEFAULT_LOG_LEVEL: &str = "debug";
 			logs_during_init.push(Box::new(|| {
-				tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to info level logging")
+				tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to {DEFAULT_LOG_LEVEL} level logging")
 			}));
-			tracing_subscriber::EnvFilter::new("debug")
+			tracing_subscriber::EnvFilter::new(format!("{DEFAULT_LOG_LEVEL},hyper_util=info"))
 		});
 		//let env_filter = env_filter
 		//      .add_directive("tokio=off".parse().unwrap())
@@ -41,10 +42,12 @@ pub fn init_subscriber(log_destination: LogDestination) {
 
 		let error_layer = ErrorLayer::default();
 
-		let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
+		// freaks out if it's built into a binary, and then two instances of it are created.
+		//TODO: figure out how to limit this to debug builds \
+		//let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
 
 		tracing_subscriber::registry()
-			.with(console_layer)
+			//.with(console_layer)
 			.with(env_filter)
 			.with(formatting_layer)
 			.with(error_layer)
@@ -86,8 +89,8 @@ pub fn init_subscriber(log_destination: LogDestination) {
 			setup(Box::new(|| Box::new(std::io::stdout())));
 		}
 		LogDestination::Xdg(name) => {
-			let associated_data_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_state_directory("").unwrap();
-			let log_path = associated_data_home.join(".log");
+			let associated_state_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_state_directory("").unwrap();
+			let log_path = associated_state_home.join(".log");
 			destination_is_path(log_path, setup);
 		}
 	};

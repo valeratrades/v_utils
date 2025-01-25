@@ -3,24 +3,27 @@
 //Q: color-eyre/eyre argument is nivilated, does anything else prevent me from having a joined prelude?
 
 pub use std::{
-	collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+	collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+	fmt::Write as _,
 	pin::Pin,
 	str::FromStr as _,
+	sync::{Arc, Mutex, RwLock},
 };
 
 pub use chrono::{DateTime, Utc};
-pub use eyre::{bail, eyre, Report, Result, WrapErr as _};
+pub use eyre::{Report, Result, WrapErr as _, bail, eyre};
 pub use futures::future::join_all;
 pub use serde::{
-	de::{DeserializeOwned, Deserializer},
 	Deserialize, Serialize, Serializer,
+	de::{DeserializeOwned, Deserializer},
 };
-pub use serde_json::{json, Value};
+pub use serde_json::{Value, json};
+pub use thiserror::Error;
 // not yet used in this lib, don't want to import just for thsi
 //use serde_with::{serde_as, DisplayFromStr};
-pub use tracing::{debug, error, info, instrument, trace, warn};
+pub use tracing::{Span, debug, error, field::Empty, info, instrument, trace, warn};
 
-pub use crate::{clientside, io::ExpandedPath, other::*, trades::*};
+pub use crate::{clientside, io::ExpandedPath, other::*, share_dir, state_dir, trades::*};
 
 #[deprecated(note = "Use main `prelude` instead")]
 pub mod clientside {
