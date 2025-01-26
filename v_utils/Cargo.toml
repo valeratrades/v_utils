@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
 
 [dev-dependencies]
-insta = "^1.42.0"
+insta = "^1.42.1"
 trybuild = { version = "^1.0.103", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
 
@@ -38,7 +38,7 @@ futures = { version = "^0.3.31", optional = true }
 quote = { version = "^1.0.38", optional = true }
 rand = { version = "^0.8.5", optional = true }
 rand_distr = { version = "^0.4.3", optional = true }
-xdg = { version = "2.5.2", optional = true }
+xdg = { version = "^2.5.2", optional = true }
 
 tracing-bunyan-formatter = { version = "^0.3.10", optional = true }
 tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry", "env-filter"], optional = true }

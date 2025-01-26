@@ -63,6 +63,17 @@ impl TimeframeDesignator {
 			_ => panic!("Invalid timeframe designator for Bybit: {:?}", self),
 		}
 	}
+
+	pub fn as_str_mexc(&self) -> &'static str {
+		match self {
+			TimeframeDesignator::Minutes => "m",
+			TimeframeDesignator::Hours => "h",
+			TimeframeDesignator::Days => "d",
+			TimeframeDesignator::Weeks => "W",
+			TimeframeDesignator::Months => "M",
+			_ => panic!("Invalid timeframe designator for Mexc: {:?}", self),
+		}
+	}
 }
 
 impl FromStr for TimeframeDesignator {
@@ -134,6 +145,16 @@ impl Timeframe {
 
 		Ok(tf_string)
 	}
+
+	pub fn format_mexc(&self) -> Result<String> {
+		let tf_string = format!("{}{}", self.n, self.designator.as_str_mexc());
+		let valid_values = vec!["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1W", "1M"];
+		if !valid_values.contains(&tf_string.as_str()) {
+			return Err(eyre!("The Timeframe does not match exactly any of the values accepted by Mexc API: {}", tf_string));
+		}
+
+		Ok(tf_string)
+	}
 }
 impl std::fmt::Display for Timeframe {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -182,7 +203,7 @@ impl From<&str> for Timeframe {
 /// # Panics
 impl From<&&str> for Timeframe {
 	fn from(s: &&str) -> Self {
-		Timeframe::from_str(*s).unwrap()
+		Timeframe::from_str(s).unwrap()
 	}
 }
 
