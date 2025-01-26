@@ -1,19 +1,14 @@
 use std::str::FromStr;
 
 use chrono::Duration;
-use eyre::{Result, eyre};
-use serde::{Deserialize, Deserializer, de::Error as SerdeError};
+use eyre::{Result, bail, eyre};
+use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
+use strum::{EnumIter, IntoEnumIterator as _};
 
-#[derive(Debug, Clone, PartialEq, Copy, Default)]
-pub struct Timeframe {
-	pub designator: TimeframeDesignator,
-	pub n: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Copy, Default)]
+#[derive(Debug, Clone, PartialEq, Copy, Default, EnumIter)]
 pub enum TimeframeDesignator {
-	#[default]
 	Seconds,
+	#[default]
 	Minutes,
 	Hours,
 	Days,
@@ -23,7 +18,7 @@ pub enum TimeframeDesignator {
 	Years,
 }
 impl TimeframeDesignator {
-	pub fn as_seconds(&self) -> usize {
+	pub fn as_seconds(&self) -> u32 {
 		match self {
 			TimeframeDesignator::Seconds => 1,
 			TimeframeDesignator::Minutes => 60,
@@ -36,12 +31,8 @@ impl TimeframeDesignator {
 		}
 	}
 
-	/// My prefered definition matches that of Binance.
+	//Q: not sure if it's better to keep this on its own or move inside the Display impl - is having this be `&'static str` worth something?
 	pub fn as_str(&self) -> &'static str {
-		self.as_str_binance()
-	}
-
-	pub fn as_str_binance(&self) -> &'static str {
 		match self {
 			TimeframeDesignator::Seconds => "s",
 			TimeframeDesignator::Minutes => "m",
@@ -53,15 +44,10 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Years => "y",
 		}
 	}
-
-	pub fn as_str_bybit(&self) -> &'static str {
-		match self {
-			TimeframeDesignator::Minutes => "",
-			TimeframeDesignator::Days => "D",
-			TimeframeDesignator::Weeks => "W",
-			TimeframeDesignator::Months => "M",
-			_ => panic!("Invalid timeframe designator for Bybit: {:?}", self),
-		}
+}
+impl std::fmt::Display for TimeframeDesignator {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.as_str())
 	}
 }
 
@@ -84,92 +70,85 @@ impl FromStr for TimeframeDesignator {
 			"Q" => Ok(TimeframeDesignator::Quarters),
 			"y" => Ok(TimeframeDesignator::Years),
 			"Y" => Ok(TimeframeDesignator::Years),
-			_ => Err(eyre::eyre!("Invalid timeframe designator: {}", s)),
+			_ => bail!("Invalid timeframe designator: {}", s),
 		}
 	}
 }
 
+/// Implemented over the number of seconds
+#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Timeframe(pub u32);
 impl Timeframe {
-	pub fn as_seconds(&self) -> usize {
-		self.n * self.designator.as_seconds()
+	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {
+		let interpreted = predefined.iter().map(|&s| Self::from_str(s).unwrap()).collect::<Vec<_>>();
+		let idx = interpreted.iter().position(|x| x == self)?;
+		Some(predefined[idx])
 	}
 
 	pub fn duration(&self) -> Duration {
-		Duration::seconds(self.as_seconds() as i64)
+		Duration::seconds(self.0 as i64)
 	}
 
-	pub fn from_seconds() -> Self {
-		unimplemented!()
-	}
-
-	pub fn display(&self) -> String {
-		format!("{}{}", self.n, self.designator.as_str())
-	}
-
-	pub fn format_binance(&self) -> Result<String> {
-		let tf_string = format!("{}{}", self.n, self.designator.as_str_binance());
-		let valid_values = vec![
-			"1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M",
-		];
-		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(eyre!("The Timeframe '{}' does not match exactly any of the values accepted by Binance API", tf_string));
-		}
-
-		Ok(tf_string)
-	}
-
-	pub fn fmt_binance(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		core::fmt::Display::fmt(&self.format_binance().unwrap(), f)
-	}
-
-	pub fn format_bybit(&self) -> Result<String> {
-		let tf_string = match self.n {
-			1 if self.designator != TimeframeDesignator::Minutes => self.designator.as_str_bybit().to_string(),
-			_ => format!("{}{}", self.n, self.designator.as_str_bybit()),
-		};
-		let valid_values = vec!["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
-		if !valid_values.contains(&tf_string.as_str()) {
-			return Err(eyre!("The Timeframe does not match exactly any of the values accepted by Bybit API: {}", tf_string));
-		}
-
-		Ok(tf_string)
+	#[deprecated(note = "Use `duration` instead")]
+	pub fn seconds(&self) -> u32 {
+		self.0
 	}
 }
-impl std::fmt::Display for Timeframe {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.display().fmt(f)
-	}
-}
-
-fn parse_timeframe(s: &str) -> Result<Timeframe> {
-	let (n_str, designator_str) = match s.char_indices().next_back() {
-		Some((idx, _)) => s.split_at(idx),
-		None => return Err(eyre!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'")),
-	};
-
-	let n = if n_str.is_empty() {
-		1
-	} else {
-		n_str
-			.parse::<usize>()
-			.map_err(|_| eyre!("Invalid number in timeframe '{}'. Expected a string representing a timeframe like '5s' or '3M'", n_str))?
-	};
-
-	let designator = TimeframeDesignator::from_str(designator_str).map_err(|_| {
-		eyre!(
-			"Invalid or missing timeframe designator '{}'. Expected a string representing a timeframe like '5s' or '3M'",
-			designator_str
-		)
-	})?;
-
-	Ok(Timeframe { designator, n })
-}
-
 impl FromStr for Timeframe {
 	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
-		parse_timeframe(s)
+		let (n_str, designator_str) = match s.char_indices().next_back() {
+			Some((idx, c)) => {
+				match c.is_digit(10) {
+					true => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
+					false => s.split_at(idx),
+				}
+			}
+			None => bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"),
+		};
+
+		let n = if n_str.is_empty() {
+			1
+		} else {
+			n_str.parse::<u32>().map_err(|_| eyre!("Invalid number in timeframe str '{n_str}'. Expected a `u32` number."))?
+		};
+
+		let designator = TimeframeDesignator::from_str(designator_str)
+		.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following characters representing a timeframe designator: ["s", "m", "h", "H", "d", "D", "w", "W", "M", "q", "Q", "y", "Y""#))?;
+
+		let total_seconds = n * designator.as_seconds();
+
+		Ok(Timeframe(total_seconds))
+	}
+}
+impl std::fmt::Display for Timeframe {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		// choose greatest denominator that is less than our value
+		let denominator = TimeframeDesignator::iter()
+			.rev()
+			.find(|d| self.0 >= d.as_seconds())
+			.expect("This can only fails if we were to allow creation of 0-len timeframes");
+		// floor against it
+		let n = self.0 / denominator.as_seconds();
+		let s = format!("{n}{denominator}");
+
+		crate::fmt_with_width!(f, &s)
+	}
+}
+impl<'de> Deserialize<'de> for Timeframe {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		let s = String::deserialize(deserializer)?;
+		Self::from_str(&s).map_err(|e| SerdeError::custom(e.to_string()))
+	}
+}
+impl Serialize for Timeframe {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer, {
+		serializer.serialize_str(&self.to_string())
 	}
 }
 
@@ -182,16 +161,7 @@ impl From<&str> for Timeframe {
 /// # Panics
 impl From<&&str> for Timeframe {
 	fn from(s: &&str) -> Self {
-		Timeframe::from_str(*s).unwrap()
-	}
-}
-
-impl<'de> Deserialize<'de> for Timeframe {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: Deserializer<'de>, {
-		let s = String::deserialize(deserializer)?;
-		parse_timeframe(&s).map_err(|e| SerdeError::custom(e.to_string()))
+		Timeframe::from_str(s).unwrap()
 	}
 }
 
@@ -201,25 +171,27 @@ mod tests {
 
 	#[test]
 	fn to_str() {
-		let tf = Timeframe {
-			designator: TimeframeDesignator::Seconds,
-			n: 5,
-		};
-		assert_eq!(tf.display(), "5s".to_owned());
-	}
-	#[test]
-	fn deserialize() {
-		let json_str = "\"5s\"";
-		let tf: Timeframe = serde_json::from_str(json_str).unwrap();
-		assert_eq!(tf.designator, TimeframeDesignator::Seconds);
-		assert_eq!(tf.n, 5);
+		let tf = Timeframe(5);
+		assert_eq!(tf.to_string(), "5s".to_owned());
 	}
 
 	#[test]
-	fn deser_quarters() {
-		let json_str = "\"3Q\"";
-		let tf: Timeframe = serde_json::from_str(json_str).unwrap();
-		assert_eq!(tf.designator, TimeframeDesignator::Quarters);
-		assert_eq!(tf.n, 3);
+	fn deserialize() {
+		let tf: Timeframe = serde_json::from_str("\"5s\"").unwrap();
+		assert_eq!(tf, Timeframe(5));
+	}
+
+	#[test]
+	fn predicated() {
+		let tf: Timeframe = "1h".into();
+		static TFS_BINANCE: [&str; 19] = [
+			"1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M",
+		];
+		static TFS_BYBIT: [&str; 13] = ["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
+		static TFS_MEXC: [&str; 9] = ["1m", "5m", "15m", "30m", "60m", "4h", "1d", "1W", "1M"];
+
+		assert_eq!(tf.try_as_predefined(&TFS_BINANCE), Some("1h"));
+		assert_eq!(tf.try_as_predefined(&TFS_BYBIT), Some("60"));
+		assert_eq!(tf.try_as_predefined(&TFS_MEXC), Some("60m"));
 	}
 }

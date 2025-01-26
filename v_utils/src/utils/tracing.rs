@@ -5,7 +5,7 @@ use std::{
 
 use tracing::info;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{Registry, layer::SubscriberExt as _, prelude::*};
+use tracing_subscriber::{layer::SubscriberExt as _, prelude::*};
 
 #[derive(Clone, Debug, Default)]
 pub enum LogDestination {

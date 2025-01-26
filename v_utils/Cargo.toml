@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
 
 [dev-dependencies]
-insta = "^1.42.0"
+insta = "^1.42.1"
 trybuild = { version = "^1.0.103", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
 
@@ -38,7 +38,8 @@ futures = { version = "^0.3.31", optional = true }
 quote = { version = "^1.0.38", optional = true }
 rand = { version = "^0.8.5", optional = true }
 rand_distr = { version = "^0.4.3", optional = true }
-xdg = { version = "2.5.2", optional = true }
+xdg = { version = "^2.5.2", optional = true }
+strum = { version = "^0.26.3", features = ["derive"], optional = true }
 
 tracing-bunyan-formatter = { version = "^0.3.10", optional = true }
 tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry", "env-filter"], optional = true }
@@ -55,7 +56,7 @@ v_utils_macros = { path = "../v_utils_macros", version = "^2.0.4", optional = tr
 default = ["lite"]
 
 io = ["dep:dirs", "dep:xdg"] 
-trades = ["dep:chrono"]
+trades = ["dep:chrono", "dep:strum"]
 macros = ["v_utils_macros"]
 llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
 tracing = ["dep:tracing-bunyan-formatter", "dep:tracing-subscriber", "dep:tracing-log", "dep:tracing-error", "dep:console-subscriber", "dep:xdg"]
