@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use chrono::Duration;
-use eyre::{eyre, Result};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer};
+use eyre::{Result, eyre};
+use serde::{Deserialize, Deserializer, de::Error as SerdeError};
 
 #[derive(Debug, Clone, PartialEq, Copy, Default)]
 pub struct Timeframe {
@@ -118,6 +118,10 @@ impl Timeframe {
 		Ok(tf_string)
 	}
 
+	pub fn fmt_binance(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		core::fmt::Display::fmt(&self.format_binance().unwrap(), f)
+	}
+
 	pub fn format_bybit(&self) -> Result<String> {
 		let tf_string = match self.n {
 			1 if self.designator != TimeframeDesignator::Minutes => self.designator.as_str_bybit().to_string(),
@@ -173,6 +177,12 @@ impl FromStr for Timeframe {
 impl From<&str> for Timeframe {
 	fn from(s: &str) -> Self {
 		Timeframe::from_str(s).unwrap()
+	}
+}
+/// # Panics
+impl From<&&str> for Timeframe {
+	fn from(s: &&str) -> Self {
+		Timeframe::from_str(*s).unwrap()
 	}
 }
 
