@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "2.3.2"
+version = "2.3.3"
 edition = "2024"
 description = "My utils crate"
 rust-version = "1.85"
