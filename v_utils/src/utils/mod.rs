@@ -19,6 +19,10 @@ pub use tracing::*;
 #[macro_export]
 macro_rules! clientside {
 	() => {
+		#[cfg(feature = "wasm")]
+		{
+			console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
+		}
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
 	};

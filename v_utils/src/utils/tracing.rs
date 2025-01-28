@@ -26,6 +26,7 @@ impl LogDestination {
 pub fn init_subscriber(log_destination: LogDestination) {
 	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
 	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
+		//TODO: 	console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
