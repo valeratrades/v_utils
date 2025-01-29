@@ -18,7 +18,7 @@ pub enum TimeframeDesignator {
 	Years,
 }
 impl TimeframeDesignator {
-	pub fn as_seconds(&self) -> u32 {
+	pub const fn as_seconds(&self) -> u32 {
 		match self {
 			TimeframeDesignator::Seconds => 1,
 			TimeframeDesignator::Minutes => 60,
@@ -32,7 +32,7 @@ impl TimeframeDesignator {
 	}
 
 	//Q: not sure if it's better to keep this on its own or move inside the Display impl - is having this be `&'static str` worth something?
-	pub fn as_str(&self) -> &'static str {
+	pub const fn as_str(&self) -> &'static str {
 		match self {
 			TimeframeDesignator::Seconds => "s",
 			TimeframeDesignator::Minutes => "m",
@@ -89,9 +89,21 @@ impl Timeframe {
 		Duration::seconds(self.0 as i64)
 	}
 
+	/// Allows for defining static arrays of Timeframes easily
+	pub const fn from_naive(n: u32, designator: TimeframeDesignator) -> Self {
+		Self(n * designator.as_seconds())
+	}
+
 	#[deprecated(note = "Use `duration` instead")]
 	pub fn seconds(&self) -> u32 {
 		self.0
+	}
+
+	pub fn designator(&self) -> TimeframeDesignator {
+		TimeframeDesignator::iter()
+			.rev()
+			.find(|d| self.0 % d.as_seconds() == 0)
+			.expect("This can only fails if we were to allow creation of 0-len timeframes")
 	}
 }
 impl FromStr for Timeframe {
@@ -124,14 +136,9 @@ impl FromStr for Timeframe {
 }
 impl std::fmt::Display for Timeframe {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		// choose greatest denominator that is less than our value
-		let denominator = TimeframeDesignator::iter()
-			.rev()
-			.find(|d| self.0 >= d.as_seconds())
-			.expect("This can only fails if we were to allow creation of 0-len timeframes");
-		// floor against it
-		let n = self.0 / denominator.as_seconds();
-		let s = format!("{n}{denominator}");
+		let designator = self.designator();
+		let n = self.0 / designator.as_seconds();
+		let s = format!("{n}{designator}");
 
 		crate::fmt_with_width!(f, &s)
 	}
