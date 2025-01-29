@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign};
-use eyre::{eyre, Result};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use eyre::{Result, eyre};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::utils;
 
@@ -10,11 +10,6 @@ use crate::utils;
 #[mul(forward)]
 #[div(forward)]
 pub struct Percent(pub f64);
-impl Percent {
-	pub fn inner(self) -> f64 {
-		self.0
-	}
-}
 
 impl<'de> Deserialize<'de> for Percent {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

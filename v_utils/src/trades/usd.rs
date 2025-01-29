@@ -1,4 +1,4 @@
-use derive_more::{derive::FromStr, Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign};
+use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign, derive::FromStr};
 use serde::{Deserialize, Serialize};
 
 #[derive(

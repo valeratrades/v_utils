@@ -16,13 +16,22 @@ pub mod tracing;
 pub use tracing::*;
 
 #[cfg(feature = "tracing")]
+#[cfg(not(feature = "wasm"))]
 #[macro_export]
 macro_rules! clientside {
 	() => {
-		#[cfg(feature = "wasm")]
-		{
-			console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
-		}
+		color_eyre::install().unwrap();
+		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
+	};
+}
+
+//HACK: all this code-duplication for one line add
+#[cfg(feature = "tracing")]
+#[cfg(feature = "wasm")]
+#[macro_export]
+macro_rules! clientside {
+	() => {
+		console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
 	};

@@ -3,7 +3,7 @@ use std::{
 	process::Command,
 };
 
-use eyre::{eyre, Result, WrapErr};
+use eyre::{Result, WrapErr, eyre};
 
 pub enum OpenMode {
 	Normal,

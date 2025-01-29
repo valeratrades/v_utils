@@ -1,5 +1,5 @@
 use chrono::{DateTime, TimeZone, Utc};
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 
 /// Doesn't support negative timestamps
 pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {

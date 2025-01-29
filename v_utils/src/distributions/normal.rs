@@ -1,4 +1,5 @@
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
+//Q: do I actually need rand_distr, or would rand::distr be enough?
 use rand_distr::{Distribution, Normal};
 
 /// Generates a random walk using Normal distribution.
@@ -9,7 +10,7 @@ use rand_distr::{Distribution, Normal};
 pub fn normal_random_walk(start: f64, num_steps: usize, std_dev: f64, drift: f64, seed: Option<u64>) -> Vec<f64> {
 	let mut rng = match seed {
 		Some(s) => StdRng::seed_from_u64(s),
-		None => StdRng::from_entropy(),
+		None => StdRng::from_os_rng(),
 	};
 
 	let normal = Normal::new(drift, std_dev).unwrap();

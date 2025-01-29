@@ -229,7 +229,7 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 #[cfg(test)]
 mod tests {
 	use insta::assert_snapshot;
-	use rand::{rngs::StdRng, Rng, SeedableRng};
+	use rand::{Rng, SeedableRng, rngs::StdRng};
 
 	use super::*;
 	use crate::distributions::laplace_random_walk;
@@ -264,7 +264,7 @@ mod tests {
 		for i in 0..prices.len() {
 			let target_probability = orders_left_to_select as f64 / (prices.len() - i) as f64;
 			let mut rng = StdRng::seed_from_u64(i as u64);
-			if rng.gen_range(0.0..1.0) < target_probability {
+			if rng.random_range(0.0..1.0) < target_probability {
 				order_ordinals.push(i);
 				orders_left_to_select -= 1;
 			}

@@ -1,4 +1,4 @@
-use rand::{rngs::StdRng, SeedableRng};
+use rand::{SeedableRng, rngs::StdRng};
 use rand_distr::{Distribution, Normal};
 
 /// Generates a random walk using Laplace distribution.
@@ -9,7 +9,7 @@ use rand_distr::{Distribution, Normal};
 pub fn laplace_random_walk(start: f64, num_steps: usize, scale: f64, drift: f64, seed: Option<u64>) -> Vec<f64> {
 	let mut rng = match seed {
 		Some(s) => StdRng::seed_from_u64(s),
-		None => StdRng::from_entropy(),
+		None => StdRng::from_os_rng(),
 	};
 
 	let normal = Normal::new(0.0, 1.0).unwrap();

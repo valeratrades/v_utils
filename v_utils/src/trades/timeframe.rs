@@ -100,7 +100,7 @@ impl FromStr for Timeframe {
 	fn from_str(s: &str) -> Result<Self> {
 		let (n_str, designator_str) = match s.char_indices().next_back() {
 			Some((idx, c)) => {
-				match c.is_digit(10) {
+				match c.is_ascii_digit() {
 					true => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
 					false => s.split_at(idx),
 				}

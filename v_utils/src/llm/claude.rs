@@ -1,8 +1,8 @@
-use eyre::{eyre, Result};
+use eyre::{Result, eyre};
 use futures::stream::{StreamExt, TryStreamExt};
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::llm::{Conversation, LlmConversation, LlmResponse, Model, Response, Role};
 

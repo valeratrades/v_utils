@@ -4,7 +4,7 @@ use std::{
 };
 
 use eyre::{Error, Result};
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Clone, Debug, Default, derive_new::new, Serialize, PartialEq, Eq)]
 pub struct ExpandedPath(pub PathBuf);
