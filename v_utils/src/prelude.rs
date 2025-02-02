@@ -11,7 +11,7 @@ pub use std::{
 };
 
 pub use chrono::{DateTime, Utc};
-pub use eyre::{Report, Result, WrapErr as _, bail, eyre};
+pub use eyre::{OptionExt as _, Report, Result, WrapErr as _, bail, eyre};
 pub use futures::future::join_all;
 pub use serde::{
 	Deserialize, Serialize, Serializer,

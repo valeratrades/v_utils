@@ -1,5 +1,6 @@
 use derive_more::{Deref, DerefMut};
 use eyre::Report;
+use serde::{Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Default, Copy, PartialEq, Eq, Hash, Deref, DerefMut, PartialOrd, Ord)]
 pub struct Asset(pub [u8; 16]);
@@ -13,6 +14,10 @@ impl Asset {
 
 	fn fmt(&self) -> &str {
 		std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0')
+	}
+
+	pub fn as_str(&self) -> &str {
+		self.fmt()
 	}
 }
 //HACK: should implement `pad`, but rust is broken (or skill issue (upd: definitely broken)). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
@@ -77,6 +82,7 @@ impl Pair {
 		&self.quote
 	}
 
+	// Exchange-specific {{{
 	pub fn fmt_binance(&self) -> String {
 		format!("{}{}", self.base, self.quote)
 	}
@@ -88,6 +94,7 @@ impl Pair {
 	pub fn fmt_mexc(&self) -> String {
 		format!("{}_{}", self.base, self.quote)
 	}
+	//,}}}
 }
 impl<A: Into<Asset>> From<(A, A)> for Pair {
 	fn from((base, quote): (A, A)) -> Self {
@@ -97,7 +104,23 @@ impl<A: Into<Asset>> From<(A, A)> for Pair {
 //HACK: should implement `pad`, but rust is broken (or skill issue). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
 impl std::fmt::Display for Pair {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "{}{}", self.base, self.quote)
+		write!(f, "{}-{}", self.base, self.quote)
+	}
+}
+
+impl<'de> serde::Deserialize<'de> for Pair {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		let s = String::deserialize(deserializer)?;
+		s.parse().map_err(serde::de::Error::custom)
+	}
+}
+impl Serialize for Pair {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer, {
+		self.to_string().serialize(serializer)
 	}
 }
 
