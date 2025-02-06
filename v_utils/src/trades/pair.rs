@@ -248,6 +248,6 @@ mod tests {
 
 	#[test]
 	fn display_pairs() {
-		assert_eq!(Pair::new("BTC", "USDT").to_string(), "BTCUSDT");
+		assert_eq!(Pair::new("BTC", "USDT").to_string(), "BTC-USDT");
 	}
 }
