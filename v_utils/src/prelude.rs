@@ -23,7 +23,7 @@ pub use thiserror::Error;
 //use serde_with::{serde_as, DisplayFromStr};
 pub use tracing::{Span, debug, error, field::Empty, info, instrument, trace, warn};
 
-pub use crate::{clientside, io::ExpandedPath, other::*, share_dir, state_dir, trades::*};
+pub use crate::{clientside, create_xdg, io::ExpandedPath, other::*, trades::*};
 
 #[deprecated(note = "Use main `prelude` instead")]
 pub mod clientside {
