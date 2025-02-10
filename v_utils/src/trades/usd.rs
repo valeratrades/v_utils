@@ -1,4 +1,3 @@
-use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign, derive::FromStr};
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -9,20 +8,20 @@ use serde::{Deserialize, Serialize};
 	Copy,
 	PartialEq,
 	PartialOrd,
-	Deref,
-	DerefMut,
-	Add,
-	AddAssign,
-	Sub,
-	SubAssign,
-	Mul,
-	MulAssign,
-	Div,
-	DivAssign,
-	Neg,
-	From,
-	Into,
-	FromStr,
+	derive_more::Deref,
+	derive_more::DerefMut,
+	derive_more::Add,
+	derive_more::AddAssign,
+	derive_more::Sub,
+	derive_more::SubAssign,
+	derive_more::Mul,
+	derive_more::MulAssign,
+	derive_more::Div,
+	derive_more::DivAssign,
+	derive_more::Neg,
+	derive_more::From,
+	derive_more::Into,
+	derive_more::FromStr,
 	Serialize,
 	Deserialize,
 )]
@@ -31,7 +30,7 @@ use serde::{Deserialize, Serialize};
 /// A struct representing USD (in future, inflation-adjusted) value. That's it. Just a newtype. But extremely powerful.
 pub struct Usd(pub f64);
 
-impl Mul<f64> for Usd {
+impl std::ops::Mul<f64> for Usd {
 	type Output = Self;
 
 	fn mul(self, rhs: f64) -> Self::Output {

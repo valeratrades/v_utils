@@ -45,8 +45,9 @@ pub fn init_subscriber(log_destination: LogDestination) {
 
 		// freaks out if it's built into a binary, and then two instances of it are created.
 		//TODO: figure out how to limit this to debug builds \
+		//#[feature("tokio_full")]
 		//let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
-
+		//
 		tracing_subscriber::registry()
 			//.with(console_layer)
 			.with(env_filter)

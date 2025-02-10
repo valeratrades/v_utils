@@ -22,7 +22,7 @@ impl FromStr for ExpandedPath {
 	fn from_str(s: &str) -> Result<Self> {
 		let path_buf = match s.starts_with("~") {
 			true => {
-				let home_dir = dirs::home_dir().ok_or_else(|| Error::msg("Failed to determine user's home directory"))?;
+				let home_dir = crate::utils::dirs::home_dir().ok_or_else(|| Error::msg("Failed to determine user's home directory"))?; //TEST
 
 				match s.len() {
 					l if l < 2 => Ok(home_dir),

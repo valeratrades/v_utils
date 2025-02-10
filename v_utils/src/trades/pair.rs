@@ -238,6 +238,7 @@ mod tests {
 		assert_eq!("XRP/USDC".parse::<Pair>().unwrap(), Pair::new("XRP", "USDC"));
 		assert_eq!("btc - usd".parse::<Pair>().unwrap(), Pair::new("BTC", "USD"));
 		assert_eq!("DOGEUSDT".parse::<Pair>().unwrap(), Pair::new("DOGE", "USDT"));
+		assert_eq!(Pair::from(("ADA", "USDT")), Pair::new("ADA", "USDT"));
 
 		assert!("something".parse::<Pair>().is_err());
 		assert!("".parse::<Pair>().is_err());
