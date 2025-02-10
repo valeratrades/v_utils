@@ -10,9 +10,6 @@ pub use format::*;
 pub mod serde;
 pub use serde::*;
 
-pub mod dirs;
-pub use dirs::*;
-
 #[cfg(feature = "tracing")]
 pub mod tracing;
 #[cfg(feature = "tracing")]
