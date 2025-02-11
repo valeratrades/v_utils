@@ -12,10 +12,12 @@ pub enum LogDestination {
 	#[default]
 	Stdout,
 	File(Box<Path>),
+	#[cfg(not(target_arch = "wasm32"))] // no clue why, but `xdg::BaseDirectories` falls apart with it
 	Xdg(String),
 }
 impl LogDestination {
 	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn xdg<S: Into<String>>(name: S) -> Self {
 		LogDestination::Xdg(name.into())
 	}
@@ -35,7 +37,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 			logs_during_init.push(Box::new(|| {
 				tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to {DEFAULT_LOG_LEVEL} level logging")
 			}));
-			tracing_subscriber::EnvFilter::new(format!("{DEFAULT_LOG_LEVEL},hyper_util=info"))
+			tracing_subscriber::EnvFilter::new(format!("{DEFAULT_LOG_LEVEL},hyper_util=info,hyper=info")) // hyper specifically is loud, shut it up (I tend to default to `Debug` level, so have to override here)
 		});
 		//let env_filter = env_filter
 		//      .add_directive("tokio=off".parse().unwrap())
@@ -90,6 +92,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		LogDestination::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())));
 		}
+		#[cfg(not(target_arch = "wasm32"))]
 		LogDestination::Xdg(name) => {
 			let associated_state_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_state_directory("").unwrap();
 			let log_path = associated_state_home.join(".log");

@@ -31,8 +31,12 @@ macro_rules! clientside {
 #[macro_export]
 macro_rules! clientside {
 	() => {
-		console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
+
+		#[cfg(target_arch = "wasm32")]
+		v_utils::__internal::console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
+		#[cfg(target_arch = "wasm32")]
+		_ = v_utils::__internal::console_log::init_with_level(log::Level::Debug);
 	};
 }

@@ -25,6 +25,11 @@ pub extern crate v_utils_macros as macros;
 pub mod __internal {
 	pub extern crate eyre;
 	pub extern crate serde;
+
+	#[cfg(feature = "wasm")]
+	pub extern crate console_error_panic_hook;
+	#[cfg(feature = "wasm")]
+	pub extern crate console_log;
 }
 
 #[cfg(feature = "llm")]

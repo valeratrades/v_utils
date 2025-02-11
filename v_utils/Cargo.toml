@@ -45,6 +45,7 @@ tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry
 tracing-log = { version = "^0.2.0", optional = true }
 tracing-error = { version = "^0.2.1", optional = true }
 console-subscriber = { version = "0.4.1", optional = true }
+console_log = { version = "^1.0.0", optional = true }
 console_error_panic_hook = { version = "^0.1.7", optional = true }
 #
 
@@ -58,9 +59,9 @@ io = ["dep:dirs", "dep:xdg"]
 trades = ["dep:chrono", "dep:strum"]
 macros = ["v_utils_macros"]
 llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
-tracing = ["dep:tracing-subscriber", "dep:tracing-log", "dep:tracing-error", "dep:xdg"]
+tracing = ["dep:xdg", "dep:tracing-subscriber", "dep:tracing-log", "dep:tracing-error", "dep:xdg"]
 distributions = ["dep:rand", "dep:rand_distr"]
-wasm = ["dep:console_error_panic_hook"]
+wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 
 
 lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
