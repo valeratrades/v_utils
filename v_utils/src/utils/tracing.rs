@@ -3,9 +3,9 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-use tracing::info;
+use tracing::{info, warn};
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{layer::SubscriberExt as _, prelude::*};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 
 #[derive(Clone, Debug, Default)]
 pub enum LogDestination {
@@ -23,6 +23,25 @@ impl LogDestination {
 	}
 }
 
+fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
+	static DEFAULT_DIRECTIVES: &str = "debug,
+hyper=info,
+hyper_util=info";
+	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
+
+	let directives = std::fs::read_to_string(DIRECTIVES_PATH);
+	let directives: String = directives
+		.as_deref()
+		.unwrap_or_else(|_| {
+			logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to:\n{DEFAULT_DIRECTIVES}")));
+			DEFAULT_DIRECTIVES
+		})
+		.split_inclusive(',')
+		.map(str::trim)
+		.collect();
+	EnvFilter::builder().parse(directives).expect("Error parsing tracing directives")
+}
+
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
@@ -32,16 +51,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
-		let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or({
-			const DEFAULT_LOG_LEVEL: &str = "debug";
-			logs_during_init.push(Box::new(|| {
-				tracing::warn!("Couldn't construct a `tracing_subscriber::EnvFilter` instance from environment, defaulting to {DEFAULT_LOG_LEVEL} level logging")
-			}));
-			tracing_subscriber::EnvFilter::new(format!("{DEFAULT_LOG_LEVEL},hyper_util=info,hyper=info")) // hyper specifically is loud, shut it up (I tend to default to `Debug` level, so have to override here)
-		});
-		//let env_filter = env_filter
-		//      .add_directive("tokio=off".parse().unwrap())
-		//      .add_directive("runtime=off".parse().unwrap());
+		let env_filter = filter_with_directives(&mut logs_during_init);
 
 		let error_layer = ErrorLayer::default();
 
