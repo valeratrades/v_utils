@@ -1,46 +1,8 @@
-use std::{
-	io::Write,
-	path::{Path, PathBuf},
-};
+use std::{io::Write, path::PathBuf};
 
 use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
-
-#[derive(Clone, Debug, Default)]
-pub enum LogDestination {
-	#[default]
-	Stdout,
-	File(Box<Path>),
-	#[cfg(not(target_arch = "wasm32"))] // no clue why, but `xdg::BaseDirectories` falls apart with it
-	Xdg(String),
-}
-impl LogDestination {
-	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn xdg<S: Into<String>>(name: S) -> Self {
-		LogDestination::Xdg(name.into())
-	}
-}
-
-fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
-	static DEFAULT_DIRECTIVES: &str = "debug,
-hyper=info,
-hyper_util=info";
-	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
-
-	let directives = std::fs::read_to_string(DIRECTIVES_PATH);
-	let directives: String = directives
-		.as_deref()
-		.unwrap_or_else(|_| {
-			logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to:\n{DEFAULT_DIRECTIVES}")));
-			DEFAULT_DIRECTIVES
-		})
-		.split_inclusive(',')
-		.map(str::trim)
-		.collect();
-	EnvFilter::builder().parse(directives).expect("Error parsing tracing directives")
-}
 
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
@@ -116,6 +78,46 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	info!("Starting ...");
 
 	trace_the_init(); //? Should I make this a trace?
+}
+
+#[derive(Clone, Debug, Default, derive_more::From)]
+pub enum LogDestination {
+	#[default]
+	Stdout,
+	File(PathBuf),
+	#[cfg(not(target_arch = "wasm32"))] // no clue why, but `xdg::BaseDirectories` falls apart with it
+	Xdg(String),
+}
+impl LogDestination {
+	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn xdg<S: Into<String>>(name: S) -> Self {
+		LogDestination::Xdg(name.into())
+	}
+}
+impl From<&str> for LogDestination {
+	fn from(s: &str) -> Self {
+		if s == "stdout" { LogDestination::Stdout } else { LogDestination::File(s.into()) }
+	}
+}
+
+fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
+	static DEFAULT_DIRECTIVES: &str = "debug,
+hyper=info,
+hyper_util=info";
+	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
+
+	let directives = std::fs::read_to_string(DIRECTIVES_PATH);
+	let directives: String = directives
+		.as_deref()
+		.unwrap_or_else(|_| {
+			logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to:\n{DEFAULT_DIRECTIVES}")));
+			DEFAULT_DIRECTIVES
+		})
+		.split_inclusive(',')
+		.map(str::trim)
+		.collect();
+	EnvFilter::builder().parse(directives).expect("Error parsing tracing directives")
 }
 
 use std::{

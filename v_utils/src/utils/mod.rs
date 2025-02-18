@@ -15,6 +15,8 @@ pub mod tracing;
 #[cfg(feature = "tracing")]
 pub use tracing::*;
 
+/// # HACK
+/// Assumes that `color_eyre` is in scope
 #[cfg(feature = "tracing")]
 #[cfg(not(feature = "wasm"))]
 #[macro_export]
@@ -25,7 +27,7 @@ macro_rules! clientside {
 	};
 }
 
-//HACK: all this code-duplication for one line add
+//HACK: code duplication
 #[cfg(feature = "tracing")]
 #[cfg(feature = "wasm")]
 #[macro_export]
