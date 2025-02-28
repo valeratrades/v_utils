@@ -18,27 +18,10 @@ pub use tracing::*;
 /// # HACK
 /// Assumes that `color_eyre` is in scope
 #[cfg(feature = "tracing")]
-#[cfg(not(feature = "wasm"))]
 #[macro_export]
 macro_rules! clientside {
 	() => {
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
-	};
-}
-
-//HACK: code duplication
-#[cfg(feature = "tracing")]
-#[cfg(feature = "wasm")]
-#[macro_export]
-macro_rules! clientside {
-	() => {
-		color_eyre::install().unwrap();
-		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
-
-		#[cfg(target_arch = "wasm32")]
-		v_utils::__internal::console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
-		#[cfg(target_arch = "wasm32")]
-		_ = v_utils::__internal::console_log::init_with_level(log::Level::Debug);
 	};
 }

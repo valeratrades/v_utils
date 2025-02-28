@@ -211,18 +211,15 @@ impl From<Pair> for String {
 	}
 }
 
-//TODO: get working
-#[allow(clippy::cmp_owned)]
 impl PartialEq<Pair> for &str {
 	fn eq(&self, other: &Pair) -> bool {
-		*self == other.to_string()
+		Pair::try_from(*self).expect("provided string can't be converted to `Pair` automatically") == *other // important not to cast `to_string` on `Pair` instance here as it will break (nightmare to debug) if I change `Display` impl
 	}
 }
 
-#[allow(clippy::cmp_owned)]
 impl PartialEq<Pair> for str {
 	fn eq(&self, other: &Pair) -> bool {
-		self == other.to_string()
+		self == other
 	}
 }
 
