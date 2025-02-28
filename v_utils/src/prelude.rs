@@ -24,7 +24,7 @@ pub use thiserror::Error;
 pub use tracing::{Span, debug, error, field::Empty, info, instrument, trace, warn};
 
 #[cfg(feature = "io")]
-pub use crate::io::create_xdg;
+pub use crate::io::xdg::*;
 pub use crate::{clientside, io::ExpandedPath, other::*, trades::*};
 
 #[deprecated(note = "Use main `prelude` instead")]
