@@ -1,11 +1,10 @@
-pub use xdg;
+pub extern crate xdg;
 
 macro_rules! impl_xdg_fn {
 	($fn_name:ident, $dir_type:ident) => {
-		#[doc = concat!("Will create ", stringify!($fn_name), "_HOME/<crate_name>/$subpath (\"\" for no subpath)")]
+		#[doc = concat!("Will create ", stringify!($fn_name), "_home/<crate_name>/$subpath (\"\" for no subpath)")]
 		pub fn $fn_name(subpath: &str) -> std::path::PathBuf {
-			let crate_name = env!("CARGO_PKG_NAME");
-			let dirs = xdg::BaseDirectories::with_prefix(crate_name).unwrap();
+			let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap();
 			dirs.$dir_type(subpath).unwrap()
 		}
 	};
