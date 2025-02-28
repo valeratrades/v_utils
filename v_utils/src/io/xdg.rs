@@ -1,18 +1,18 @@
 pub use xdg;
 
-#[macro_export]
-macro_rules! create_xdg {
-	($dir_type:ident $(, $subpath:expr)?) => {{
-		let dirs = v_utils::io::xdg::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap(); // CARGO_PKG_NAME will be evaluated to the name of the _crate that calls_ this macro
-		let subpath = Option::from($($subpath)?).unwrap_or("");
-		match stringify!($dir_type) {
-			"state" => dirs.create_state_directory(subpath),
-			"data" => dirs.create_data_directory(subpath),
-			"cache" => dirs.create_cache_directory(subpath),
-			"runtime" => dirs.create_runtime_directory(subpath),
-			"config" => dirs.create_config_directory(subpath),
-			_ => unimplemented!("Unknown directory type"),
+macro_rules! impl_xdg_fn {
+	($fn_name:ident, $dir_type:ident) => {
+		#[doc = concat!("Will create ", stringify!($fn_name), "_HOME/<crate_name>/$subpath (\"\" for no subpath)")]
+		pub fn $fn_name(subpath: &str) -> std::path::PathBuf {
+			let crate_name = env!("CARGO_PKG_NAME");
+			let dirs = xdg::BaseDirectories::with_prefix(crate_name).unwrap();
+			dirs.$dir_type(subpath).unwrap()
 		}
-		.unwrap()
-	}};
+	};
 }
+
+impl_xdg_fn!(xdg_data, create_data_directory);
+impl_xdg_fn!(xdg_config, create_config_directory);
+impl_xdg_fn!(xdg_cache, create_cache_directory);
+impl_xdg_fn!(xdg_state, create_state_directory);
+impl_xdg_fn!(xdg_runtime, create_runtime_directory);
