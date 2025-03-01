@@ -55,7 +55,8 @@ v_utils_macros = { path = "../v_utils_macros", version = "^2.1.0", optional = tr
 [features]
 default = ["lite"]
 
-io = ["dep:dirs", "dep:xdg"] 
+io = ["dep:dirs"] 
+xdg = ["dep:xdg"] # have to separate it, because `xdg` lib behaves weirdly under wasm
 trades = ["dep:chrono", "dep:strum"]
 macros = ["v_utils_macros"]
 llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
@@ -65,7 +66,7 @@ wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 
 
 lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
-full = ["lite", "llm", "distributions", "dep:tokio", "tokio/full", "dep:console-subscriber"] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
+full = ["lite", "llm", "distributions", "xdg", "dep:tokio", "tokio/full", "dep:console-subscriber"] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
 
 # dev only
 slow_tests = []
