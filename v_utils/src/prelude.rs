@@ -23,8 +23,6 @@ pub use thiserror::Error;
 //use serde_with::{serde_as, DisplayFromStr};
 pub use tracing::{Span, debug, error, field::Empty, info, instrument, trace, warn};
 
-#[cfg(feature = "io")]
-pub use crate::io::xdg::*;
 pub use crate::{clientside, io::ExpandedPath, other::*, trades::*};
 
 #[deprecated(note = "Use main `prelude` instead")]

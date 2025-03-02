@@ -1,6 +1,4 @@
 #[cfg(feature = "xdg")]
-pub use xdg_with_lib::*;
-#[cfg(feature = "xdg")]
 mod xdg_with_lib {
 	macro_rules! impl_xdg_fn {
 		($fn_name:ident, $dir_type:ident) => {
@@ -25,8 +23,6 @@ mod xdg_with_lib {
 	impl_xdg_fn!(xdg_runtime, create_runtime_directory);
 }
 
-#[cfg(not(feature = "xdg"))]
-pub use xdg_no_deps::*;
 #[cfg(not(feature = "xdg"))]
 mod xdg_no_deps {
 	macro_rules! impl_backup_xdg_fn {
@@ -53,3 +49,23 @@ mod xdg_no_deps {
 	impl_backup_xdg_fn!(xdg_state, "XDG_STATE_HOME", ".local/state");
 	impl_backup_xdg_fn!(xdg_runtime, "XDG_RUNTIME_DIR", ".runtime");
 }
+
+//TODO: potentially switch to defining fn to **get** the path from (appname, subpath); split those on `xdg` presence, and then here use whichever one is exported.
+//macro_rules! impl_create_xdg {
+//	($method_name:ident) => {
+//		#[doc = concat!("Will create directory returned by ", stringify!($method_name), "(env!(\"CARGO_PKG_NAME\"), subpath)")]
+//		#[macro_export]
+//		macro_rules! create_$method_name {
+//			($subpath: exRr) => {{
+//				let dir = $method_name(env!("CARGO_PKG_NAME"), $subpath);
+//				std::fs::create_dir_all(&dir).unwrap();
+//				dir
+//			}};
+//		}
+//	};
+//}
+//impl_create_xdg!(xdg_data);
+//impl_create_xdg!(xdg_config);
+//impl_create_xdg!(xdg_cache);
+//impl_create_xdg!(xdg_state);
+//impl_create_xdg!(xdg_runtime);

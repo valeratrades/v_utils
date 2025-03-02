@@ -673,3 +673,17 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+
+//TODO!!!!!!!: Settinsg fw
+
+#[proc_macro_derive(Settings)]
+pub fn derive_setings(input: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	let name = &input.ident;
+
+	let expanded = quote! {
+		todo!();
+	};
+
+	TokenStream::from(expanded)
+}
