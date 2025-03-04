@@ -674,8 +674,18 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
-//TODO!!!!!!!: Settinsg fw
+/**
+```rust
+use v_utils_macros::{Settings, clap_settings};
+struct Cli {
+	clap_settings!()
+}
 
+let cli = Cli::parse().unwrap();
+let settings = cli.try_build_settings().unwrap();
+```
+*/
+//TODO!!!!!!!: \
 #[proc_macro_derive(Settings)]
 pub fn derive_setings(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
