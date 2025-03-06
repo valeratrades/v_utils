@@ -706,32 +706,32 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			#[must_use]
-			pub fn try_build<C>(cli_raw: &C) -> Result<Self, ::v_utils::__internal::eyre::Report> {
-				let path: Option<std::path::PathBuf> = None; //dbg
-
+			pub fn try_build(path: Option<std::path::PathBuf> /*dbg*/) -> Result<Self, ::v_utils::__internal::eyre::Report> {
 				let app_name = env!("CARGO_PKG_NAME");
 				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
 				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
 
-				let locations = [
+				let location_bases = [
 					format!("{xdg_conf_dir}/{app_name}"),
 					format!("{xdg_conf_dir}/{app_name}/config"), //
 				];
+				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
+				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::default()); //TODO: use with_prefix(app_name)
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).prefix_separator(":"));
 
 				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
-				match path {
+				let raw: ::v_utils::__internal::config::Config = match path {
 					Some(path) => {
-						let builder = builder.add_source(::v_utils::__internal::config::File::with_name(&path.to_string()).required(true));
-						Ok(builder.build()?.try_deserialize().wrap_err(err_msg))
+						let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
+						builder.build()?
 					}
 					None => {
 						let mut conf_files_found = Vec::new();
 						for location in locations.iter() {
-							if std::path::Path::new(&location).exists() {
-								conf_files_found.push(location.into());
+							if location.exists() {
+								conf_files_found.push(location);
 							}
 						}
 						match conf_files_found.len() {
@@ -739,22 +739,18 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
 							},
 							1 => {
-								builder = builder.add_source(::v_utils::__internal::config::File::with_name(location).required(true));
+								builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
 							},
 							_ => {
 								return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
 							}
 						}
-
-						let raw: ::v_utils::__internal::config::Config = builder.build()?;
-						raw.try_deserialize().wrap_err(err_msg)
-						//v_utils::_internal::eyre::WrapErr::<Self, _>::wrap_err(raw.try_deserialize(), err_msg)
+						builder.build()?
 					}
-				}
+				};
+				raw.try_deserialize().wrap_err(err_msg)
 			}
 		}
-	};
-	let match_path = quote_spanned! { "match_path" => 
 	};
 	//#[derive(clap::Args)]
 	//pub struct SettingsArgs {

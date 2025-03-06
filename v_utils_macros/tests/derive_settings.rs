@@ -1,4 +1,3 @@
-use insta::assert_debug_snapshot;
 use serde::{Deserialize, Serialize};
 //use v_utils::io::ExpandedPath;
 
@@ -8,12 +7,13 @@ struct Settings {
 	pub positions_dir: std::path::PathBuf,
 	pub binance: Binance,
 }
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, v_utils_macros::Settings)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, v_utils_macros::MyConfigPrimitives, v_utils_macros::Settings)]
 struct Binance {
 	pub read_key: String,
 	pub read_secret: String,
 }
 
+#[derive(Debug, Default, Clone, PartialEq)]
 struct Cli {
 	config: Option<std::path::PathBuf>, //TODO: switch to ExpandedPath
 	//#[flatten]
@@ -54,16 +54,27 @@ fn main() {
 	std::fs::write(
 		"/tmp/test.toml",
 		r#"
-		mock = true
 		positions_dir = "/tmp"
 		[binance]
-		read_key = "full_key"
-		full_key = "read_key"
+		read_secret = { env = "BINANCE_READ_SECRET" }
+		#read_secret = "written out read_secret"
 		"#,
 	)
 	.unwrap();
+	std::env::set_var("BINANCE_READ_SECRET", "isarendtiaeahoulegf");
 
-	//std::en::set_var("APPNAME_MOCK", "false");
+	std::env::set_var("V_UTILS_MACROS:MOCK", "false");
+	std::env::set_var("V_UTILS_MACROS:BINANCE.READ_KEY", "env_read_key"); //NB: notice that nesting is provided by `.`, and prefix_separator is `:`
 
-	assert!(true); //TODO .
+	let settings = Settings::try_build(Some("/tmp/test.toml".into())).unwrap();
+	insta::assert_debug_snapshot!(settings, @r#"
+ Settings {
+     mock: false,
+     positions_dir: "/tmp",
+     binance: Binance {
+         read_key: "env_read_key",
+         read_secret: "written out read_secret",
+     },
+ }
+ "#);
 }
