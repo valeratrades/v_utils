@@ -26,9 +26,15 @@ trybuild = { version = "^1.0.103", features = ["diff"]}
 v_utils = { path = "../v_utils", features = ["full"]}
 
 [dependencies]
-proc-macro2 = { version = "^1.0.93" }
+proc-macro2 = { version = "^1.0.93", features = ["span-locations"] }
 syn = { version = "^2.0.98", features = ["full", "extra-traits"] }
 quote = { version = "^1.0.38" }
 serde.workspace = true
 eyre.workspace = true
 heck.workspace = true
+
+[features]
+default = ["cli"] #dbg
+cli = []
+
+full = ["cli"]

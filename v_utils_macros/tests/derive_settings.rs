@@ -1,17 +1,27 @@
 use insta::assert_debug_snapshot;
+use serde::{Deserialize, Serialize};
+//use v_utils::io::ExpandedPath;
 
-#[derive(Debug, Default, PartialEq, v_utils_macros::Settings)]
-pub struct Settings {
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, v_utils_macros::Settings)]
+struct Settings {
 	pub mock: bool,
-	pub positions_dir: PathBuf,
+	pub positions_dir: std::path::PathBuf,
 	pub binance: Binance,
 }
-#[derive(Clone, Debug, v_util_macros::Settings)]
-pub struct Binance {
-	pub full_key: String,
-	pub full_secret: String,
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, v_utils_macros::Settings)]
+struct Binance {
 	pub read_key: String,
 	pub read_secret: String,
+}
+
+struct Cli {
+	config: Option<std::path::PathBuf>, //TODO: switch to ExpandedPath
+	//#[flatten]
+	//settings: SettingsArgs,
+	mock: bool,
+	positions_dir: Option<std::path::PathBuf>,
+	binance_read_key: Option<String>,
+	binance_read_secret: Option<String>,
 }
 
 // needs to gen:
@@ -28,14 +38,32 @@ pub struct Binance {
 // so then it also naturally becomes a macro
 
 //impl plan:
-//+ conf
-//+ env
+//+ build fn (start with just conf files)
+//+ integration test
 //+ flags
-//+ build fn
 //+ #[default]
 //* cached
+//+Q: integrate with MyConfigPrimitives?
 
+//Q: it is possible that my current MyConfigPrimitives derive is messing with aggregated construction, as it derives `deserialize` instead of `try_deserializes`
+
+//Q: n
 fn main() {
 	// should be full integration: use clap, create an actual partial conf file in `/tmp`, add env flags, create a clap string, then aggregate and attemtp creating.
+
+	std::fs::write(
+		"/tmp/test.toml",
+		r#"
+		mock = true
+		positions_dir = "/tmp"
+		[binance]
+		read_key = "full_key"
+		full_key = "read_key"
+		"#,
+	)
+	.unwrap();
+
+	//std::en::set_var("APPNAME_MOCK", "false");
+
 	assert!(true); //TODO .
 }

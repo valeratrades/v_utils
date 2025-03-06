@@ -8,5 +8,6 @@ fn tests() {
 	t.pass("tests/make_df.rs");
 	t.pass("tests/wrap_new.rs");
 	t.pass("tests/scream_it.rs");
+	#[cfg(feature = "cli")]
 	t.pass("tests/derive_settings.rs");
 }

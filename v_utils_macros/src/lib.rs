@@ -4,7 +4,7 @@
 extern crate proc_macro;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, quote_spanned};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
@@ -373,7 +373,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				impl PrivateValue {
 					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {
 						match self {
-							PrivateValue::String(s) => Ok(s.clone()),
+							PrivateValue::String(s) => Ok(s.clone()), //HACK: probably can avoid cloning.
 							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
 						}
 					}
@@ -682,18 +682,96 @@ struct Cli {
 }
 
 let cli = Cli::parse().unwrap();
-let settings = cli.try_build_settings().unwrap();
+let settings = Settings::try_build(&cli).unwrap();
 ```
 */
 //TODO!!!!!!!: \
+//NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
+#[cfg(feature = "cli")]
 #[proc_macro_derive(Settings)]
 pub fn derive_setings(input: TokenStream) -> TokenStream {
-	let input = parse_macro_input!(input as DeriveInput);
-	let name = &input.ident;
-
-	let expanded = quote! {
-		todo!();
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
 	};
+
+	let expanded = quote_spanned! {name.span()=>
+		impl #name {
+			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
+			#[must_use]
+			pub fn try_build<C>(cli_raw: &C) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+				let path: Option<std::path::PathBuf> = None; //dbg
+
+				let app_name = env!("CARGO_PKG_NAME");
+				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
+				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
+
+				let locations = [
+					format!("{xdg_conf_dir}/{app_name}"),
+					format!("{xdg_conf_dir}/{app_name}/config"), //
+				];
+
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::default()); //TODO: use with_prefix(app_name)
+
+				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
+				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
+				match path {
+					Some(path) => {
+						let builder = builder.add_source(::v_utils::__internal::config::File::with_name(&path.to_string()).required(true));
+						Ok(builder.build()?.try_deserialize().wrap_err(err_msg))
+					}
+					None => {
+						let mut conf_files_found = Vec::new();
+						for location in locations.iter() {
+							if std::path::Path::new(&location).exists() {
+								conf_files_found.push(location.into());
+							}
+						}
+						match conf_files_found.len() {
+							0 => {
+								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+							},
+							1 => {
+								builder = builder.add_source(::v_utils::__internal::config::File::with_name(location).required(true));
+							},
+							_ => {
+								return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
+							}
+						}
+
+						let raw: ::v_utils::__internal::config::Config = builder.build()?;
+						raw.try_deserialize().wrap_err(err_msg)
+						//v_utils::_internal::eyre::WrapErr::<Self, _>::wrap_err(raw.try_deserialize(), err_msg)
+					}
+				}
+			}
+		}
+	};
+	let match_path = quote_spanned! { "match_path" => 
+	};
+	//#[derive(clap::Args)]
+	//pub struct SettingsArgs {
+	//	config: Option<std::path::PathBuf>, //dbg
+	//}
+	//#[macro_export]
+	//macro_rules! insert_clap_settings {
+	//	() => {
+	//		#[clap(long, default_value = "")]
+	//		pub config: Option<PathBuf>, //dbg
+	//	}
+	//}
+	//pub mod prelude {
+	//	pub use #name;
+	//	//Q: could I make these `must_use`?
+	//	//TODO: use the other 2
+	//}
 
 	TokenStream::from(expanded)
 }
