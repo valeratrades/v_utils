@@ -702,11 +702,12 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
-	let expanded = quote_spanned! {name.span()=>
+	let try_build = quote_spanned! {name.span()=>
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			#[must_use]
-			pub fn try_build(path: Option<std::path::PathBuf> /*dbg*/) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+				let path = flags.config.map(|p| p.0);
 				let app_name = env!("CARGO_PKG_NAME");
 				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
 				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
@@ -718,7 +719,7 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).prefix_separator(":"));
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/));
 
 				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
@@ -752,6 +753,15 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 			}
 		}
 	};
+	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
+		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
+		#[derive(Default, Debug, clap::Args, Clone, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
+		pub struct SettingsFlags {
+			#[arg(long)]
+			config: Option<v_utils::io::ExpandedPath>,
+			//TODO!!!: add all the flags (all with flattened nesting over '_')
+		}
+	};
 	//#[derive(clap::Args)]
 	//pub struct SettingsArgs {
 	//	config: Option<std::path::PathBuf>, //dbg
@@ -768,6 +778,22 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 	//	//Q: could I make these `must_use`?
 	//	//TODO: use the other 2
 	//}
-
+	let expanded = quote! {
+		#try_build
+		#settings_args
+	};
 	TokenStream::from(expanded)
 }
+
+/*TODO!!: figure out better errors by doing:
+```
+Is your macro expanding to an item / a bunch of statements, or is it an expression? (Very probably the former, but just checking)
+If the former, then I strongly recommend the following trick (assuming your macro is not very hygiene-sensitive):
+rather then returning the TokenStream from your proc-macro, you .to_string() it, and ::std::fs::write() it to some_file: &str (e.g., let some_file = "/tmp/expansion.rs"; if you only have a single macro callsite).
+optionally, but recommended, format said file (you can use Command to run rustfmt --edition 2021 on it);
+now, what you do return from your proc-macro is simply quote!( include!(#some_file); ).into().
+Enjoy the better diagnostics™
+
+Note: do not keep this in production, of course; I personally have a helper TokenStream -> TokenStream function which does that, and whose usage I uncomment when needing to debug :ferrisOwO:
+```
+*/

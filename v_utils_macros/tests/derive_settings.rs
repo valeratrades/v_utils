@@ -7,21 +7,18 @@ struct Settings {
 	pub positions_dir: std::path::PathBuf,
 	pub binance: Binance,
 }
-#[derive(Clone, Debug, Default, PartialEq, Serialize, v_utils_macros::MyConfigPrimitives, v_utils_macros::Settings)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, v_utils_macros::MyConfigPrimitives)]
 struct Binance {
 	pub read_key: String,
 	pub read_secret: String,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, PartialEq, clap::Parser)]
+#[command(author, version, about, long_about = None)]
 struct Cli {
-	config: Option<std::path::PathBuf>, //TODO: switch to ExpandedPath
-	//#[flatten]
-	//settings: SettingsArgs,
-	mock: bool,
-	positions_dir: Option<std::path::PathBuf>,
-	binance_read_key: Option<String>,
-	binance_read_secret: Option<String>,
+	//config: Option<std::path::PathBuf>, //TODO: switch to ExpandedPath
+	#[clap(flatten)]
+	settings: SettingsFlags,
 }
 
 // needs to gen:
@@ -54,26 +51,32 @@ fn main() {
 	std::fs::write(
 		"/tmp/test.toml",
 		r#"
-		positions_dir = "/tmp"
+		positions_dir = "/tmp/"
 		[binance]
 		read_secret = { env = "BINANCE_READ_SECRET" }
-		#read_secret = "written out read_secret"
 		"#,
 	)
 	.unwrap();
 	std::env::set_var("BINANCE_READ_SECRET", "isarendtiaeahoulegf");
 
-	std::env::set_var("V_UTILS_MACROS:MOCK", "false");
-	std::env::set_var("V_UTILS_MACROS:BINANCE.READ_KEY", "env_read_key"); //NB: notice that nesting is provided by `.`, and prefix_separator is `:`
+	std::env::set_var("V_UTILS_MACROS__MOCK", "false");
+	std::env::set_var("V_UTILS_MACROS__BINANCE__READ_KEY", "env_read_key"); //NB: to represent nesting we use `__` as separator
 
-	let settings = Settings::try_build(Some("/tmp/test.toml".into())).unwrap();
-	insta::assert_debug_snapshot!(settings, @r#"
+	let cli_input = vec![
+		"", "--config", "/tmp/test.toml"
+	];
+	use clap::Parser as _;
+	let cli = Cli::parse_from(cli_input);
+	dbg!(&cli);
+
+	let out_settings = Settings::try_build(cli.settings).unwrap();
+	insta::assert_debug_snapshot!(out_settings, @r#"
  Settings {
      mock: false,
      positions_dir: "/tmp",
      binance: Binance {
          read_key: "env_read_key",
-         read_secret: "written out read_secret",
+         read_secret: "isarendtiaeahoulegf",
      },
  }
  "#);
