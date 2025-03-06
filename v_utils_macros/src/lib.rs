@@ -1,7 +1,7 @@
 #![allow(clippy::get_first)]
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
-extern crate proc_macro;
+extern crate proc_macro2;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
@@ -9,6 +9,23 @@ use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
 };
+
+// _dbg (can't make a mod before of macro_rules not having `pub` option {{{
+/// A helper function to know location of errors in `quote!{}`s
+fn _dbg_token_stream(expanded: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+	let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_expanded.rs");
+	std::fs::write(fpath, expanded.to_string()).unwrap();
+	std::process::Command::new("rustfmt").arg("--edition=2024").arg(fpath).output().unwrap();
+	quote! {include!(#fpath); }
+}
+macro_rules! _dbg_tree {
+	($target:expr) => {
+		let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_dbg.rs");
+		let dbg_str = format!("{:#?}", $target);
+		std::fs::write(fpath, dbg_str).unwrap();
+	};
+}
+//,}}}
 
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
@@ -681,6 +698,7 @@ struct Cli {
 	clap_settings!()
 }
 
+//OUTDATED
 let cli = Cli::parse().unwrap();
 let settings = Settings::try_build(&cli).unwrap();
 ```
@@ -688,19 +706,10 @@ let settings = Settings::try_build(&cli).unwrap();
 //TODO!!!!!!!: \
 //NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
 #[cfg(feature = "cli")]
-#[proc_macro_derive(Settings)]
-pub fn derive_setings(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Settings, attributes(settings))]
+pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
-	let fields = if let syn::Data::Struct(syn::DataStruct {
-		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
-		..
-	}) = ast.data
-	{
-		named
-	} else {
-		unimplemented!()
-	};
 
 	let try_build = quote_spanned! {name.span()=>
 		impl #name {
@@ -753,47 +762,73 @@ pub fn derive_setings(input: TokenStream) -> TokenStream {
 			}
 		}
 	};
+
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	//XXX: will fail on nested structs
+	_dbg_tree!(&fields);
+
+	//dbg
+	let flag_quotes = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		// check if attr is `#[settings(flatten)]`
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		match has_flatten_attr {
+			true => quote! {
+				//TODO!!!!!!!!: impl flatten. Here should have been an expansion of struct under #ty key
+			},
+			false => quote! {
+				#[arg(long)]
+				#ident: Option<#ty>,
+			},
+		}
+	});
+
 	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
 		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
 		#[derive(Default, Debug, clap::Args, Clone, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
 		pub struct SettingsFlags {
 			#[arg(long)]
 			config: Option<v_utils::io::ExpandedPath>,
-			//TODO!!!: add all the flags (all with flattened nesting over '_')
+			#(#flag_quotes)*
 		}
 	};
-	//#[derive(clap::Args)]
-	//pub struct SettingsArgs {
-	//	config: Option<std::path::PathBuf>, //dbg
-	//}
-	//#[macro_export]
-	//macro_rules! insert_clap_settings {
-	//	() => {
-	//		#[clap(long, default_value = "")]
-	//		pub config: Option<PathBuf>, //dbg
-	//	}
-	//}
-	//pub mod prelude {
-	//	pub use #name;
-	//	//Q: could I make these `must_use`?
-	//	//TODO: use the other 2
-	//}
 	let expanded = quote! {
 		#try_build
-		#settings_args
+		//#settings_args //dbg
 	};
-	TokenStream::from(expanded)
+
+	_dbg_token_stream(expanded).into()
+	//expanded
 }
 
-/*TODO!!: figure out better errors by doing:
-```
-Is your macro expanding to an item / a bunch of statements, or is it an expression? (Very probably the former, but just checking)
-If the former, then I strongly recommend the following trick (assuming your macro is not very hygiene-sensitive):
-rather then returning the TokenStream from your proc-macro, you .to_string() it, and ::std::fs::write() it to some_file: &str (e.g., let some_file = "/tmp/expansion.rs"; if you only have a single macro callsite).
-optionally, but recommended, format said file (you can use Command to run rustfmt --edition 2021 on it);
-now, what you do return from your proc-macro is simply quote!( include!(#some_file); ).into().
-Enjoy the better diagnostics™
+#[proc_macro_derive(SettingsArgs)]
+pub fn derive_settings_args(input: TokenStream) -> TokenStream {
+	// impls trait under which it sends
+	// Vec<(key: String, value: String)> of its members. Probably sholud go up to the very top, only after being joined with `config` path in main `Settings` macro (so it would be dependant on that struct also deriving `SettinsgArgs`)
+	//Q: but how the hell do I impl that nesting?!
 
-Note: do not keep this in production, of course; I personally have a helper TokenStream -> TokenStream function which does that, and whose usage I uncomment when needing to debug :ferrisOwO:
-```
-*/
+	//DO: SettinsgFlags is no longer 2d, - we keep the structure, but now for every single nested child we create `__OptionalFields{name}` double (if a field is already an option, we leave it as is)
+	//DO: each double implements SettingsArgs trait, which will implement Args manualy (unless this is possible in derives too), but **flags will have static prefix** being SETTINGS_ARGS_PREFIX_#name (don't capitalize it (could produce nasty bugs), just #[allow(non_snake_case)])
+	//DO: impl clap::Args manually for SettingsFlags (in the Settings macro)
+	//DO: impl config::Source for SettingsFlags (want to use same trait as the one we construct clap::Args from)
+	todo!()
+}

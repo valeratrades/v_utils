@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 struct Settings {
 	pub mock: bool,
 	pub positions_dir: std::path::PathBuf,
+	#[settings(flatten)]
 	pub binance: Binance,
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, v_utils_macros::MyConfigPrimitives)]
@@ -21,6 +22,89 @@ struct Cli {
 	settings: SettingsFlags,
 }
 
+use std::str::FromStr as _;
+#[derive(Debug, Default, PartialEq)]
+struct SettingsFlags {
+	config: Option<v_utils::io::ExpandedPath>,
+	mock: Option<bool>,
+	binance: Binance,
+}
+impl clap::FromArgMatches for SettingsFlags {
+    fn from_arg_matches(matches: &clap::ArgMatches) -> Result<Self, clap::Error> {
+        Ok(SettingsFlags {
+            config: matches
+                .get_one::<String>("config")
+                .map(|s| v_utils::io::ExpandedPath::from_str(s).unwrap()),
+            mock: matches.get_one::<bool>("mock").map(|_| true),
+            binance: Binance {
+                read_key: matches.get_one::<String>("binance_read_key")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                read_secret: matches.get_one::<String>("binance_read_secret")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+            },
+        })
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &clap::ArgMatches) -> Result<(), clap::Error> {
+        if matches.contains_id("config") {
+            self.config = matches
+                .get_one::<String>("config")
+                .map(|s| v_utils::io::ExpandedPath::from_str(s).unwrap());
+        }
+        if matches.contains_id("mock") {
+            self.mock = matches.get_one::<bool>("mock").map(|_| true)
+        }
+        if matches.contains_id("binance_read_key") {
+            self.binance.read_key = matches
+                .get_one::<String>("binance_read_key")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+        }
+        if matches.contains_id("binance_read_secret") {
+            self.binance.read_secret = matches
+                .get_one::<String>("binance_read_secret")
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+        }
+        Ok(())
+    }
+}
+impl clap::Args for SettingsFlags {
+	fn augment_args(cmd: clap::Command) -> clap::Command {
+		cmd.arg(
+			clap::Arg::new("config")
+				.long("config")
+				.required(false)
+				.help("Run in mock mode"),
+		)
+			.arg(
+				clap::Arg::new("positions_dir")
+					.long("positions-dir")
+					.required(false)
+					.help("Directory for positions data"),
+			)
+			// Add Binance-specific arguments directly here
+			.arg(
+				clap::Arg::new("binance_read_key")
+					.long("binance-read-key")
+					.required(false)
+					.help("Binance API read key"),
+			)
+			.arg(
+				clap::Arg::new("binance_read_secret")
+					.long("binance-read-secret")
+					.required(false)
+					.help("Binance API read secret"),
+			)
+	}
+
+	fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
+		Self::augment_args(cmd)
+	}
+}
+
 // needs to gen:
 // 4 sources
 // 1. config file (using `config` crate)
@@ -35,12 +119,11 @@ struct Cli {
 // so then it also naturally becomes a macro
 
 //impl plan:
-//+ build fn (start with just conf files)
-//+ integration test
-//+ flags
-//+ #[default]
-//* cached
-//+Q: integrate with MyConfigPrimitives?
+//- [x] build fn (start with just conf files)
+//- [x] integration test
+//- [ ] flags
+//- [ ] #[default]
+//- [ ] cached
 
 //Q: it is possible that my current MyConfigPrimitives derive is messing with aggregated construction, as it derives `deserialize` instead of `try_deserializes`
 
@@ -59,12 +142,13 @@ fn main() {
 	.unwrap();
 	std::env::set_var("BINANCE_READ_SECRET", "isarendtiaeahoulegf");
 
+	//NB: to represent nesting we use `__` separator
 	std::env::set_var("V_UTILS_MACROS__MOCK", "false");
-	std::env::set_var("V_UTILS_MACROS__BINANCE__READ_KEY", "env_read_key"); //NB: to represent nesting we use `__` as separator
+	std::env::set_var("V_UTILS_MACROS__BINANCE__READ_KEY", "env_read_key");
 
 	let cli_input = vec![
 		"", "--config", "/tmp/test.toml"
-	];
+	]; // should follow std::env::os_args()
 	use clap::Parser as _;
 	let cli = Cli::parse_from(cli_input);
 	dbg!(&cli);
@@ -73,7 +157,7 @@ fn main() {
 	insta::assert_debug_snapshot!(out_settings, @r#"
  Settings {
      mock: false,
-     positions_dir: "/tmp",
+     positions_dir: "/tmp/",
      binance: Binance {
          read_key: "env_read_key",
          read_secret: "isarendtiaeahoulegf",
