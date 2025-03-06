@@ -5,6 +5,7 @@
 **/bin/
 **/*.test
 **/*.out
+**/*.db
 
 ## Personal
 **/_*
@@ -19,7 +20,7 @@ commit
 functions.sh
 
 ## Nix
-result
+result/
 .direnv/
 
 ## Vim
@@ -53,7 +54,9 @@ venv/
 *.exe~
 *.dll
 
+## Web
+**/*.sass-cache/
 ## Rust
-.cargo/config.toml
-.cargo/config
 **/**.pending-snap
+### could be used for initial debugging of apps using `config` crate
+config.toml

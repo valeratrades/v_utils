@@ -8,49 +8,49 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
 
+[dependencies]
+const_format = "0.2.34"
+derive-new = "^0.7.0"
+derive_more = { version = "2.0.1", features = ["full"] }
+# unconditional
+eyre.workspace = true
+function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
+macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
+serde.workspace = true
+serde_json = "^1.0.138"
+thiserror = "2.0.11"
+tracing = { version = "^0.1.41", features = ["log", "std", "async-await"] }
+async-sse = { version = "^5.1.0", optional = true }
+bytes = { version = "^1.10.0", optional = true }
+chrono = { version = "^0.4.39", optional = true }
+config = { version = "^0.15.9", optional = true }
+dirs = { version = "^6.0.0", optional = true }
+futures = { version = "^0.3.31", optional = true }
+libc = { version = "^0.2", optional = true }
+quote = { version = "^1.0.38", optional = true }
+rand = { version = "^0.9.0", optional = true }
+rand_distr = { version = "^0.5.0", optional = true }
+reqwest = { version = "^0.12.12", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
+strum = { version = "^0.27.0", features = ["derive"], optional = true }
+
+# # optional
+tokio = { version = "^1.43.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
+xdg = { version = "^2.5.2", optional = true }
+console-subscriber = { version = "0.4.1", optional = true }
+console_error_panic_hook = { version = "^0.1.7", optional = true }
+console_log = { version = "^1.0.0", optional = true }
+tracing-error = { version = "^0.2.1", optional = true }
+tracing-log = { version = "^0.2.0", optional = true }
+
+tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry", "env-filter"], optional = true }
+#
+
+v_utils_macros = { path = "../v_utils_macros", version = "^2.1.0", optional = true }
+
 [dev-dependencies]
 insta = "^1.42.1"
 trybuild = { version = "^1.0.103", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
-
-[dependencies]
-# unconditional
-eyre.workspace = true
-const_format = "0.2.34"
-serde.workspace = true
-tracing = { version = "^0.1.41", features = ["log", "std", "async-await"] }
-derive-new = "^0.7.0"
-serde_json = "^1.0.138"
-function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
-thiserror = "2.0.11"
-macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
-derive_more = { version = "2.0.1", features = ["full"] }
-
-# # optional
-tokio = { version = "^1.43.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
-async-sse = { version = "^5.1.0", optional = true }
-bytes = { version = "^1.10.0", optional = true }
-reqwest = { version = "^0.12.12", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
-chrono = { version = "^0.4.39", optional = true }
-futures = { version = "^0.3.31", optional = true }
-quote = { version = "^1.0.38", optional = true }
-rand = { version = "^0.9.0", optional = true }
-rand_distr = { version = "^0.5.0", optional = true }
-xdg = { version = "^2.5.2", optional = true }
-strum = { version = "^0.27.0", features = ["derive"], optional = true }
-libc = { version = "^0.2", optional = true }
-dirs = { version = "^6.0.0", optional = true }
-config = { version = "^0.15.9", optional = true }
-
-tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry", "env-filter"], optional = true }
-tracing-log = { version = "^0.2.0", optional = true }
-tracing-error = { version = "^0.2.1", optional = true }
-console-subscriber = { version = "0.4.1", optional = true }
-console_log = { version = "^1.0.0", optional = true }
-console_error_panic_hook = { version = "^0.1.7", optional = true }
-#
-
-v_utils_macros = { path = "../v_utils_macros", version = "^2.1.0", optional = true }
 #
 
 [features]
@@ -62,13 +62,27 @@ cli = ["v_utils_macros/cli", "dep:xdg", "dep:config"]
 trades = ["dep:chrono", "dep:strum"]
 macros = ["v_utils_macros"]
 llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
-tracing = ["dep:xdg", "dep:tracing-subscriber", "dep:tracing-log", "dep:tracing-error", "dep:xdg"]
+tracing = [
+    "dep:xdg",
+    "dep:tracing-subscriber",
+    "dep:tracing-log",
+    "dep:tracing-error",
+    "dep:xdg"
+]
 distributions = ["dep:rand", "dep:rand_distr"]
 wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 
-
 lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
-full = ["lite", "llm", "distributions", "xdg", "cli", "dep:tokio", "tokio/full", "dep:console-subscriber"] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
+full = [
+    "lite",
+    "llm",
+    "distributions",
+    "xdg",
+    "cli",
+    "dep:tokio",
+    "tokio/full",
+    "dep:console-subscriber"
+] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
 
 # dev only
 slow_tests = []

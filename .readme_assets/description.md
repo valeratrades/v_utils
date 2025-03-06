@@ -1,0 +1,1 @@
+My utils crate. For personal use only. But maybe, just maybe, one day I will document it slightly more. v_utils is optimized for developer productivity, other concerns, including even performance, are secondary. Iteration speed above all.
