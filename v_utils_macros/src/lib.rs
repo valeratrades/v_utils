@@ -716,7 +716,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			#[must_use]
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
-				let path = flags.config.map(|p| p.0);
+				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
 				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
 				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
@@ -728,7 +728,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/));
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
 
 				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
@@ -792,7 +792,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			true => {
 				use quote::ToTokens as _;
 				let type_name = ty.to_token_stream().to_string();
-				let nested_struct_name = format_ident!("SettingsBadlyNested{type_name}");
+				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
 				quote! {
 				#[clap(flatten)]
 				#ident: #nested_struct_name,
@@ -846,17 +846,14 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 			_ => quote! { Option<#ty> },
 		};
 
-		// Create the long flag string (without the #)
-		let flag_string = format!("{}-{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
-
-		// Generate the attribute directly with quote!
+		let prefixed_field_name = format_ident!("{}_{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
 		quote! {
-			#[arg(long = #flag_string)]
-			#ident: #option_wrapped_ty,
+			#[arg(long)]
+			#prefixed_field_name: #option_wrapped_ty,
 		}
 	});
 
-	let produced_struct_name = format_ident!("SettingsBadlyNested{name}");
+	let produced_struct_name = format_ident!("__SettingsBadlyNested{name}");
 	let expanded = quote! {
 		#[derive(Default, Debug, clap::Args, Clone, PartialEq)]
 		pub struct #produced_struct_name {
@@ -864,6 +861,7 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		}
 	};
 
+	_dbg_token_stream(expanded.clone());
 	TokenStream::from(expanded)
 }
 
