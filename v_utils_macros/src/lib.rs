@@ -4,7 +4,7 @@
 extern crate proc_macro2;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
@@ -773,12 +773,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		unimplemented!()
 	};
 
-	//XXX: will fail on nested structs
-	_dbg_tree!(&fields);
-
-	//dbg
 	let flag_quotes = fields.iter().map(|field| {
-		let ident = &field.ident;
 		let ty = &field.ty;
 
 		// check if attr is `#[settings(flatten)]`
@@ -791,10 +786,18 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			false
 		});
 
+		//HACK: hugely oversimplified (can only handle one level of nesting)
+		let ident = &field.ident;
 		match has_flatten_attr {
-			true => quote! {
-				//TODO!!!!!!!!: impl flatten. Here should have been an expansion of struct under #ty key
-			},
+			true => {
+				use quote::ToTokens as _;
+				let type_name = ty.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("SettingsBadlyNested{type_name}");
+				quote! {
+				#[clap(flatten)]
+				#ident: #nested_struct_name,
+				}
+			}
 			false => quote! {
 				#[arg(long)]
 				#ident: Option<#ty>,
@@ -813,22 +816,66 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	};
 	let expanded = quote! {
 		#try_build
-		//#settings_args //dbg
+		#settings_args
 	};
 
-	_dbg_token_stream(expanded).into()
-	//expanded
+	TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(SettingsArgs)]
-pub fn derive_settings_args(input: TokenStream) -> TokenStream {
-	// impls trait under which it sends
-	// Vec<(key: String, value: String)> of its members. Probably sholud go up to the very top, only after being joined with `config` path in main `Settings` macro (so it would be dependant on that struct also deriving `SettinsgArgs`)
-	//Q: but how the hell do I impl that nesting?!
+#[proc_macro_derive(SettingsBadlyNested)]
+pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as DeriveInput);
+	let name = &ast.ident;
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
 
-	//DO: SettinsgFlags is no longer 2d, - we keep the structure, but now for every single nested child we create `__OptionalFields{name}` double (if a field is already an option, we leave it as is)
-	//DO: each double implements SettingsArgs trait, which will implement Args manualy (unless this is possible in derives too), but **flags will have static prefix** being SETTINGS_ARGS_PREFIX_#name (don't capitalize it (could produce nasty bugs), just #[allow(non_snake_case)])
-	//DO: impl clap::Args manually for SettingsFlags (in the Settings macro)
-	//DO: impl config::Source for SettingsFlags (want to use same trait as the one we construct clap::Args from)
-	todo!()
+	let prefixed_flags = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+		let option_wrapped_ty = match &ty {
+			syn::Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Option" => {
+				quote! { #ty }
+			}
+			_ => quote! { Option<#ty> },
+		};
+
+		// Create the long flag string (without the #)
+		let flag_string = format!("{}-{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
+
+		// Generate the attribute directly with quote!
+		quote! {
+			#[arg(long = #flag_string)]
+			#ident: #option_wrapped_ty,
+		}
+	});
+
+	let produced_struct_name = format_ident!("SettingsBadlyNested{name}");
+	let expanded = quote! {
+		#[derive(Default, Debug, clap::Args, Clone, PartialEq)]
+		pub struct #produced_struct_name {
+			#(#prefixed_flags)*
+		}
+	};
+
+	TokenStream::from(expanded)
 }
+
+//#[proc_macro_derive(SettingsArgs)]
+//pub fn derive_settings_args(input: TokenStream) -> TokenStream {
+//	// impls trait under which it sends
+//	// Vec<(key: String, value: String)> of its members. Probably sholud go up to the very top, only after being joined with `config` path in main `Settings` macro (so it would be dependant on that struct also deriving `SettinsgArgs`)
+//	//Q: but how the hell do I impl that nesting?!
+//
+//	//DO: SettinsgFlags is no longer 2d, - we keep the structure, but now for every single nested child we create `__OptionalFields{name}` double (if a field is already an option, we leave it as is)
+//	//DO: each double implements SettingsArgs trait, which will implement Args manualy (unless this is possible in derives too), but **flags will have static prefix** being SETTINGS_ARGS_PREFIX_#name (don't capitalize it (could produce nasty bugs), just #[allow(non_snake_case)])
+//	//DO: impl clap::Args manually for SettingsFlags (in the Settings macro)
+//	//DO: impl config::Source for SettingsFlags (want to use same trait as the one we construct clap::Args from)
+//	todo!()
+//}
