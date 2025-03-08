@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-//use v_utils::io::ExpandedPath;
-use v_utils::__internal::config;
 
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize, v_utils_macros::Settings)]
 struct Settings {
@@ -30,25 +28,6 @@ struct Cli {
 	settings: SettingsFlags,
 }
 
-impl config::Source for SettingsFlags {
-	fn clone_into_box(&self) -> Box<dyn config::Source + Send + Sync> {
-		Box::new((*self).clone())
-	}
-
-	/// Collect all configuration properties available from this source into
-	/// a [`Map`].
-	fn collect(&self) -> Result<config::Map<String, config::Value>, config::ConfigError> {
-		let mut map = config::Map::new();
-		if let Some(bybit_read_secret) = &self.bybit.bybit_read_secret {
-			map.insert(
-				"bybit.read_secret".to_owned(),
-				config::Value::new(Some(&"flags:bybit".to_owned()), config::ValueKind::String(bybit_read_secret.to_owned())),
-			);
-		}
-		Ok(map)
-	}
-}
-
 // needs to gen:
 // 4 sources
 // 1. config file (using `config` crate)
@@ -66,7 +45,9 @@ impl config::Source for SettingsFlags {
 //- [x] build fn (start with just conf files)
 //- [x] integration test
 //- [.](left: config::Source impl) flags
-//- [ ] #[default]
+//		- [ ] derive while hardcoding ValueKind::String
+//		- [ ] proper matching for ValueKind types
+//- [ ] #[default] (simply mirror them as clap defaults)
 //- [ ] cached
 
 //Q: it is possible that my current MyConfigPrimitives derive is messing with aggregated construction, as it derives `deserialize` instead of `try_deserializes`

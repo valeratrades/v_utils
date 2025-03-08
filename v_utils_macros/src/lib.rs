@@ -12,10 +12,11 @@ use syn::{
 
 // _dbg (can't make a mod before of macro_rules not having `pub` option {{{
 /// A helper function to know location of errors in `quote!{}`s
-fn _dbg_token_stream(expanded: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-	let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_expanded.rs");
-	std::fs::write(fpath, expanded.to_string()).unwrap();
-	std::process::Command::new("rustfmt").arg("--edition=2024").arg(fpath).output().unwrap();
+fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
+	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
+	std::fs::create_dir_all(std::path::PathBuf::from(&fpath).parent().unwrap()).unwrap();
+	std::fs::write(&fpath, expanded.to_string()).unwrap();
+	std::process::Command::new("rustfmt").arg("--edition=2024").arg(&fpath).output().unwrap();
 	quote! {include!(#fpath); }
 }
 macro_rules! _dbg_tree {
@@ -794,14 +795,48 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let type_name = ty.to_token_stream().to_string();
 				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
 				quote! {
-				#[clap(flatten)]
-				#ident: #nested_struct_name,
+					#[clap(flatten)]
+					#ident: #nested_struct_name,
 				}
 			}
-			false => quote! {
-				#[arg(long)]
-				#ident: Option<#ty>,
-			},
+			false => {
+				quote! {
+					#[arg(long)]
+					#ident: Option<#ty>,
+				}
+			}
+		}
+	});
+
+	//HACK: code duplication. But if I produce both in single pass, it starts getting weird about types.
+	let source_quotes = fields.iter().map(|field| {
+		let ty = &field.ty;
+
+		// check if attr is `#[settings(flatten)]`
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		let ident = &field.ident;
+		match has_flatten_attr {
+			true => {
+				use quote::ToTokens as _;
+				let type_name = ty.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
+				quote! {
+					//TODO!!!!: .
+				}
+			}
+			false => {
+				quote! {
+					//TODO!!!!: .
+				}
+			}
 		}
 	});
 
@@ -813,12 +848,29 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			config: Option<v_utils::io::ExpandedPath>,
 			#(#flag_quotes)*
 		}
+		impl v_utils::__internal::config::Source for SettingsFlags {
+			fn clone_into_box(&self) -> Box<dyn v_utils::__internal::config::Source + Send + Sync> {
+				Box::new((*self).clone())
+			}
+
+			fn collect(&self) -> Result<v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>, v_utils::__internal::config::ConfigError> {
+				let mut map = v_utils::__internal::config::Map::new();
+				if let Some(bybit_read_secret) = &self.bybit.bybit_read_secret {
+					map.insert(
+						"bybit.read_secret".to_owned(),
+						v_utils::__internal::config::Value::new(Some(&"flags:bybit".to_owned()), v_utils::__internal::config::ValueKind::String(bybit_read_secret.to_owned())),
+					);
+				}
+				Ok(map)
+			}
+		}
 	};
 	let expanded = quote! {
 		#try_build
 		#settings_args
 	};
 
+	_dbg_token_stream(expanded.clone(), "settings");
 	TokenStream::from(expanded)
 }
 
@@ -861,7 +913,7 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		}
 	};
 
-	_dbg_token_stream(expanded.clone());
+	_dbg_token_stream(expanded.clone(), "nested");
 	TokenStream::from(expanded)
 }
 
