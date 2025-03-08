@@ -90,14 +90,14 @@ fn main() {
 	insta::assert_debug_snapshot!(out_settings, @r#"
  Settings {
      mock: false,
-     positions_dir: "\"/tmp/please_work/\"",
+     positions_dir: "/tmp/please_work/",
      sth_else: "define it here as-is",
      binance: Binance {
          read_key: "env_read_key",
          read_secret: "isarendtiaeahoulegf",
      },
      bybit: Bybit {
-         secret_path: "\"passed as a flag\"",
+         secret_path: "passed as a flag",
      },
  }
  "#);

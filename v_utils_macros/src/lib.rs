@@ -74,7 +74,7 @@ fn extract_vec_inner_type(type_path: &syn::TypePath) -> &syn::Type {
 	// Return a dummy type if extraction fails
 	panic!("Failed to extract inner type from Vec")
 }
-fn single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
 	match ty {
 		syn::Type::Path(type_path) =>
 			if type_path.path.segments.last().unwrap().ident == "Option" {
@@ -889,11 +889,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		match has_flatten_attr {
 			true => {
 				quote! {
-					&self.#ident.collect_config(&mut map);
+					let _ = &self.#ident.collect_config(&mut map);
 				}
 			}
 			false => {
-				let value_kind = get_value_kind_for_type(ident.as_ref().unwrap(), ty);
+				let value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
 				let field_name_string = format!("{}", ident.as_ref().unwrap());
 				quote! {
 					if let Some(#ident) = &self.#ident {
@@ -970,7 +970,7 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let config_value_kind = get_value_kind_for_type(ident.as_ref().unwrap(), ty);
+		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
 		let prefixed_field_name = format_ident!("{lowercase_name}_{}", ident.as_ref().unwrap());
 		let config_value_path = format!("{lowercase_name}.{}", ident.as_ref().unwrap());
 		let source_tag = format!("flags:{}", lowercase_name);
@@ -1001,9 +1001,40 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	//TokenStream::from(expanded)
 }
 
-/// takes in clap-compatible type, and returns config::ValueKind
-fn clap_to_config(ty: &syn::Type) -> proc_macro2::TokenStream {
-	todo!();
+/// Takes in field identifier and type, returns the appropriate config::ValueKind conversion
+fn clap_to_config(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	match inner_type {
+		// bool
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) }
+		}
+		// Vec/Array
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			// Create a new Array from the Vec
+			quote! {
+				{
+					let mut array = v_utils::__internal::config::Array::new();
+					for item in #ident.iter() {
+						array.push(v_utils::__internal::config::Value::new(
+							None,
+							v_utils::__internal::config::ValueKind::String(item.to_string())
+						));
+					}
+					v_utils::__internal::config::ValueKind::Array(array)
+				}
+			}
+		}
+		// default to String
+		_ => {
+			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+		}
+	}
 }
 
 // we can't do type-conversion checks at clap-parsing level, as we need to push them through config's system later.
@@ -1039,45 +1070,45 @@ fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream
 	}
 }
 
-// Function to determine the ValueKind based on a field's type
-fn get_value_kind_for_type(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
-	match ty {
-		syn::Type::Path(type_path) => {
-			if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments.last().unwrap().arguments {
-				if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-					match inner_type {
-						syn::Type::Path(inner_path) => {
-							let inner_type_str = inner_path.path.segments.last().unwrap().ident.to_string();
-
-							match inner_type_str.as_str() {
-								"bool" => quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) },
-								"i64" => quote! { v_utils::__internal::config::ValueKind::I64(*#ident) },
-								"i128" => quote! { v_utils::__internal::config::ValueKind::I128(*#ident) },
-								"u64" => quote! { v_utils::__internal::config::ValueKind::U64(*#ident) },
-								"u128" => quote! { v_utils::__internal::config::ValueKind::U128(*#ident) },
-								"f64" => quote! { v_utils::__internal::config::ValueKind::Float(*#ident) },
-								"String" => quote! { v_utils::__internal::config::ValueKind::String(#ident.to_owned()) },
-								//XXX: what on earth should happen if we need say PathBuf?
-								//TODO!!!!!!!: check if this can work out at all (unlikely), and if not - only add flags of corresponding types (default to String)
-								_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
-							}
-						}
-						_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
-					}
-				} else {
-					panic!("How did we get here?");
-					quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
-				}
-			} else {
-				_dbg_tree!(type_path);
-				//panic!("Surely this is impossible");
-				quote! { v_utils::__internal::config::ValueKind::String(format!("{:?}", #ident))}
-			}
-		}
-		_ => {
-			panic!("Surely this is like really impossible");
-			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
-		}
-	}
-}
+//// Function to determine the ValueKind based on a field's type
+//fn get_value_kind_for_type(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
+//	match ty {
+//		syn::Type::Path(type_path) => {
+//			if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments.last().unwrap().arguments {
+//				if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+//					match inner_type {
+//						syn::Type::Path(inner_path) => {
+//							let inner_type_str = inner_path.path.segments.last().unwrap().ident.to_string();
+//
+//							match inner_type_str.as_str() {
+//								"bool" => quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) },
+//								"i64" => quote! { v_utils::__internal::config::ValueKind::I64(*#ident) },
+//								"i128" => quote! { v_utils::__internal::config::ValueKind::I128(*#ident) },
+//								"u64" => quote! { v_utils::__internal::config::ValueKind::U64(*#ident) },
+//								"u128" => quote! { v_utils::__internal::config::ValueKind::U128(*#ident) },
+//								"f64" => quote! { v_utils::__internal::config::ValueKind::Float(*#ident) },
+//								"String" => quote! { v_utils::__internal::config::ValueKind::String(#ident.to_owned()) },
+//								//XXX: what on earth should happen if we need say PathBuf?
+//								//TODO!!!!!!!: check if this can work out at all (unlikely), and if not - only add flags of corresponding types (default to String)
+//								_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
+//							}
+//						}
+//						_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
+//					}
+//				} else {
+//					panic!("How did we get here?");
+//					quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+//				}
+//			} else {
+//				_dbg_tree!(type_path);
+//				//panic!("Surely this is impossible");
+//				quote! { v_utils::__internal::config::ValueKind::String(format!("{:?}", #ident))}
+//			}
+//		}
+//		_ => {
+//			panic!("Surely this is like really impossible");
+//			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+//		}
+//	}
+//}
 //,}}}
