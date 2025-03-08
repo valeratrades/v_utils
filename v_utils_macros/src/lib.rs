@@ -1,14 +1,92 @@
 #![allow(clippy::get_first)]
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
-extern crate proc_macro;
+extern crate proc_macro2;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote, quote_spanned};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
 };
+
+// helpers {{{
+/// A helper function to know location of errors in `quote!{}`s
+fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
+	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
+	std::fs::create_dir_all(std::path::PathBuf::from(&fpath).parent().unwrap()).unwrap();
+	std::fs::write(&fpath, expanded.to_string()).unwrap();
+	std::process::Command::new("rustfmt").arg("--edition=2024").arg(&fpath).output().unwrap();
+	quote! {include!(#fpath); }
+}
+macro_rules! _dbg_tree {
+	($target:expr) => {
+		let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_dbg.rs");
+		let dbg_str = format!("{:#?}", $target);
+		std::fs::write(fpath, dbg_str).unwrap();
+	};
+}
+fn is_option_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Option";
+	}
+	false
+}
+
+// Helper function to check if a type path is Vec<T>
+fn is_vec_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Vec";
+	}
+	false
+}
+
+// Helper function to check if a type is a specific primitive
+fn is_type(type_path: &syn::TypePath, type_name: &str) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == type_name;
+	}
+	false
+}
+
+// Extract inner type from Option<T>
+fn extract_option_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Option")
+}
+
+// Extract inner type from Vec<T>
+fn extract_vec_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Vec")
+}
+fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	match ty {
+		syn::Type::Path(type_path) =>
+			if type_path.path.segments.last().unwrap().ident == "Option" {
+				quote! { #ty }
+			} else {
+				quote! { Option<#ty> }
+			},
+		_ => quote! { Option<#ty> },
+	}
+}
+
+//,}}}
 
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
@@ -373,7 +451,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				impl PrivateValue {
 					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {
 						match self {
-							PrivateValue::String(s) => Ok(s.clone()),
+							PrivateValue::String(s) => Ok(s.clone()), //HACK: probably can avoid cloning.
 							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
 						}
 					}
@@ -674,16 +752,321 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
-//TODO!!!!!!!: Settinsg fw
+// Settings {{{
+//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
+/**
+```rust
+use v_utils_macros::{Settings, clap_settings};
+struct Cli {
+	clap_settings!()
+}
 
-#[proc_macro_derive(Settings)]
-pub fn derive_setings(input: TokenStream) -> TokenStream {
-	let input = parse_macro_input!(input as DeriveInput);
-	let name = &input.ident;
+//OUTDATED
+let cli = Cli::parse().unwrap();
+let settings = Settings::try_build(&cli).unwrap();
+```
+*/
+//TODO!!!!!!!: \
+//NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
+#[cfg(feature = "cli")]
+#[proc_macro_derive(Settings, attributes(settings))]
+pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
 
-	let expanded = quote! {
-		todo!();
+	let try_build = quote_spanned! {name.span()=>
+		impl #name {
+			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
+			#[must_use]
+			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+				let path = flags.config.as_ref().map(|p| p.0.clone());
+				let app_name = env!("CARGO_PKG_NAME");
+				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
+				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
+
+				let location_bases = [
+					format!("{xdg_conf_dir}/{app_name}"),
+					format!("{xdg_conf_dir}/{app_name}/config"), //
+				];
+				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
+				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
+
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
+
+				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
+				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
+				let raw: ::v_utils::__internal::config::Config = match path {
+					Some(path) => {
+						let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
+						builder.build()?
+					}
+					None => {
+						let mut conf_files_found = Vec::new();
+						for location in locations.iter() {
+							if location.exists() {
+								conf_files_found.push(location);
+							}
+						}
+						match conf_files_found.len() {
+							0 => {
+								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+							},
+							1 => {
+								builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
+							},
+							_ => {
+								return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
+							}
+						}
+						builder.build()?
+					}
+				};
+				raw.try_deserialize().wrap_err(err_msg)
+			}
+		}
 	};
 
-	TokenStream::from(expanded)
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	let flag_quotes = fields.iter().map(|field| {
+		let ty = &field.ty;
+
+		// check if attr is `#[settings(flatten)]`
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		//HACK: hugely oversimplified (can only handle one level of nesting)
+		let ident = &field.ident;
+		match has_flatten_attr {
+			true => {
+				use quote::ToTokens as _;
+				let type_name = ty.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
+				quote! {
+					#[clap(flatten)]
+					#ident: #nested_struct_name,
+				}
+			}
+			false => {
+				let clap_ty = clap_compatible_option_wrapped_ty(ty);
+				quote! {
+					#[arg(long)]
+					#ident: #clap_ty,
+				}
+			}
+		}
+	});
+
+	//HACK: code duplication. But if I produce both in single pass, it starts getting weird about types.
+	let source_quotes = fields.iter().map(|field| {
+		let ty = &field.ty;
+
+		// check if attr is `#[settings(flatten)]`
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		let ident = &field.ident;
+		match has_flatten_attr {
+			true => {
+				quote! {
+					let _ = &self.#ident.collect_config(&mut map);
+				}
+			}
+			false => {
+				let value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
+				let field_name_string = format!("{}", ident.as_ref().unwrap());
+				quote! {
+					if let Some(#ident) = &self.#ident {
+						map.insert(
+							#field_name_string.to_owned(),
+							v_utils::__internal::config::Value::new(Some(&"flags".to_owned()), #value_kind),
+						);
+					}
+				}
+			}
+		}
+	});
+
+	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
+		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
+		#[derive(Default, Debug, clap::Args, Clone, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
+		pub struct SettingsFlags {
+			#[arg(long)]
+			config: Option<v_utils::io::ExpandedPath>,
+			#(#flag_quotes)*
+		}
+		impl v_utils::__internal::config::Source for SettingsFlags {
+			fn clone_into_box(&self) -> Box<dyn v_utils::__internal::config::Source + Send + Sync> {
+				Box::new((*self).clone())
+			}
+
+			fn collect(&self) -> Result<v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>, v_utils::__internal::config::ConfigError> {
+				let mut map = v_utils::__internal::config::Map::new();
+
+				#(#source_quotes)*
+
+				Ok(map)
+			}
+		}
+	};
+	let expanded = quote! {
+		#try_build
+		#settings_args
+	};
+
+	_dbg_token_stream(expanded.clone(), "settings").into()
+	//TokenStream::from(expanded)
 }
+
+///NB: assumes that the child struct and the field containing it on parent are **named the same** (with adjustment for casing).
+#[proc_macro_derive(SettingsBadlyNested)]
+pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as DeriveInput);
+	let name = &ast.ident;
+	let lowercase_name = name.to_string().to_lowercase();
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	let prefixed_flags = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		let clap_ty = clap_compatible_option_wrapped_ty(ty);
+		let prefixed_field_name = format_ident!("{}_{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
+		quote! {
+			#[arg(long)]
+			#prefixed_field_name: #clap_ty,
+		}
+	});
+
+	let config_inserts = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
+		let prefixed_field_name = format_ident!("{lowercase_name}_{}", ident.as_ref().unwrap());
+		let config_value_path = format!("{lowercase_name}.{}", ident.as_ref().unwrap());
+		let source_tag = format!("flags:{}", lowercase_name);
+		quote! {
+			if let Some(#ident) = &self.#prefixed_field_name {
+				map.insert(
+					#config_value_path.to_owned(),
+					v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
+				);
+			}
+		}
+	});
+
+	let produced_struct_name = format_ident!("__SettingsBadlyNested{name}");
+	let expanded = quote! {
+		#[derive(Default, Debug, clap::Args, Clone, PartialEq)]
+		pub struct #produced_struct_name {
+			#(#prefixed_flags)*
+		}
+		impl #produced_struct_name {
+			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
+				#(#config_inserts)*
+			}
+		}
+	};
+
+	_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
+	//TokenStream::from(expanded)
+}
+
+/// Takes in field identifier and type, returns the appropriate config::ValueKind conversion
+fn clap_to_config(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	match inner_type {
+		// bool
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) }
+		}
+		// Vec/Array
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			// Create a new Array from the Vec
+			quote! {
+				{
+					let mut array = v_utils::__internal::config::Array::new();
+					for item in #ident.iter() {
+						array.push(v_utils::__internal::config::Value::new(
+							None,
+							v_utils::__internal::config::ValueKind::String(item.to_string())
+						));
+					}
+					v_utils::__internal::config::ValueKind::Array(array)
+				}
+			}
+		}
+		// default to String
+		_ => {
+			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+		}
+	}
+}
+
+// we can't do type-conversion checks at clap-parsing level, as we need to push them through config's system later.
+fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	//TODO!!!!!: add numeric types (all that are in config::ValueKind)
+	// Now map the inner type to clap-compatible types
+	match inner_type {
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { Option<bool> }
+		}
+		// If it's a Vec, check its element type
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			let vec_inner = extract_vec_inner_type(type_path);
+			if let syn::Type::Path(inner_path) = vec_inner {
+				if is_type(inner_path, "bool") {
+					quote! { Option<Vec<bool>> }
+				} else {
+					// Default to Vec<String> for other element types
+					quote! { Option<Vec<String>> }
+				}
+			} else {
+				// Default to Vec<String> if we can't determine the element type
+				quote! { Option<Vec<String>> }
+			}
+		}
+		_ => quote! { Option<String> },
+	}
+}
+//,}}}

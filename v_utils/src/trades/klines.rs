@@ -1,8 +1,6 @@
-#![allow(dead_code)]
 use chrono::{DateTime, Duration, Utc};
 use derive_more::{Deref, DerefMut};
 use eyre::Result;
-use strum::IntoEnumIterator as _;
 
 use crate::trades::Timeframe;
 

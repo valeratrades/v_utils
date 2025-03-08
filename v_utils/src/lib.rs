@@ -30,6 +30,11 @@ pub mod __internal {
 	pub extern crate console_error_panic_hook;
 	#[cfg(feature = "wasm")]
 	pub extern crate console_log;
+
+	#[cfg(feature = "cli")]
+	pub extern crate config;
+	#[cfg(feature = "cli")]
+	pub extern crate xdg;
 }
 
 #[cfg(feature = "llm")]
