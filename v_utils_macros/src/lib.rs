@@ -934,8 +934,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		#settings_args
 	};
 
-	_dbg_token_stream(expanded.clone(), "settings").into()
-	//TokenStream::from(expanded)
+	//_dbg_token_stream(expanded.clone(), "settings").into()
+	TokenStream::from(expanded)
 }
 
 ///NB: assumes that the child struct and the field containing it on parent are **named the same** (with adjustment for casing).
@@ -997,8 +997,8 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		}
 	};
 
-	_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
-	//TokenStream::from(expanded)
+	//_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
+	TokenStream::from(expanded)
 }
 
 /// Takes in field identifier and type, returns the appropriate config::ValueKind conversion
