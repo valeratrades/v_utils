@@ -10,7 +10,7 @@ use syn::{
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
 };
 
-// _dbg (can't make a mod before of macro_rules not having `pub` option {{{
+// helpers {{{
 /// A helper function to know location of errors in `quote!{}`s
 fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
 	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
@@ -26,6 +26,66 @@ macro_rules! _dbg_tree {
 		std::fs::write(fpath, dbg_str).unwrap();
 	};
 }
+fn is_option_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Option";
+	}
+	false
+}
+
+// Helper function to check if a type path is Vec<T>
+fn is_vec_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Vec";
+	}
+	false
+}
+
+// Helper function to check if a type is a specific primitive
+fn is_type(type_path: &syn::TypePath, type_name: &str) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == type_name;
+	}
+	false
+}
+
+// Extract inner type from Option<T>
+fn extract_option_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Option")
+}
+
+// Extract inner type from Vec<T>
+fn extract_vec_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Vec")
+}
+fn single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	match ty {
+		syn::Type::Path(type_path) =>
+			if type_path.path.segments.last().unwrap().ident == "Option" {
+				quote! { #ty }
+			} else {
+				quote! { Option<#ty> }
+			},
+		_ => quote! { Option<#ty> },
+	}
+}
+
 //,}}}
 
 /// returns `Vec<String>` of the ways to refer to a struct name
@@ -693,6 +753,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 }
 
 // Settings {{{
+//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
 /**
 ```rust
 use v_utils_macros::{Settings, clap_settings};
@@ -801,10 +862,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 			}
 			false => {
-				let option_wrapped = single_option_wrapped_ty(ty);
+				let clap_ty = clap_compatible_option_wrapped_ty(ty);
 				quote! {
 					#[arg(long)]
-					#ident: #option_wrapped,
+					#ident: #clap_ty,
 				}
 			}
 		}
@@ -827,11 +888,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let ident = &field.ident;
 		match has_flatten_attr {
 			true => {
-				let type_name = ty.to_token_stream().to_string();
-				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
 				quote! {
-					//TODO!!!!: .
-					//DO: call .collect(&mut map) on each nested struct
+					&self.#ident.collect_config(&mut map);
 				}
 			}
 			false => {
@@ -867,13 +925,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				#(#source_quotes)*
 
-				if let Some(bybit_read_secret) = &self.bybit.bybit_read_secret {
-					map.insert(
-						"bybit.read_secret".to_owned(),
-						v_utils::__internal::config::Value::new(Some(&"flags:bybit".to_owned()), v_utils::__internal::config::ValueKind::String(bybit_read_secret.to_owned())),
-					);
-				}
-
 				Ok(map)
 			}
 		}
@@ -887,10 +938,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	//TokenStream::from(expanded)
 }
 
+///NB: assumes that the child struct and the field containing it on parent are **named the same** (with adjustment for casing).
 #[proc_macro_derive(SettingsBadlyNested)]
 pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
+	let lowercase_name = name.to_string().to_lowercase();
 	let fields = if let Data::Struct(syn::DataStruct {
 		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
 		..
@@ -905,11 +958,29 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let option_wrapped = single_option_wrapped_ty(ty);
+		let clap_ty = clap_compatible_option_wrapped_ty(ty);
 		let prefixed_field_name = format_ident!("{}_{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
 		quote! {
 			#[arg(long)]
-			#prefixed_field_name: #option_wrapped,
+			#prefixed_field_name: #clap_ty,
+		}
+	});
+
+	let config_inserts = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		let config_value_kind = get_value_kind_for_type(ident.as_ref().unwrap(), ty);
+		let prefixed_field_name = format_ident!("{lowercase_name}_{}", ident.as_ref().unwrap());
+		let config_value_path = format!("{lowercase_name}.{}", ident.as_ref().unwrap());
+		let source_tag = format!("flags:{}", lowercase_name);
+		quote! {
+			if let Some(#ident) = &self.#prefixed_field_name {
+				map.insert(
+					#config_value_path.to_owned(),
+					v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
+				);
+			}
 		}
 	});
 
@@ -919,21 +990,52 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		pub struct #produced_struct_name {
 			#(#prefixed_flags)*
 		}
+		impl #produced_struct_name {
+			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
+				#(#config_inserts)*
+			}
+		}
 	};
 
 	_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
 	//TokenStream::from(expanded)
 }
 
-fn single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
-	match ty {
-		syn::Type::Path(type_path) =>
-			if type_path.path.segments.last().unwrap().ident == "Option" {
-				quote! { #ty }
+/// takes in clap-compatible type, and returns config::ValueKind
+fn clap_to_config(ty: &syn::Type) -> proc_macro2::TokenStream {
+	todo!();
+}
+
+// we can't do type-conversion checks at clap-parsing level, as we need to push them through config's system later.
+fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	//TODO!!!!!: add numeric types (all that are in config::ValueKind)
+	// Now map the inner type to clap-compatible types
+	match inner_type {
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { Option<bool> }
+		}
+		// If it's a Vec, check its element type
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			let vec_inner = extract_vec_inner_type(type_path);
+			if let syn::Type::Path(inner_path) = vec_inner {
+				if is_type(inner_path, "bool") {
+					quote! { Option<Vec<bool>> }
+				} else {
+					// Default to Vec<String> for other element types
+					quote! { Option<Vec<String>> }
+				}
 			} else {
-				quote! { Option<#ty> }
-			},
-		_ => quote! { Option<#ty> },
+				// Default to Vec<String> if we can't determine the element type
+				quote! { Option<Vec<String>> }
+			}
+		}
+		_ => quote! { Option<String> },
 	}
 }
 

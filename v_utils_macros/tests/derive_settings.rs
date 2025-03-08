@@ -17,8 +17,7 @@ struct Binance {
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, v_utils_macros::MyConfigPrimitives, v_utils_macros::SettingsBadlyNested)]
 struct Bybit {
-	pub read_key: String,
-	pub read_secret: String,
+	pub secret_path: std::path::PathBuf,
 }
 
 #[derive(Debug, Default, PartialEq, clap::Parser)]
@@ -78,7 +77,7 @@ fn main() {
 		"",
 		"--config",
 		"/tmp/test.toml",
-		"--bybit-read-secret",
+		"--bybit-secret-path",
 		"passed as a flag",
 		"--positions-dir",
 		"/tmp/please_work/",
