@@ -774,6 +774,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
+	#[cfg(feature = "xdg")]
+	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
+		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
+		let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
+	};
+	#[cfg(not(feature = "xdg"))]
+	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
+		let xdg_conf_dir = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").unwrap()));
+	};
+
 	let try_build = quote_spanned! {name.span()=>
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
@@ -781,8 +791,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
-				let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(app_name).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
-				let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
+
+				#xdg_conf_dir
 
 				let location_bases = [
 					format!("{xdg_conf_dir}/{app_name}"),

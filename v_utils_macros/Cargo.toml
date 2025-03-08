@@ -26,10 +26,11 @@ trybuild = { version = "^1.0.104", features = ["diff"] }
 v_utils = { path = "../v_utils", features = ["full"] }
 
 [features]
-default = ["cli"] #dbg
+default = ["cli"]
 cli = []
+xdg = []
 
-full = ["cli"]
+full = ["cli", "xdg"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
