@@ -774,7 +774,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
-	#[cfg(feature = "xdg")]
+	//#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
 		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
 		let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
@@ -785,6 +785,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	};
 
 	let try_build = quote_spanned! {name.span()=>
+		//#[cfg(not(feature = "hydrate"))]
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			#[must_use]
