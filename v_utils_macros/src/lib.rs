@@ -4,7 +4,7 @@
 extern crate proc_macro2;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
-use quote::{format_ident, quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned, ToTokens as _};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
@@ -692,6 +692,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 	TokenStream::from(expanded)
 }
 
+// Settings {{{
 /**
 ```rust
 use v_utils_macros::{Settings, clap_settings};
@@ -800,9 +801,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 			}
 			false => {
+				let option_wrapped = single_option_wrapped_ty(ty);
 				quote! {
 					#[arg(long)]
-					#ident: Option<#ty>,
+					#ident: #option_wrapped,
 				}
 			}
 		}
@@ -825,16 +827,23 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let ident = &field.ident;
 		match has_flatten_attr {
 			true => {
-				use quote::ToTokens as _;
 				let type_name = ty.to_token_stream().to_string();
 				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
 				quote! {
 					//TODO!!!!: .
+					//DO: call .collect(&mut map) on each nested struct
 				}
 			}
 			false => {
+				let value_kind = get_value_kind_for_type(ident.as_ref().unwrap(), ty);
+				let field_name_string = format!("{}", ident.as_ref().unwrap());
 				quote! {
-					//TODO!!!!: .
+					if let Some(#ident) = &self.#ident {
+						map.insert(
+							#field_name_string.to_owned(),
+							v_utils::__internal::config::Value::new(Some(&"flags".to_owned()), #value_kind),
+						);
+					}
 				}
 			}
 		}
@@ -855,12 +864,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 			fn collect(&self) -> Result<v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>, v_utils::__internal::config::ConfigError> {
 				let mut map = v_utils::__internal::config::Map::new();
+
+				#(#source_quotes)*
+
 				if let Some(bybit_read_secret) = &self.bybit.bybit_read_secret {
 					map.insert(
 						"bybit.read_secret".to_owned(),
 						v_utils::__internal::config::Value::new(Some(&"flags:bybit".to_owned()), v_utils::__internal::config::ValueKind::String(bybit_read_secret.to_owned())),
 					);
 				}
+
 				Ok(map)
 			}
 		}
@@ -870,8 +883,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		#settings_args
 	};
 
-	_dbg_token_stream(expanded.clone(), "settings");
-	TokenStream::from(expanded)
+	_dbg_token_stream(expanded.clone(), "settings").into()
+	//TokenStream::from(expanded)
 }
 
 #[proc_macro_derive(SettingsBadlyNested)]
@@ -891,17 +904,12 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	let prefixed_flags = fields.iter().map(|field| {
 		let ident = &field.ident;
 		let ty = &field.ty;
-		let option_wrapped_ty = match &ty {
-			syn::Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Option" => {
-				quote! { #ty }
-			}
-			_ => quote! { Option<#ty> },
-		};
 
+		let option_wrapped = single_option_wrapped_ty(ty);
 		let prefixed_field_name = format_ident!("{}_{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
 		quote! {
 			#[arg(long)]
-			#prefixed_field_name: #option_wrapped_ty,
+			#prefixed_field_name: #option_wrapped,
 		}
 	});
 
@@ -913,19 +921,61 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		}
 	};
 
-	_dbg_token_stream(expanded.clone(), "nested");
-	TokenStream::from(expanded)
+	_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
+	//TokenStream::from(expanded)
 }
 
-//#[proc_macro_derive(SettingsArgs)]
-//pub fn derive_settings_args(input: TokenStream) -> TokenStream {
-//	// impls trait under which it sends
-//	// Vec<(key: String, value: String)> of its members. Probably sholud go up to the very top, only after being joined with `config` path in main `Settings` macro (so it would be dependant on that struct also deriving `SettinsgArgs`)
-//	//Q: but how the hell do I impl that nesting?!
-//
-//	//DO: SettinsgFlags is no longer 2d, - we keep the structure, but now for every single nested child we create `__OptionalFields{name}` double (if a field is already an option, we leave it as is)
-//	//DO: each double implements SettingsArgs trait, which will implement Args manualy (unless this is possible in derives too), but **flags will have static prefix** being SETTINGS_ARGS_PREFIX_#name (don't capitalize it (could produce nasty bugs), just #[allow(non_snake_case)])
-//	//DO: impl clap::Args manually for SettingsFlags (in the Settings macro)
-//	//DO: impl config::Source for SettingsFlags (want to use same trait as the one we construct clap::Args from)
-//	todo!()
-//}
+fn single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	match ty {
+		syn::Type::Path(type_path) =>
+			if type_path.path.segments.last().unwrap().ident == "Option" {
+				quote! { #ty }
+			} else {
+				quote! { Option<#ty> }
+			},
+		_ => quote! { Option<#ty> },
+	}
+}
+
+// Function to determine the ValueKind based on a field's type
+fn get_value_kind_for_type(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
+	match ty {
+		syn::Type::Path(type_path) => {
+			if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments.last().unwrap().arguments {
+				if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+					match inner_type {
+						syn::Type::Path(inner_path) => {
+							let inner_type_str = inner_path.path.segments.last().unwrap().ident.to_string();
+
+							match inner_type_str.as_str() {
+								"bool" => quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) },
+								"i64" => quote! { v_utils::__internal::config::ValueKind::I64(*#ident) },
+								"i128" => quote! { v_utils::__internal::config::ValueKind::I128(*#ident) },
+								"u64" => quote! { v_utils::__internal::config::ValueKind::U64(*#ident) },
+								"u128" => quote! { v_utils::__internal::config::ValueKind::U128(*#ident) },
+								"f64" => quote! { v_utils::__internal::config::ValueKind::Float(*#ident) },
+								"String" => quote! { v_utils::__internal::config::ValueKind::String(#ident.to_owned()) },
+								//XXX: what on earth should happen if we need say PathBuf?
+								//TODO!!!!!!!: check if this can work out at all (unlikely), and if not - only add flags of corresponding types (default to String)
+								_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
+							}
+						}
+						_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
+					}
+				} else {
+					panic!("How did we get here?");
+					quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+				}
+			} else {
+				_dbg_tree!(type_path);
+				//panic!("Surely this is impossible");
+				quote! { v_utils::__internal::config::ValueKind::String(format!("{:?}", #ident))}
+			}
+		}
+		_ => {
+			panic!("Surely this is like really impossible");
+			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+		}
+	}
+}
+//,}}}

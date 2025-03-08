@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 struct Settings {
 	pub mock: bool,
 	pub positions_dir: std::path::PathBuf,
+	sth_else: String,
 	#[settings(flatten)]
 	pub binance: Binance,
 	#[settings(flatten)]
@@ -59,7 +60,7 @@ fn main() {
 	std::fs::write(
 		"/tmp/test.toml",
 		r#"
-		positions_dir = "/tmp/"
+		sth_else = "define it here as-is"
 		[binance]
 		read_secret = { env = "BINANCE_READ_SECRET" }
 		[bybit]
@@ -73,7 +74,15 @@ fn main() {
 	std::env::set_var("V_UTILS_MACROS__MOCK", "false");
 	std::env::set_var("V_UTILS_MACROS__BINANCE__READ_KEY", "env_read_key");
 
-	let cli_input = vec!["", "--config", "/tmp/test.toml", "--bybit-read-secret", "passed as a flag"]; // should follow std::env::os_args()
+	let cli_input = vec![
+		"",
+		"--config",
+		"/tmp/test.toml",
+		"--bybit-read-secret",
+		"passed as a flag",
+		"--positions-dir",
+		"/tmp/please_work/",
+	]; // should follow std::env::os_args()
 	use clap::Parser as _;
 	let cli = Cli::parse_from(cli_input);
 	dbg!(&cli);
