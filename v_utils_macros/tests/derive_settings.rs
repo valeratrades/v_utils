@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 struct Settings {
 	pub mock: bool,
 	pub positions_dir: std::path::PathBuf,
-	sth_else: String,
+	pub sth_else: String,
+	pub numeric: f64,
 	#[settings(flatten)]
 	pub binance: Binance,
 	#[settings(flatten)]
@@ -81,6 +82,8 @@ fn main() {
 		"passed as a flag",
 		"--positions-dir",
 		"/tmp/please_work/",
+		"--numeric",
+		"0.682",
 	]; // should follow std::env::os_args()
 	use clap::Parser as _;
 	let cli = Cli::parse_from(cli_input);
@@ -92,6 +95,7 @@ fn main() {
      mock: false,
      positions_dir: "/tmp/please_work/",
      sth_else: "define it here as-is",
+     numeric: 0.682,
      binance: Binance {
          read_key: "env_read_key",
          read_secret: "isarendtiaeahoulegf",

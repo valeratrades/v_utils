@@ -4,7 +4,7 @@
 extern crate proc_macro2;
 use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
-use quote::{format_ident, quote, quote_spanned, ToTokens as _};
+use quote::{format_ident, quote, quote_spanned};
 use syn::{
 	parse::{Parse, ParseStream},
 	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
@@ -1069,46 +1069,4 @@ fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream
 		_ => quote! { Option<String> },
 	}
 }
-
-//// Function to determine the ValueKind based on a field's type
-//fn get_value_kind_for_type(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
-//	match ty {
-//		syn::Type::Path(type_path) => {
-//			if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments.last().unwrap().arguments {
-//				if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-//					match inner_type {
-//						syn::Type::Path(inner_path) => {
-//							let inner_type_str = inner_path.path.segments.last().unwrap().ident.to_string();
-//
-//							match inner_type_str.as_str() {
-//								"bool" => quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) },
-//								"i64" => quote! { v_utils::__internal::config::ValueKind::I64(*#ident) },
-//								"i128" => quote! { v_utils::__internal::config::ValueKind::I128(*#ident) },
-//								"u64" => quote! { v_utils::__internal::config::ValueKind::U64(*#ident) },
-//								"u128" => quote! { v_utils::__internal::config::ValueKind::U128(*#ident) },
-//								"f64" => quote! { v_utils::__internal::config::ValueKind::Float(*#ident) },
-//								"String" => quote! { v_utils::__internal::config::ValueKind::String(#ident.to_owned()) },
-//								//XXX: what on earth should happen if we need say PathBuf?
-//								//TODO!!!!!!!: check if this can work out at all (unlikely), and if not - only add flags of corresponding types (default to String)
-//								_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
-//							}
-//						}
-//						_ => quote! { v_utils::__internal::config::ValueKind::String(#ident.into()) },
-//					}
-//				} else {
-//					panic!("How did we get here?");
-//					quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
-//				}
-//			} else {
-//				_dbg_tree!(type_path);
-//				//panic!("Surely this is impossible");
-//				quote! { v_utils::__internal::config::ValueKind::String(format!("{:?}", #ident))}
-//			}
-//		}
-//		_ => {
-//			panic!("Surely this is like really impossible");
-//			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
-//		}
-//	}
-//}
 //,}}}
