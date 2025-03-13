@@ -1,13 +1,23 @@
 use crate::Percent;
 
-#[derive(Debug, Clone, Default, derive_new::new, Copy)]
+#[derive(Debug, Clone, Default, Copy, serde::Deserialize, serde::Serialize)]
 pub struct NowThen {
 	pub now: f64,
 	pub then: f64,
+	pub duration: Option<std::time::Duration>,
 }
 impl NowThen {
+	pub fn new(now: f64, then: f64) -> Self {
+		Self { now, then, duration: None }
+	}
+
 	pub fn from_now_diff(now: f64, diff: f64) -> Self {
-		Self { now, then: now + diff }
+		Self::new(now, now + diff)
+	}
+
+	pub fn add_duration(mut self, duration: std::time::Duration) -> Self {
+		self.duration = Some(duration);
+		self
 	}
 }
 
