@@ -58,13 +58,13 @@ default = ["lite"]
 
 io = ["dep:dirs"] 
 xdg = [
+
     "dep:xdg",
     "v_utils_macros/xdg"
 ] # have to separate it, because `xdg` lib behaves weirdly under wasm
 cli = ["v_utils_macros/cli", "dep:config"]
 trades = ["dep:chrono", "dep:strum"]
 macros = ["v_utils_macros"]
-llm = ["dep:reqwest", "dep:futures", "dep:bytes"]
 tracing = [
     "dep:xdg",
     "dep:tracing-subscriber",
@@ -78,7 +78,6 @@ wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
 full = [
     "lite",
-    "llm",
     "distributions",
     "xdg",
     "cli",
@@ -86,6 +85,3 @@ full = [
     "tokio/full",
     "dep:console-subscriber"
 ] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
-
-# dev only
-slow_tests = []

@@ -37,8 +37,5 @@ pub mod __internal {
 	pub extern crate xdg;
 }
 
-#[cfg(feature = "llm")]
-pub mod llm;
-
 #[cfg(feature = "distributions")]
 pub mod distributions;
