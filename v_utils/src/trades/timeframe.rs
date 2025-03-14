@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use chrono::Duration;
-use eyre::{Result, bail, eyre};
-use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
+use eyre::{bail, eyre, Result};
+use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
 use strum::{EnumIter, IntoEnumIterator as _};
 
 #[derive(Debug, Clone, PartialEq, Copy, Default, EnumIter)]
@@ -65,7 +65,9 @@ impl FromStr for TimeframeDesignator {
 			"D" => Ok(TimeframeDesignator::Days),
 			"w" => Ok(TimeframeDesignator::Weeks),
 			"W" => Ok(TimeframeDesignator::Weeks),
+			"wk" => Ok(TimeframeDesignator::Weeks),
 			"M" => Ok(TimeframeDesignator::Months),
+			"mo" => Ok(TimeframeDesignator::Months),
 			"q" => Ok(TimeframeDesignator::Quarters),
 			"Q" => Ok(TimeframeDesignator::Quarters),
 			"y" => Ok(TimeframeDesignator::Years),
@@ -110,7 +112,7 @@ impl FromStr for Timeframe {
 	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
-		let (n_str, designator_str) = match s.char_indices().next_back() {
+		let (mut n_str, designator_str) = match s.char_indices().next_back() {
 			Some((idx, c)) => {
 				match c.is_ascii_digit() {
 					true => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
@@ -120,14 +122,36 @@ impl FromStr for Timeframe {
 			None => bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"),
 		};
 
+		let designator = {
+			let allowed_designators = ["s", "m", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
+			if !n_str.is_empty() && n_str.chars().last().unwrap().is_ascii_alphabetic() {
+				n_str = &n_str[..n_str.len() - 1];
+				let designator_chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect(); // forced to eval every time, but otherwise can't create designator_str in shared context
+				if designator_chars.len() > 2 {
+					bail!("Invalid timeframe string: {s}. Longest allowed designator is 2 characters, like 'mo' or 'wk' for Yahoo");
+				}
+				let designator_string = String::from_iter(designator_chars);
+				TimeframeDesignator::from_str(&designator_string).map_err(|_| {
+					eyre!(
+						r#"Invalid str timeframe designator '{designator_string}'. Expected one of the following characters representing a timeframe designator: [{:?}]"#,
+						allowed_designators
+					)
+				})?
+			} else {
+				TimeframeDesignator::from_str(designator_str).map_err(|_| {
+					eyre!(
+						r#"Invalid char timeframe designator '{designator_str}'. Expected one of the following characters representing a timeframe designator: [{:?}]"#,
+						allowed_designators
+					)
+				})?
+			}
+		};
+
 		let n = if n_str.is_empty() {
 			1
 		} else {
 			n_str.parse::<u32>().map_err(|_| eyre!("Invalid number in timeframe str '{n_str}'. Expected a `u32` number."))?
 		};
-
-		let designator = TimeframeDesignator::from_str(designator_str)
-		.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following characters representing a timeframe designator: ["s", "m", "h", "H", "d", "D", "w", "W", "M", "q", "Q", "y", "Y""#))?;
 
 		let total_seconds = n * designator.as_seconds();
 
@@ -190,15 +214,16 @@ mod tests {
 
 	#[test]
 	fn predicated() {
-		let tf: Timeframe = "1h".into();
 		static TFS_BINANCE: [&str; 19] = [
 			"1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "3d", "1w", "1M",
 		];
 		static TFS_BYBIT: [&str; 13] = ["1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"];
 		static TFS_MEXC: [&str; 9] = ["1m", "5m", "15m", "30m", "60m", "4h", "1d", "1W", "1M"];
+		static TFS_YAHOO: [&str; 12] = ["1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d", "5d", "1wk", "1mo", "3mo"];
 
-		assert_eq!(tf.try_as_predefined(&TFS_BINANCE), Some("1h"));
-		assert_eq!(tf.try_as_predefined(&TFS_BYBIT), Some("60"));
-		assert_eq!(tf.try_as_predefined(&TFS_MEXC), Some("60m"));
+		assert_eq!(Timeframe::from("1h").try_as_predefined(&TFS_BINANCE), Some("1h"));
+		assert_eq!(Timeframe::from("1h").try_as_predefined(&TFS_BYBIT), Some("60"));
+		assert_eq!(Timeframe::from("1h").try_as_predefined(&TFS_MEXC), Some("60m"));
+		assert_eq!(Timeframe::from("3M").try_as_predefined(&TFS_YAHOO), Some("3mo"));
 	}
 }
