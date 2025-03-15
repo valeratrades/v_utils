@@ -79,6 +79,7 @@ pub struct Kline {
 	pub taker_buy_volume_quote: Option<f64>,
 }
 
+/// Unlike `Kline`, timestamp signifies the end of the period, not the start. As another difference - `Vec<Close>` can have uneven spacing between measured points.
 #[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, serde::Deserialize, serde::Serialize, derive_more::Deref, derive_more::DerefMut)]
 pub struct Close {
 	#[deref_mut]
