@@ -1,5 +1,4 @@
 use chrono::{DateTime, Duration, Utc};
-use derive_more::{Deref, DerefMut};
 use eyre::Result;
 
 use crate::trades::Timeframe;
