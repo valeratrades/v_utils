@@ -9,7 +9,7 @@ macro_rules! fmt_with_width {
 				Some(std::fmt::Alignment::Left) => write!($f, "{:<width$}", $s, width = w),
 				Some(std::fmt::Alignment::Right) => write!($f, "{:>width$}", $s, width = w),
 				Some(std::fmt::Alignment::Center) => write!($f, "{:^width$}", $s, width = w),
-				None => write!($f, "{:width$}", $s, width = w),
+				_ => write!($f, "{:width$}", $s, width = w),
 			}
 		} else {
 			write!($f, "{}", $s)

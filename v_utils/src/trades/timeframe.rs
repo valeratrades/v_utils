@@ -1,8 +1,7 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
-use chrono::Duration;
-use eyre::{bail, eyre, Result};
-use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize};
+use eyre::{Result, bail, eyre};
+use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
 use strum::{EnumIter, IntoEnumIterator as _};
 
 #[derive(Debug, Clone, PartialEq, Copy, Default, EnumIter)]
@@ -88,7 +87,7 @@ impl Timeframe {
 	}
 
 	pub fn duration(&self) -> Duration {
-		Duration::seconds(self.0 as i64)
+		Duration::from_secs(self.0 as u64)
 	}
 
 	/// Allows for defining static arrays of Timeframes easily
@@ -119,7 +118,7 @@ impl FromStr for Timeframe {
 					false => s.split_at(idx),
 				}
 			}
-			None => bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"),
+			_ => bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"),
 		};
 
 		let designator = {

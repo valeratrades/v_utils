@@ -1,5 +1,7 @@
-use chrono::{DateTime, Duration, Utc};
+use std::time::Duration;
+
 use eyre::Result;
+use jiff::Timestamp;
 
 use crate::trades::Timeframe;
 
@@ -11,7 +13,7 @@ pub struct Ohlc {
 	pub close: f64,
 }
 
-pub fn p_to_ohlc(p: &[(f64, DateTime<Utc>)], timeframe: &Timeframe) -> Result<Vec<Ohlc>> {
+pub fn p_to_ohlc(p: &[(f64, Timestamp)], timeframe: &Timeframe) -> Result<Vec<Ohlc>> {
 	if p.is_empty() {
 		return Ok(Vec::new());
 	}
@@ -24,8 +26,7 @@ pub fn p_to_ohlc(p: &[(f64, DateTime<Utc>)], timeframe: &Timeframe) -> Result<Ve
 	for &(price, timestamp) in p.iter() {
 		if timestamp >= current_start + duration {
 			ohlc_data.push(current_ohlc);
-			let duration_nanos = duration.num_nanoseconds().unwrap_or(0);
-			current_start = timestamp - Duration::nanoseconds(timestamp.timestamp_nanos_opt().unwrap() % duration_nanos);
+			current_start = timestamp - Duration::from_nanos((timestamp.as_nanosecond() % duration.as_nanos() as i128).try_into().unwrap());
 			current_ohlc = Ohlc::new(price, price, price, price);
 		} else {
 			current_ohlc.high = current_ohlc.high.max(price);
@@ -68,7 +69,7 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 /// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
 #[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, derive_more::Deref, derive_more::DerefMut)]
 pub struct Kline {
-	pub open_time: DateTime<Utc>,
+	pub open_time: Timestamp,
 	#[deref_mut]
 	#[deref]
 	pub ohlc: Ohlc,
@@ -84,7 +85,7 @@ pub struct Close {
 	#[deref_mut]
 	#[deref]
 	pub close: f64,
-	pub timestamp: DateTime<Utc>,
+	pub timestamp: Timestamp,
 }
 
 #[cfg(test)]

@@ -10,7 +10,6 @@ pub use std::{
 	sync::{Arc, Mutex, RwLock},
 };
 
-pub use chrono::{DateTime, Utc};
 pub use eyre::{OptionExt as _, Report, Result, WrapErr as _, bail, eyre};
 pub use futures::future::join_all;
 pub use serde::{

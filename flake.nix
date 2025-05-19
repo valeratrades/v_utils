@@ -11,6 +11,9 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = builtins.trace "flake.nix sourced" [ (import rust-overlay) ];
+				rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+					extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
+				});
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -20,7 +23,7 @@
         pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        workflowContents = v-utils.ci { inherit pkgs; lastSupportedVersion = "nightly-2025-01-16"; jobsErrors = [ "rust-tests" ]; jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sort" "tokei" ]; };
+        workflowContents = v-utils.ci { inherit pkgs; lastSupportedVersion = "nightly-2025-01-16"; jobsErrors = [ "rust-tests" ]; jobsWarnings = [ "rust-doc" "rust-clippy" "rust-machete" "rust-sorted" "tokei" ]; };
         readme = v-utils.readme-fw { inherit pkgs pname; lastSupportedVersion = "nightly-1.86"; rootDir = ./.; licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }]; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
       in
       {
@@ -53,7 +56,7 @@
             mold-wrapped
             openssl
             pkg-config
-            (rust-bin.fromRustupToolchainFile ./.cargo/rust-toolchain.toml)
+						rust
           ] ++ pre-commit-check.enabledPackages;
         };
       }

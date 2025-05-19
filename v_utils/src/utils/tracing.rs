@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf};
+use std::{borrow::Cow, io::Write, path::PathBuf};
 
 use tracing::{info, warn};
 use tracing_error::ErrorLayer;
@@ -66,7 +66,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		}
 		#[cfg(not(target_arch = "wasm32"))]
 		LogDestination::Xdg(name) => {
-			let associated_state_home = xdg::BaseDirectories::with_prefix(name).unwrap().create_state_directory("").unwrap();
+			let associated_state_home = xdg::BaseDirectories::with_prefix(name).create_state_directory("").unwrap();
 			let log_path = associated_state_home.join(".log");
 			destination_is_path(log_path, setup);
 		}
@@ -102,22 +102,18 @@ impl From<&str> for LogDestination {
 }
 
 fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
-	static DEFAULT_DIRECTIVES: &str = "debug,
-hyper=info,
-hyper_util=info";
+	static DEFAULT_DIRECTIVES: &str = "debug,\nhyper=info,\nhyper_util=info";
 	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
 
-	let directives = std::fs::read_to_string(DIRECTIVES_PATH);
-	let directives: String = directives
-		.as_deref()
-		.unwrap_or_else(|_| {
-			logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to:\n{DEFAULT_DIRECTIVES}")));
-			DEFAULT_DIRECTIVES
-		})
-		.split_inclusive(',')
-		.map(str::trim)
-		.collect();
-	EnvFilter::builder().parse(directives).expect("Error parsing tracing directives")
+	let directives = std::fs::read_to_string(DIRECTIVES_PATH).map(Cow::Owned).unwrap_or_else(|_| {
+		logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to default")));
+		Cow::Borrowed(DEFAULT_DIRECTIVES)
+	});
+
+	let directives_str = directives.clone();
+	logs_during_init.push(Box::new(move || info!("Proceeding with following log directives:\n{directives_str}")));
+
+	EnvFilter::builder().parse(&directives).expect("Error parsing tracing directives")
 }
 
 use std::{

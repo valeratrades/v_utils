@@ -1,10 +1,12 @@
 [formatter.nix]
-command = "nixpkgs-fmt"
+command = "nixfmt"
 includes = ["*.nix"]
+options = ["-w", "200"]
 
 [formatter.rust]
 command = "rustfmt"
 includes = ["*.rs"]
+options = ["--edition", "2024"]
 
 [formatter.rust-leptos]
 command = "leptosfmt"

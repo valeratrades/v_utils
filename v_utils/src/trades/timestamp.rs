@@ -1,10 +1,10 @@
-use chrono::{DateTime, TimeZone, Utc};
 use eyre::{Result, bail};
+use jiff::Timestamp;
 
 /// Doesn't support negative timestamps
-pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
+pub fn guess_timestamp_unsafe(timestamp: String) -> Result<Timestamp> {
 	// Try parsing as ISO 8601 format
-	if let Ok(dt) = timestamp.parse::<DateTime<Utc>>() {
+	if let Ok(dt) = timestamp.parse::<Timestamp>() {
 		return Ok(dt);
 	}
 
@@ -18,7 +18,7 @@ pub fn guess_timestamp_unsafe(timestamp: String) -> Result<DateTime<Utc>> {
 			19 => num,
 			_ => bail!("Invalid timestamp length for guessing: {len}\nTimestamp: {timestamp}"),
 		};
-		return Ok(Utc.timestamp_nanos(nanos as i64));
+		return Ok(Timestamp::from_nanosecond(nanos as i128).unwrap());
 	}
 
 	bail!("Couldn't parse timestamp: {}", timestamp)
