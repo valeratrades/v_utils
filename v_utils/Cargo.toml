@@ -11,7 +11,6 @@ repository = "https://github.com/valeratrades/v_utils"
 [dependencies]
 async-sse = { version = "^5.1.0", optional = true }
 bytes = { version = "^1.10.1", optional = true }
-jiff = { version = "^0.2.13", features = ["serde"], optional = true }
 config = { version = "^0.15.11", optional = true }
 console-subscriber = { version = "0.4.1", optional = true }
 console_error_panic_hook = { version = "^0.1.7", optional = true }
@@ -24,6 +23,7 @@ dirs = { version = "^6.0.0", optional = true }
 eyre.workspace = true
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { version = "^0.3.31", optional = true }
+jiff = { version = "^0.2.13", features = ["serde"], optional = true }
 libc = { version = "^0.2", optional = true }
 macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
 quote = { version = "^1.0.40", optional = true }
@@ -58,9 +58,8 @@ default = ["lite"]
 
 io = ["dep:dirs"] 
 xdg = [
-
     "dep:xdg",
-    "v_utils_macros/xdg"
+    "v_utils_macros/xdg",
 ] # have to separate it, because `xdg` lib behaves weirdly under wasm
 cli = ["v_utils_macros/cli", "dep:config"]
 trades = ["dep:jiff", "dep:strum"]
@@ -70,7 +69,7 @@ tracing = [
     "dep:tracing-subscriber",
     "dep:tracing-log",
     "dep:tracing-error",
-    "dep:xdg"
+    "dep:xdg",
 ]
 distributions = ["dep:rand", "dep:rand_distr"]
 wasm = ["dep:console_error_panic_hook", "dep:console_log"]
@@ -83,5 +82,5 @@ full = [
     "cli",
     "dep:tokio",
     "tokio/full",
-    "dep:console-subscriber"
+    "dep:console-subscriber",
 ] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds

@@ -196,7 +196,7 @@ impl From<&&str> for Timeframe {
 }
 
 #[cfg(test)]
-mod tests {
+mod timeframe_tests {
 	use super::*;
 
 	#[test]

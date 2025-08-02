@@ -102,7 +102,7 @@ impl From<&str> for LogDestination {
 }
 
 fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
-	static DEFAULT_DIRECTIVES: &str = "debug,\nhyper=info,\nhyper_util=info";
+	static DEFAULT_DIRECTIVES: &str = "debug,\nhyper=info,hyper_util=info";
 	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
 
 	let directives = std::fs::read_to_string(DIRECTIVES_PATH).map(Cow::Owned).unwrap_or_else(|_| {
@@ -113,7 +113,7 @@ fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvF
 	let directives_str = directives.clone();
 	logs_during_init.push(Box::new(move || info!("Proceeding with following log directives:\n{directives_str}")));
 
-	EnvFilter::builder().parse(&directives).expect("Error parsing tracing directives")
+	EnvFilter::builder().parse(&directives).expect(&format!("Error parsing tracing directives:\n```\n{directives}\n```\n"))
 }
 
 use std::{
