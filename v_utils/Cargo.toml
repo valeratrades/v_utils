@@ -11,7 +11,7 @@ repository = "https://github.com/valeratrades/v_utils"
 [dependencies]
 async-sse = { version = "^5.1.0", optional = true }
 bytes = { version = "^1.10.1", optional = true }
-config = { version = "^0.15.11", optional = true }
+config = { version = "^0.15.17", optional = true }
 console-subscriber = { version = "0.4.1", optional = true }
 console_error_panic_hook = { version = "^0.1.7", optional = true }
 console_log = { version = "^1.0.0", optional = true }
@@ -23,33 +23,33 @@ dirs = { version = "^6.0.0", optional = true }
 eyre.workspace = true
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { version = "^0.3.31", optional = true }
-jiff = { version = "^0.2.13", features = ["serde"], optional = true }
+jiff = { version = "^0.2.15", features = ["serde"], optional = true }
 libc = { version = "^0.2", optional = true }
 macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
 quote = { version = "^1.0.40", optional = true }
-rand = { version = "^0.9.1", optional = true }
+rand = { version = "^0.9.2", optional = true }
 rand_distr = { version = "^0.5.1", optional = true }
-reqwest = { version = "^0.12.15", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
+reqwest = { version = "^0.12.23", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"], optional = true }
 serde.workspace = true
-serde_json = "^1.0.140"
-strum = { version = "^0.27.1", features = ["derive"], optional = true }
-thiserror = "2.0.12"
+serde_json = "^1.0.145"
+strum = { version = "^0.27.2", features = ["derive"], optional = true }
+thiserror = "2.0.16"
 tracing = { version = "^0.1.41", features = ["log", "std", "async-await"] }
 
 # # optional
-tokio = { version = "^1.45.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
+tokio = { version = "^1.47.1", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
 tracing-error = { version = "^0.2.1", optional = true }
 tracing-log = { version = "^0.2.0", optional = true }
 xdg = { version = "^3.0.0", optional = true }
 
-tracing-subscriber = { version = "^0.3.19", features = ["fmt", "json", "registry", "env-filter"], optional = true }
+tracing-subscriber = { version = "^0.3.20", features = ["fmt", "json", "registry", "env-filter"], optional = true }
 #
 
 v_utils_macros = { path = "../v_utils_macros", version = "^2.2.8", optional = true }
 
 [dev-dependencies]
-insta = "^1.43.1"
-trybuild = { version = "^1.0.105", features = ["diff"] }
+insta = "^1.43.2"
+trybuild = { version = "^1.0.111", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
 #
 
