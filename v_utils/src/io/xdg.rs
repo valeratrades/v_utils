@@ -6,7 +6,7 @@ mod xdg_with_lib {
 			#[macro_export]
 			macro_rules! $fn_name {
 				($subpath: expr) => {{
-					let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap();
+					let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
 					dirs.$dir_type($subpath).unwrap()
 				}};
 				() => {

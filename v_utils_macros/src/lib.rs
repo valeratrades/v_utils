@@ -6,8 +6,9 @@ use heck::AsShoutySnakeCase;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, quote_spanned};
 use syn::{
+	Data, DeriveInput, Fields, Ident, LitInt, Token,
 	parse::{Parse, ParseStream},
-	parse_macro_input, token, Data, DeriveInput, Fields, Ident, LitInt, Token,
+	parse_macro_input, token,
 };
 
 // helpers {{{
@@ -435,7 +436,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 		})
 		.unzip();
 
-	let gen = quote! {
+	let q = quote! {
 		impl<'de> v_utils::__internal::serde::Deserialize<'de> for #name {
 			fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 		where
@@ -509,8 +510,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			}
 		}
 	};
-
-	gen.into()
+	q.into()
 }
 
 // make_df! {{{
@@ -776,7 +776,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 	//#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
-		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")).unwrap(); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
+		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
 		let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
 	};
 	//#[cfg(not(feature = "xdg"))]
