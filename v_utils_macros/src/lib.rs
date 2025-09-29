@@ -774,10 +774,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
+	//DEPRECATE: split over xdg (previously was there for interop with clients targetting WASM)
 	//#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
 		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME")); //HACK: should use a method from `v_utils::io`, where use of `xdg` is conditional on an unrelated feature. Hardcoding `xdg` here problematic.
-		let xdg_conf_dir = xdg_dirs.get_config_home().parent().unwrap().display().to_string();
+		let xdg_conf_dir = xdg_dirs.get_config_home().unwrap().parent().unwrap().display().to_string();
 	};
 	//#[cfg(not(feature = "xdg"))]
 	//let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
