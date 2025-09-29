@@ -1,14 +1,32 @@
+use std::fmt::Write;
+
 pub fn format_eyre_chain_for_user(e: eyre::Report) -> String {
-	let chain = e.chain().rev().collect::<Vec<_>>();
 	let mut s = String::new();
-	for (i, e) in chain.into_iter().enumerate() {
-		if i > 0 {
+
+	fn write_chain(err: &dyn std::error::Error, s: &mut String) {
+		if let Some(src) = err.source() {
+			write_chain(src, s);
 			s.push('\n');
+			s.push_str("-> ");
+			let _ = write!(s, "{err}");
+		} else {
+			s.push_str("\x1b[31mError\x1b[0m: ");
+			let _ = write!(s, "{err}");
 		}
-		s.push_str("-> ");
-		s.push_str(&e.to_string());
 	}
+
+	write_chain(e.as_ref(), &mut s);
 	s
+}
+
+pub fn exit_on_error<T>(r: eyre::Result<T>) -> T {
+	match r {
+		Ok(t) => t,
+		Err(e) => {
+			println!("{}", format_eyre_chain_for_user(e));
+			std::process::exit(7);
+		}
+	}
 }
 
 /// Constructs `eyre::Report` with capped size
