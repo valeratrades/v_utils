@@ -90,6 +90,10 @@ impl Timeframe {
 		Duration::from_secs(self.0 as u64)
 	}
 
+	pub fn signed_duration(&self) -> jiff::SignedDuration {
+		jiff::SignedDuration::from_secs(self.0 as i64)
+	}
+
 	/// Allows for defining static arrays of Timeframes easily
 	pub const fn from_naive(n: u32, designator: TimeframeDesignator) -> Self {
 		Self(n * designator.as_seconds())
