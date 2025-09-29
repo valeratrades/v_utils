@@ -76,7 +76,7 @@ impl ExpandedPath {
 		self.0
 	}
 
-	pub fn display(&self) -> std::path::Display {
+	pub fn display(&self) -> std::path::Display<'_> {
 		self.0.display()
 	}
 
