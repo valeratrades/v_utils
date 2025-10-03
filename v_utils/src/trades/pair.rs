@@ -217,12 +217,6 @@ impl PartialEq<Pair> for &str {
 	}
 }
 
-impl PartialEq<Pair> for str {
-	fn eq(&self, other: &Pair) -> bool {
-		self == other
-	}
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
