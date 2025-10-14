@@ -116,37 +116,21 @@ impl FromStr for Timeframe {
 	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
-		let (mut n_str, designator_str) = match s.char_indices().next_back() {
-			Some((idx, c)) => {
-				match c.is_ascii_digit() {
-					true => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
-					false => s.split_at(idx),
-				}
-			}
-			_ => bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'"),
+		// Find where the numeric part ends and the designator begins
+		let split_point = s.chars().position(|c| c.is_ascii_alphabetic());
+
+		let (n_str, designator_str) = match split_point {
+			Some(pos) => s.split_at(pos),
+			None => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
 		};
 
-		let designator = {
-			let allowed_designators = ["s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
-			if !n_str.is_empty() && n_str.chars().last().unwrap().is_ascii_alphabetic() {
-				n_str = &n_str[..n_str.len() - 1];
-				let designator_chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect(); // forced to eval every time, but otherwise can't create designator_str in shared context
-				let designator_string = String::from_iter(designator_chars);
-				TimeframeDesignator::from_str(&designator_string).map_err(|_| {
-					eyre!(
-						r#"Invalid str timeframe designator '{designator_string}'. Expected one of the following characters representing a timeframe designator: [{:?}]"#,
-						allowed_designators
-					)
-				})?
-			} else {
-				TimeframeDesignator::from_str(designator_str).map_err(|_| {
-					eyre!(
-						r#"Invalid char timeframe designator '{designator_str}'. Expected one of the following characters representing a timeframe designator: [{:?}]"#,
-						allowed_designators
-					)
-				})?
-			}
-		};
+		if s.is_empty() {
+			bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'");
+		}
+
+		let allowed_designators = ["s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
+		let designator = TimeframeDesignator::from_str(designator_str)
+			.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following: [{:?}]"#, allowed_designators))?;
 
 		let n = if n_str.is_empty() {
 			1
@@ -211,6 +195,18 @@ mod timeframe_tests {
 	fn deserialize() {
 		let tf: Timeframe = serde_json::from_str("\"5s\"").unwrap();
 		assert_eq!(tf, Timeframe(5));
+	}
+
+	#[test]
+	fn parse_weird() {
+		let tf = Timeframe::from_str("5min").unwrap();
+		assert_eq!(tf, Timeframe(5 * 60));
+
+		let tf = Timeframe::from_str("1wk").unwrap();
+		assert_eq!(tf.designator(), TimeframeDesignator::Weeks);
+
+		let tf = Timeframe::from_str("mo").unwrap();
+		assert_eq!(tf.designator(), TimeframeDesignator::Months);
 	}
 
 	#[test]
