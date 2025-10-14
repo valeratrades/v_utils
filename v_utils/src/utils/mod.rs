@@ -54,7 +54,7 @@ macro_rules! define_str_enum {
       fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
           $($str => Ok(Self::$variant)),*,
-          _ => bail!("Invalid {} string: {}", stringify!($name).to_lowercase(), s),
+          _ => eyre::bail!("Invalid {} string: {}", stringify!($name).to_lowercase(), s),
         }
       }
     }
