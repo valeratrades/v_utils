@@ -58,6 +58,7 @@ impl FromStr for TimeframeDesignator {
 		match s {
 			"s" => Ok(TimeframeDesignator::Seconds),
 			"m" => Ok(TimeframeDesignator::Minutes),
+			"min" => Ok(TimeframeDesignator::Minutes),
 			"h" => Ok(TimeframeDesignator::Hours),
 			"H" => Ok(TimeframeDesignator::Hours),
 			"d" => Ok(TimeframeDesignator::Days),
@@ -126,13 +127,10 @@ impl FromStr for Timeframe {
 		};
 
 		let designator = {
-			let allowed_designators = ["s", "m", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
+			let allowed_designators = ["s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
 			if !n_str.is_empty() && n_str.chars().last().unwrap().is_ascii_alphabetic() {
 				n_str = &n_str[..n_str.len() - 1];
 				let designator_chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect(); // forced to eval every time, but otherwise can't create designator_str in shared context
-				if designator_chars.len() > 2 {
-					bail!("Invalid timeframe string: {s}. Longest allowed designator is 2 characters, like 'mo' or 'wk' for Yahoo");
-				}
 				let designator_string = String::from_iter(designator_chars);
 				TimeframeDesignator::from_str(&designator_string).map_err(|_| {
 					eyre!(
