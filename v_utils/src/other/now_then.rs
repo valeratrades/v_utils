@@ -1,6 +1,6 @@
 use crate::Percent;
 
-#[derive(Debug, Clone, Default, Copy, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Default, Copy, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct NowThen {
 	pub now: f64,
 	pub then: f64,
@@ -29,9 +29,9 @@ impl std::fmt::Display for NowThen {
 		let (diff_f, diff_suffix) = format_number_compactly(diff, 0.005);
 		let now_suffix = if now_suffix == diff_suffix { "" } else { now_suffix };
 
-		let diff_str = format!("{:+}{}", diff_f, diff_suffix);
-		let now_str = format!("{}{}", now_f, now_suffix);
-		let s = format!("{}{}", now_str, diff_str);
+		let diff_str = format!("{diff_f:+}{diff_suffix}");
+		let now_str = format!("{now_f}{now_suffix}");
+		let s = format!("{now_str}{diff_str}");
 
 		crate::fmt_with_width!(f, s)
 	}
@@ -73,7 +73,7 @@ fn format_number_compactly(mut n: f64, precision: f64) -> (f64, &'static str) {
 		if !n_str.contains('.') {
 			break;
 		}
-		let n_precision = n_str.split('.').last().unwrap().len();
+		let n_precision = n_str.split('.').next_back().unwrap().len();
 		let try_round_one_more = format!("{:.*}", n_precision - 1, n);
 		if ((n - try_round_one_more.parse::<f64>().unwrap()) / n).abs() > precision {
 			break;
