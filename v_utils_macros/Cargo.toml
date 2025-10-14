@@ -12,17 +12,17 @@ repository = "https://github.com/Valera6/v_utils"
 eyre.workspace = true
 heck.workspace = true
 proc-macro2 = { version = "^1.0.101", features = ["span-locations"] }
-quote = { version = "^1.0.40" }
+quote = { version = "^1.0.41" }
 serde.workspace = true
 syn = { version = "^2.0.106", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
-clap = { version = "^4.5.48", features = ["derive"] }
+clap = { version = "^4.5.49", features = ["derive"] }
 insta = "1.43.2"
 polars = { version = "0.51.0", default-features = false, features = ["fmt"] } # pains me to add this entire dep for one test. Maybe I'll figure out a way to get rid of this at some point.
 serde_json = "1.0.145"
-toml = "0.9.7"
-trybuild = { version = "^1.0.111", features = ["diff"] }
+toml = "0.9.8"
+trybuild = { version = "^1.0.112", features = ["diff"] }
 v_utils = { path = "../v_utils", features = ["full"] }
 
 [features]
