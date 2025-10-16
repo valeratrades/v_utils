@@ -6,8 +6,9 @@
 // of course it's included unconditionally - the crate itself is called "v_utils"
 pub mod utils;
 
-#[cfg(feature = "lite")]
-pub mod prelude;
+//Q: I like the idea of having a prelude, but atm it just leads to possibility of mismatching def paths, client imports v_utils and something else relying on a different version of v_utils
+//#[cfg(feature = "lite")]
+//pub mod prelude;
 
 pub mod other;
 pub use other::*;
