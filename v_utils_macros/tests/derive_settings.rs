@@ -29,5 +29,6 @@ fn main() {
 	// Test that try_build method exists (compile-time check)
 	// Note: We can't actually call try_build in a simple test because it requires
 	// environment setup and config files, but we can verify it compiles
-	let _settings = AppConfig::try_build(flags);
+	let _settings = AppConfig::try_build(flags).unwrap();
+	println!("{_settings:?}")
 }

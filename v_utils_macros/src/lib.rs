@@ -789,7 +789,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		//#[cfg(not(feature = "hydrate"))]
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
-			#[must_use]
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
