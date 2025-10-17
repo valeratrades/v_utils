@@ -753,19 +753,17 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 }
 
 // Settings {{{
-//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
-/**
-```rust
-use v_utils_macros::{Settings, clap_settings};
-struct Cli {
-	clap_settings!()
-}
-
+//TODO!: error messages (like the one about necessity of deriving SettingsNested on children). Want interface to be like this \
+//```rust
+//use v_utils_macros::{Settings, clap_settings};
+//struct Cli {
+//	clap_settings!()
+//}
+//
 //OUTDATED
-let cli = Cli::parse().unwrap();
-let settings = Settings::try_build(&cli).unwrap();
-```
-*/
+//let cli = Cli::parse().unwrap();
+//let settings = Settings::try_build(&cli).unwrap();
+
 //TODO!!!!!!!: \
 //NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
 #[cfg(feature = "cli")]
@@ -789,7 +787,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		//#[cfg(not(feature = "hydrate"))]
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
-			#[must_use]
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");

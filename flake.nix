@@ -30,7 +30,7 @@
             { name = "rust-doc"; args = { package = "v_utils"; }; }
             "rust-clippy"
             "rust-machete"
-            "rust-sorted"
+            #"rust-sorted" #dbg: something weird with it un-formatting it
             "tokei"
           ];
         };
