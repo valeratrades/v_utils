@@ -115,7 +115,7 @@ fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvF
 
 	EnvFilter::builder()
 		.parse(&directives)
-		.expect(&format!("Error parsing tracing directives:\n```\n{directives}\n```\n"))
+		.unwrap_or_else(|_| panic!("Error parsing tracing directives:\n```\n{directives}\n```\n"))
 }
 
 use std::{
