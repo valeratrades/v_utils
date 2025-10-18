@@ -39,11 +39,12 @@ pub fn report_msg(s: String) -> eyre::Report {
 /// Useful for putting random potentially large things into logs without thinking
 #[track_caller]
 #[function_name::named]
-pub fn truncate_msg(s: &str) -> String {
+pub fn truncate_msg<S: AsRef<str>>(s: S) -> String {
 	const MAX_LINES: usize = 50;
 	const CHARS_IN_A_LINE: usize = 150;
 	let truncation_message = format!("\n------------------------- // truncated at {} by `{}`\n", std::panic::Location::caller(), function_name!());
 
+	let s = s.as_ref();
 	let lines: Vec<&str> = s.lines().collect();
 	if lines.len() > MAX_LINES {
 		let start_cut = &lines[..(MAX_LINES / 2)];
