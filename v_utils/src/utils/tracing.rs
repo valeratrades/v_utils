@@ -22,6 +22,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//#[feature("tokio_full")]
 		//let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
 		//
+		//TODO!!!: check out [tracing appender](https://docs.rs/tracing-appender/latest/tracing_appender/) - seems very useful for long-running processes. Probably should add it here + config for it in the same place as directives conf
 		tracing_subscriber::registry()
 			//.with(console_layer)
 			.with(env_filter)
