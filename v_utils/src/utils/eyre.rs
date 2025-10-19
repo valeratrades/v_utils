@@ -19,11 +19,11 @@ pub fn format_eyre_chain_for_user(e: eyre::Report) -> String {
 	s
 }
 
-pub fn exit_on_error<T>(r: eyre::Result<T>) -> T {
+pub fn exit_on_error<T, E: Into<eyre::Report>>(r: Result<T, E>) -> T {
 	match r {
 		Ok(t) => t,
 		Err(e) => {
-			println!("{}", format_eyre_chain_for_user(e));
+			println!("{}", format_eyre_chain_for_user(e.into()));
 			std::process::exit(7);
 		}
 	}

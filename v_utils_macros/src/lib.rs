@@ -753,18 +753,8 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 }
 
 // Settings {{{
-//TODO!: error messages (like the one about necessity of deriving SettingsNested on children). Want interface to be like this \
-//```rust
-//use v_utils_macros::{Settings, clap_settings};
-//struct Cli {
-//	clap_settings!()
-//}
-//
-//OUTDATED
-//let cli = Cli::parse().unwrap();
-//let settings = Settings::try_build(&cli).unwrap();
 
-//TODO!!!!!!!: \
+//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
 //NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
 #[cfg(feature = "cli")]
 #[proc_macro_derive(Settings, attributes(settings))]
