@@ -404,7 +404,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
-#[proc_macro_derive(MyConfigPrimitives)]
+#[proc_macro_derive(MyConfigPrimitives, attributes(private_value))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -425,13 +425,26 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			let ty = &f.ty;
 			let type_string = quote! { #ty }.to_string();
 
-			match type_string.as_str() {
-				"String" => (
+			// Check if field has #[private_value] attribute
+			let has_private_value_attr = f.attrs.iter().any(|attr| {
+				attr.path().is_ident("private_value")
+			});
+
+			if has_private_value_attr {
+				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
+				(
 					quote! { #ident: PrivateValue },
-					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? },
-				),
-				"PathBuf" => (quote! { #ident: v_utils::io::ExpandedPath }, quote! { #ident: helper.#ident.0 }),
-				_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
+					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.parse().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))? },
+				)
+			} else {
+				match type_string.as_str() {
+					"String" => (
+						quote! { #ident: PrivateValue },
+						quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? },
+					),
+					"PathBuf" => (quote! { #ident: v_utils::io::ExpandedPath }, quote! { #ident: helper.#ident.0 }),
+					_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
+				}
 			}
 		})
 		.unzip();
