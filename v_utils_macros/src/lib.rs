@@ -459,13 +459,13 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 
 				#[derive(Clone, Debug)]
 				enum PrivateValue {
-					String(String),
+					Direct(String),
 					Env { env: String },
 				}
 				impl PrivateValue {
 					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {
 						match self {
-							PrivateValue::String(s) => Ok(s.clone()), //HACK: probably can avoid cloning.
+							PrivateValue::Direct(s) => Ok(s.clone()),
 							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
 						}
 					}
@@ -481,14 +481,56 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							type Value = PrivateValue;
 
 							fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-								formatter.write_str("a string or a map with a single key 'env'")
+								formatter.write_str("a value (string, number, bool, etc.) or a map with a single key 'env'")
+							}
+
+							fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
+							}
+
+							fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
+							}
+
+							fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
+							}
+
+							fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
+							}
+
+							fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
+							}
+
+							fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+							where
+								E: v_utils::__internal::serde::de::Error,
+							{
+								Ok(PrivateValue::Direct(value.to_string()))
 							}
 
 							fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
 						where
 								E: v_utils::__internal::serde::de::Error,
 							{
-								Ok(PrivateValue::String(value.to_owned()))
+								Ok(PrivateValue::Direct(value.to_owned()))
 							}
 
 							fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>

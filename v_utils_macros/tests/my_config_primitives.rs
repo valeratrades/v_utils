@@ -22,6 +22,8 @@ pub struct Test {
 	path: PathBuf,
 	#[private_value]
 	port: Port,
+	#[private_value]
+	test_private_value_works_with_non_strings: usize,
 }
 
 fn main() {
@@ -31,6 +33,7 @@ whoami = { env = "USER" }
 a_random_non_string = 1
 path = "~/.config/a_test_path"
 port = "8080"
+test_private_value_works_with_non_strings = 1234
 "#;
 
 	let t: Test = toml::from_str(toml_str).expect("Failed to deserialize");
