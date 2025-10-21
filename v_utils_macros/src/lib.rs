@@ -430,12 +430,44 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				attr.path().is_ident("private_value")
 			});
 
+			// Check if type is Option<T>
+			let is_option = if let syn::Type::Path(type_path) = ty {
+				is_option_type(type_path)
+			} else {
+				false
+			};
+
 			if has_private_value_attr {
 				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
 				(
 					quote! { #ident: PrivateValue },
 					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.parse().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))? },
 				)
+			} else if is_option {
+				// Handle Option<T> types
+				if let syn::Type::Path(type_path) = ty {
+					let inner_type = extract_option_inner_type(type_path);
+					let inner_type_string = quote! { #inner_type }.to_string();
+
+					match inner_type_string.as_str() {
+						"String" => (
+							quote! { #ident: Option<PrivateValue> },
+							quote! {
+								#ident: match helper.#ident {
+									Some(pv) => Some(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?),
+									None => None,
+								}
+							},
+						),
+						"PathBuf" => (
+							quote! { #ident: Option<v_utils::io::ExpandedPath> },
+							quote! { #ident: helper.#ident.map(|ep| ep.0) },
+						),
+						_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
+					}
+				} else {
+					(quote! { #ident: #ty }, quote! { #ident: helper.#ident })
+				}
 			} else {
 				match type_string.as_str() {
 					"String" => (

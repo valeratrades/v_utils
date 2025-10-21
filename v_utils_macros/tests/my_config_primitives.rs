@@ -24,6 +24,7 @@ pub struct Test {
 	port: Port,
 	#[private_value]
 	test_private_value_works_with_non_strings: usize,
+	optional_string: Option<String>,
 }
 
 fn main() {
@@ -34,6 +35,7 @@ a_random_non_string = 1
 path = "~/.config/a_test_path"
 port = "8080"
 test_private_value_works_with_non_strings = 1234
+optional_string = { env = "USER" }
 "#;
 
 	let t: Test = toml::from_str(toml_str).expect("Failed to deserialize");
@@ -44,4 +46,5 @@ test_private_value_works_with_non_strings = 1234
 	assert_eq!(t.whoami, std::env::var("USER").unwrap());
 	assert_eq!(t.a_random_non_string, 1);
 	assert_eq!(t.port, Port(8080));
+	assert_eq!(t.optional_string, Some(std::env::var("USER").unwrap()));
 }
