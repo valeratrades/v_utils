@@ -6,7 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::utils;
 
-#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, PartialOrd, Deref, DerefMut, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign, Neg, From, Into)]
+#[derive(Add, AddAssign, Clone, Copy, Debug, Default, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, PartialEq, PartialOrd, Sub, SubAssign, derive_new::new)]
 #[mul(forward)]
 #[div(forward)]
 pub struct Percent(pub f64);

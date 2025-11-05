@@ -6,7 +6,7 @@ use std::{
 use eyre::{Error, Result};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-#[derive(Clone, Debug, Default, derive_new::new, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, derive_new::new)]
 pub struct ExpandedPath(pub PathBuf);
 impl<'de> Deserialize<'de> for ExpandedPath {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

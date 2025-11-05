@@ -4,7 +4,7 @@ use eyre::{Result, bail, eyre};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
 use strum::{EnumIter, IntoEnumIterator as _};
 
-#[derive(Debug, Clone, PartialEq, Copy, Default, EnumIter)]
+#[derive(Clone, Copy, Debug, Default, EnumIter, PartialEq)]
 pub enum TimeframeDesignator {
 	Seconds,
 	#[default]
@@ -78,7 +78,7 @@ impl FromStr for TimeframeDesignator {
 }
 
 /// Implemented over the number of seconds
-#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Timeframe(pub u32);
 impl Timeframe {
 	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {

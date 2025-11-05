@@ -150,7 +150,7 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///use v_utils::macros::CompactFormat;
 ///use v_utils::trades::{Timeframe, TimeframeDesignator};
 ///
-///#[derive(CompactFormat, PartialEq, Debug)]
+///#[derive(CompactFormat, Debug, PartialEq)]
 ///pub struct SAR {
 ///	 pub start: f64,
 ///	 pub increment: f64,
@@ -995,7 +995,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
 		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
-		#[derive(Default, Debug, clap::Args, Clone, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
+		#[derive(clap::Args, Clone, Debug, Default, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
 		pub struct SettingsFlags {
 			#[arg(long)]
 			config: Option<v_utils::io::ExpandedPath>,
@@ -1072,7 +1072,7 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 
 	let produced_struct_name = format_ident!("__SettingsBadlyNested{name}");
 	let expanded = quote! {
-		#[derive(Default, Debug, clap::Args, Clone, PartialEq)]
+		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
 		pub struct #produced_struct_name {
 			#(#prefixed_flags)*
 		}

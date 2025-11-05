@@ -1,18 +1,18 @@
 use v_utils_macros::{CompactFormat, OptionalFieldsFromVecStr, VecFieldsFromVecStr};
 
-#[derive(CompactFormat, Debug, Clone, PartialEq)]
+#[derive(Clone, CompactFormat, Debug, PartialEq)]
 struct TrailingStop {
 	percent: f64,
 }
 
-#[derive(OptionalFieldsFromVecStr, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, OptionalFieldsFromVecStr, PartialEq)]
 struct OptionalProtocols {
 	trailing_stop: Option<TrailingStop>,
 	take_profit_stop_loss: Option<f64>,
 	leading_crosses: Option<f64>,
 }
 
-#[derive(VecFieldsFromVecStr, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq, VecFieldsFromVecStr)]
 struct VecProtocols {
 	trailing_stop: Vec<TrailingStop>,
 	take_profit_stop_loss: Vec<f64>,

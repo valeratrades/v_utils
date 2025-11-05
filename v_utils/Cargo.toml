@@ -7,6 +7,39 @@ rust-version = "1.85"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
+#
+
+[features]
+default = ["lite"]
+
+io = ["dep:dirs"] 
+xdg = [
+    "dep:xdg",
+    "v_utils_macros/xdg",
+] # have to separate it, because `xdg` lib behaves weirdly under wasm
+cli = ["v_utils_macros/cli", "dep:config"]
+trades = ["dep:jiff", "dep:strum"]
+macros = ["v_utils_macros"]
+tracing = [
+    "dep:xdg",
+    "dep:tracing-subscriber",
+    "dep:tracing-log",
+    "dep:tracing-error",
+    "dep:xdg",
+]
+distributions = ["dep:rand", "dep:rand_distr"]
+wasm = ["dep:console_error_panic_hook", "dep:console_log"]
+
+lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
+full = [
+    "lite",
+    "distributions",
+    "xdg",
+    "cli",
+    "dep:tokio",
+    "tokio/full",
+    "dep:console-subscriber",
+] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
 
 [dependencies]
 async-sse = { version = "^5.1.0", optional = true }
@@ -51,36 +84,3 @@ v_utils_macros = { path = "../v_utils_macros", version = "^2.3.10", optional = t
 insta = "^1.43.2"
 trybuild = { version = "^1.0.113", features = ["diff"] }
 v_utils_macros = { path = "../v_utils_macros" }
-#
-
-[features]
-default = ["lite"]
-
-io = ["dep:dirs"] 
-xdg = [
-    "dep:xdg",
-    "v_utils_macros/xdg",
-] # have to separate it, because `xdg` lib behaves weirdly under wasm
-cli = ["v_utils_macros/cli", "dep:config"]
-trades = ["dep:jiff", "dep:strum"]
-macros = ["v_utils_macros"]
-tracing = [
-    "dep:xdg",
-    "dep:tracing-subscriber",
-    "dep:tracing-log",
-    "dep:tracing-error",
-    "dep:xdg",
-]
-distributions = ["dep:rand", "dep:rand_distr"]
-wasm = ["dep:console_error_panic_hook", "dep:console_log"]
-
-lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
-full = [
-    "lite",
-    "distributions",
-    "xdg",
-    "cli",
-    "dep:tokio",
-    "tokio/full",
-    "dep:console-subscriber",
-] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds

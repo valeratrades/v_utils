@@ -2,7 +2,7 @@ use derive_more::{Deref, DerefMut};
 use eyre::Report;
 use serde::{Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Default, Copy, PartialEq, Eq, Hash, Deref, DerefMut, PartialOrd, Ord)]
+#[derive(Clone, Copy, Default, Deref, DerefMut, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Asset(pub [u8; 16]);
 impl Asset {
 	pub fn new<S: AsRef<str>>(s: S) -> Self {
@@ -57,7 +57,7 @@ impl PartialEq<&str> for Asset {
 	}
 }
 
-#[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Pair {
 	base: Asset,
 	quote: Asset,
@@ -124,7 +124,7 @@ impl Serialize for Pair {
 	}
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 #[error("Invalid pair format '{provided_str}'. Expected two assets separated by one of: [{}]", allowed_delimiters.join(" "))]
 pub struct InvalidPairError {
 	provided_str: String,

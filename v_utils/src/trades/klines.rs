@@ -5,7 +5,7 @@ use jiff::Timestamp;
 
 use crate::trades::Timeframe;
 
-#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, derive_new::new)]
 pub struct Ohlc {
 	pub open: f64,
 	pub high: f64,
@@ -67,7 +67,7 @@ pub fn mock_p_to_ohlc(p: &[f64], step: usize) -> Vec<Ohlc> {
 /// Standard candlestick data unit. Can only ever be full, - if an exchange returns partial data for an ongoing candle, or if trading/exchange is down leading to the associated data being cut, the [Kline] object is NOT created.
 /// # Other
 /// Timestamp is often [unsafely converted](crate::trades::guess_timestamp_unsafe) from a string
-#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, derive_more::Deref, derive_more::DerefMut)]
+#[derive(Clone, Copy, Debug, Default, derive_more::Deref, derive_more::DerefMut, PartialEq, derive_new::new)]
 pub struct Kline {
 	pub open_time: Timestamp,
 	#[deref_mut]
@@ -80,7 +80,7 @@ pub struct Kline {
 }
 
 /// Unlike `Kline`, timestamp signifies the end of the period, not the start. As another difference - `Vec<Close>` can have uneven spacing between measured points.
-#[derive(Clone, Debug, Default, derive_new::new, Copy, PartialEq, serde::Deserialize, serde::Serialize, derive_more::Deref, derive_more::DerefMut)]
+#[derive(Clone, Copy, Debug, Default, derive_more::Deref, derive_more::DerefMut, serde::Deserialize, PartialEq, serde::Serialize, derive_new::new)]
 pub struct Close {
 	#[deref_mut]
 	#[deref]

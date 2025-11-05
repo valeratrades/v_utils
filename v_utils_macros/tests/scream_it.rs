@@ -3,7 +3,7 @@ use std::str::FromStr;
 use insta::assert_debug_snapshot;
 use v_utils_macros::ScreamIt;
 
-#[derive(ScreamIt, Debug, PartialEq)]
+#[derive(Debug, PartialEq, ScreamIt)]
 pub enum OrderType {
 	Limit,
 	Market,

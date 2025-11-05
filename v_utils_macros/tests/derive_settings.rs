@@ -16,7 +16,7 @@ pub struct AppConfig {
 /// The Settings derive macro generates a `SettingsFlags` struct
 /// which can be flattened into your CLI struct
 #[allow(dead_code)]
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
