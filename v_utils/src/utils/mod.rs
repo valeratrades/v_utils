@@ -24,9 +24,9 @@ macro_rules! clientside {
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")));
 	};
-	($dest:expr) => {
+	($fname:expr) => {
 		color_eyre::install().unwrap();
-		v_utils::utils::init_subscriber($dest); // eg: None
+		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")).fname($fname));
 	};
 }
 

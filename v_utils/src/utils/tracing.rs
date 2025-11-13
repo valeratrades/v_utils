@@ -8,7 +8,7 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
 	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
-	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>| {
+	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, stderr_errors: bool| {
 		//TODO: 	console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		//TEST: if `with_ansi(false)` removes the need for `AnsiEsc` completely
@@ -24,10 +24,21 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
 		//
 		//TODO!!!: check out [tracing appender](https://docs.rs/tracing-appender/latest/tracing_appender/) - seems very useful for long-running processes. Probably should add it here + config for it in the same place as directives conf
+
+		use tracing_subscriber::filter::LevelFilter;
+
+		// Conditionally create stderr layer
+		let stderr_layer = if stderr_errors {
+			Some(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(true).with_filter(LevelFilter::ERROR))
+		} else {
+			None
+		};
+
 		tracing_subscriber::registry()
 			//.with(console_layer)
 			.with(env_filter)
 			.with(formatting_layer)
+			.with(stderr_layer)
 			.with(error_layer)
 			.init();
 		//tracing_subscriber::registry()
@@ -36,11 +47,11 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//  .init();
 	};
 
-	fn destination_is_path<F, P>(path: P, setup: F)
+	fn destination_is_path<F, P>(path: P, stderr_errors: bool, setup: F)
 	where
 		P: Into<PathBuf> + Sized,
 		//F: FnOnce() -> Box<dyn Write> + 'static, {
-		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>), {
+		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, bool), {
 		let path = path.into();
 
 		// Truncate the file before setting up the logger
@@ -53,24 +64,28 @@ pub fn init_subscriber(log_destination: LogDestination) {
 				.unwrap_or_else(|_| panic!("Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first", path.display()));
 		}
 
-		setup(Box::new(move || {
-			let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).expect("Failed to open log file");
-			Box::new(file) as Box<dyn Write>
-		}));
+		setup(
+			Box::new(move || {
+				let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).expect("Failed to open log file");
+				Box::new(file) as Box<dyn Write>
+			}),
+			stderr_errors,
+		);
 	}
 
 	match log_destination {
-		LogDestination::File(path) => {
-			destination_is_path(path, setup);
+		LogDestination::File { path, stderr_errors } => {
+			destination_is_path(path, stderr_errors, setup);
 		}
 		LogDestination::Stdout => {
-			setup(Box::new(|| Box::new(std::io::stdout())));
+			setup(Box::new(|| Box::new(std::io::stdout())), false);
 		}
 		#[cfg(not(target_arch = "wasm32"))]
-		LogDestination::Xdg(name) => {
-			let associated_state_home = xdg::BaseDirectories::with_prefix(name).create_state_directory("").unwrap();
-			let log_path = associated_state_home.join(".log");
-			destination_is_path(log_path, setup);
+		LogDestination::Xdg { dname, fname, stderr_errors } => {
+			let associated_state_home = xdg::BaseDirectories::with_prefix(dname).create_state_directory("").unwrap();
+			let filename = fname.as_ref().map(|s| format!("{s}.log")).unwrap_or_else(|| ".log".to_string());
+			let log_path = associated_state_home.join(filename);
+			destination_is_path(log_path, stderr_errors, setup);
 		}
 	};
 
@@ -82,24 +97,84 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	trace_the_init(); //? Should I make this a trace?
 }
 
-#[derive(Clone, Debug, Default, derive_more::From)]
+#[derive(Clone, Debug, Default)]
 pub enum LogDestination {
 	#[default]
 	Stdout,
-	File(PathBuf),
+	File {
+		path: PathBuf,
+		stderr_errors: bool,
+	},
 	#[cfg(not(target_arch = "wasm32"))] // no clue why, but `xdg::BaseDirectories` falls apart with it
-	Xdg(String),
+	Xdg {
+		dname: String,
+		fname: Option<String>,
+		stderr_errors: bool,
+	},
 }
+
 impl LogDestination {
+	/// Helper for creating [File](LogDestination::File) variant
+	pub fn file<P: Into<PathBuf>>(path: P) -> Self {
+		LogDestination::File {
+			path: path.into(),
+			stderr_errors: false,
+		}
+	}
+
 	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn xdg<S: Into<String>>(name: S) -> Self {
-		LogDestination::Xdg(name.into())
+		LogDestination::Xdg {
+			dname: name.into(),
+			fname: None,
+			stderr_errors: false,
+		}
+	}
+
+	/// Set custom filename for Xdg variant (creates `{fname}.log`)
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn fname<S: Into<String>>(self, fname: S) -> Self {
+		match self {
+			LogDestination::Xdg { dname, stderr_errors, .. } => LogDestination::Xdg {
+				dname,
+				fname: Some(fname.into()),
+				stderr_errors,
+			},
+			_ => self,
+		}
+	}
+
+	/// Enable/disable ERROR level logging to stderr
+	pub fn stderr_errors(self, enabled: bool) -> Self {
+		match self {
+			LogDestination::File { path, .. } => LogDestination::File { path, stderr_errors: enabled },
+			#[cfg(not(target_arch = "wasm32"))]
+			LogDestination::Xdg { dname, fname, .. } => LogDestination::Xdg {
+				dname,
+				fname,
+				stderr_errors: enabled,
+			},
+			other => other,
+		}
 	}
 }
 impl From<&str> for LogDestination {
 	fn from(s: &str) -> Self {
-		if s == "stdout" { LogDestination::Stdout } else { LogDestination::File(s.into()) }
+		if s == "stdout" {
+			LogDestination::Stdout
+		} else {
+			LogDestination::File {
+				path: s.into(),
+				stderr_errors: false,
+			}
+		}
+	}
+}
+
+impl From<PathBuf> for LogDestination {
+	fn from(path: PathBuf) -> Self {
+		LogDestination::File { path, stderr_errors: false }
 	}
 }
 
