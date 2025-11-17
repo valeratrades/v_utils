@@ -33,6 +33,7 @@
             #"rust-sorted" #dbg: something weird with it un-formatting it
             "tokei"
           ];
+          jobsOther = [ "loc-badge" ];
         };
         readme = v-utils.readme-fw { inherit pkgs pname; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; licenses = [{ name = "Blue Oak 1.0.0"; outPath = "LICENSE"; }]; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
       in
@@ -41,11 +42,8 @@
           inherit stdenv;
           shellHook =
             pre-commit-check.shellHook +
+            workflowContents.shellHook +
             ''
-                            mkdir -p ./.github/workflows
-                            rm -f ./.github/workflows/errors.yml; cp ${workflowContents.errors} ./.github/workflows/errors.yml
-                            rm -f ./.github/workflows/warnings.yml; cp ${workflowContents.warnings} ./.github/workflows/warnings.yml
-
                             cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
 
                             cargo -Zscript -q ${v-utils.hooks.appendCustom} ./.git/hooks/pre-commit

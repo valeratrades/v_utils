@@ -31,6 +31,7 @@ syn = { version = "^2.0.108", features = ["full", "extra-traits"] }
 clap = { version = "^4.5.51", features = ["derive"] }
 insta = "1.43.2"
 polars = { version = "0.52.0", default-features = false, features = ["fmt"] } # pains me to add this entire dep for one test. Maybe I'll figure out a way to get rid of this at some point.
+secrecy = "^0.10.3"
 serde_json = "1.0.145"
 toml = "0.9.8"
 trybuild = { version = "^1.0.113", features = ["diff"] }
