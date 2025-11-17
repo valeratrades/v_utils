@@ -27,6 +27,7 @@ pub struct Test {
 	#[private_value]
 	test_private_value_works_with_non_strings: usize,
 	optional_string: Option<String>,
+	optional_secret: Option<SecretString>,
 }
 
 fn main() {
@@ -39,15 +40,21 @@ path = "~/.config/a_test_path"
 port = "8080"
 test_private_value_works_with_non_strings = 1234
 optional_string = { env = "USER" }
+optional_secret = { env = "USER" }
 "#;
 
 	let t: Test = toml::from_str(toml_str).expect("Failed to deserialize");
 
 	// variables change, so assert properties
 	assert_eq!(t.alpaca_key, "PKTJYTJNKYSBHAZYT3CO");
+	assert_eq!(secrecy::ExposeSecret::expose_secret(&t.alpaca_secret), &std::env::var("HOME").unwrap());
 	assert_eq!(t.path, PathBuf::from(format!("{}/.config/a_test_path", std::env::var("HOME").unwrap())));
 	assert_eq!(t.whoami, std::env::var("USER").unwrap());
 	assert_eq!(t.a_random_non_string, 1);
 	assert_eq!(t.port, Port(8080));
 	assert_eq!(t.optional_string, Some(std::env::var("USER").unwrap()));
+	assert_eq!(
+		t.optional_secret.as_ref().map(|s| secrecy::ExposeSecret::expose_secret(s)),
+		Some(std::env::var("USER").unwrap().as_str())
+	);
 }

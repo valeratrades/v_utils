@@ -463,6 +463,15 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							quote! { #ident: Option<v_utils::io::ExpandedPath> },
 							quote! { #ident: helper.#ident.map(|ep| ep.0) },
 						),
+						"SecretString" => (
+							quote! { #ident: Option<PrivateValue> },
+							quote! {
+								#ident: match helper.#ident {
+									Some(pv) => Some(secrecy::SecretString::new(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.into_boxed_str())),
+									None => None,
+								}
+							},
+						),
 						_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
 					}
 				} else {
@@ -475,6 +484,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 						quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? },
 					),
 					"PathBuf" => (quote! { #ident: v_utils::io::ExpandedPath }, quote! { #ident: helper.#ident.0 }),
+					"SecretString" => (
+						quote! { #ident: PrivateValue },
+						quote! { #ident: secrecy::SecretString::new(helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.into_boxed_str()) },
+					),
 					_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
 				}
 			}
