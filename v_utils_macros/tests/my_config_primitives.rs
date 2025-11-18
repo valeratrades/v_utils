@@ -54,7 +54,7 @@ optional_secret = { env = "USER" }
 	assert_eq!(t.port, Port(8080));
 	assert_eq!(t.optional_string, Some(std::env::var("USER").unwrap()));
 	assert_eq!(
-		t.optional_secret.as_ref().map(|s| secrecy::ExposeSecret::expose_secret(s)),
+		t.optional_secret.as_ref().map(secrecy::ExposeSecret::expose_secret),
 		Some(std::env::var("USER").unwrap().as_str())
 	);
 }

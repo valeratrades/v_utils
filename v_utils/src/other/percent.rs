@@ -175,6 +175,66 @@ impl From<&str> for Percent {
 }
 //,}}}
 
+/// Signed percent wrapper that guarantees values are in the range [-1.0, 1.0] (i.e., -100% to 100%)
+#[derive(Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, PartialOrd, Serialize)]
+pub struct PercentS(Percent);
+
+impl PercentS {
+	pub fn new(value: f64) -> Result<Self> {
+		if !(-1.0..=1.0).contains(&value) {
+			return Err(eyre!("PercentS value {value} is outside valid range [-1.0, 1.0]"));
+		}
+		Ok(PercentS(Percent(value)))
+	}
+}
+
+impl TryFrom<Percent> for PercentS {
+	type Error = eyre::Report;
+
+	fn try_from(p: Percent) -> Result<Self> {
+		Self::new(p.0)
+	}
+}
+
+impl<'de> Deserialize<'de> for PercentS {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		let p = Percent::deserialize(deserializer)?;
+		Self::try_from(p).map_err(de::Error::custom)
+	}
+}
+
+/// Unsigned percent wrapper that guarantees values are in the range [0.0, 1.0] (i.e., 0% to 100%)
+#[derive(Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, PartialOrd, Serialize)]
+pub struct PercentU(Percent);
+
+impl PercentU {
+	pub fn new(value: f64) -> Result<Self> {
+		if !(0.0..=1.0).contains(&value) {
+			return Err(eyre!("PercentU value {value} is outside valid range [0.0, 1.0]"));
+		}
+		Ok(PercentU(Percent(value)))
+	}
+}
+
+impl TryFrom<Percent> for PercentU {
+	type Error = eyre::Report;
+
+	fn try_from(p: Percent) -> Result<Self> {
+		Self::new(p.0)
+	}
+}
+
+impl<'de> Deserialize<'de> for PercentU {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		let p = Percent::deserialize(deserializer)?;
+		Self::try_from(p).map_err(de::Error::custom)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -262,5 +322,19 @@ mod tests {
 		//TODO!:
 		assert_eq!(format!("|{:<10.4}|", p), "|12.3456%  |");
 		assert_eq!(format!("|{:^15.4}|", p), "|   12.3456%    |");
+	}
+
+	#[test]
+	fn percent_s_range() {
+		assert!(PercentS::new(0.5).is_ok());
+		assert!(PercentS::new(-1.1).is_err());
+		assert!(PercentS::new(1.1).is_err());
+	}
+
+	#[test]
+	fn percent_u_range() {
+		assert!(PercentU::new(0.5).is_ok());
+		assert!(PercentU::new(-0.1).is_err());
+		assert!(PercentU::new(1.1).is_err());
 	}
 }
