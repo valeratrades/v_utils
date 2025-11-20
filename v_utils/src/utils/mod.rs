@@ -10,6 +10,26 @@ pub use format::*;
 pub mod serde;
 pub use serde::*;
 
+/// Macro for logging to both stdout and tracing info
+/// Usage: log!("message") or log!("format {}", arg)
+#[macro_export]
+macro_rules! log {
+	($($arg:tt)*) => {{
+		println!($($arg)*);
+		tracing::info!($($arg)*);
+	}};
+}
+
+/// Macro for logging to both stderr and tracing debug
+/// Usage: elog!("message") or elog!("format {}", arg)
+#[macro_export]
+macro_rules! elog {
+	($($arg:tt)*) => {{
+		eprintln!($($arg)*);
+		tracing::debug!($($arg)*);
+	}};
+}
+
 #[cfg(feature = "tracing")]
 pub mod tracing;
 #[cfg(feature = "tracing")]
