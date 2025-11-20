@@ -6,6 +6,7 @@ use strum::{EnumIter, IntoEnumIterator as _};
 
 #[derive(Clone, Copy, Debug, Default, EnumIter, PartialEq)]
 pub enum TimeframeDesignator {
+	Milliseconds,
 	Seconds,
 	#[default]
 	Minutes,
@@ -17,22 +18,24 @@ pub enum TimeframeDesignator {
 	Years,
 }
 impl TimeframeDesignator {
-	pub const fn as_seconds(&self) -> u32 {
+	pub const fn as_millis(&self) -> u64 {
 		match self {
-			TimeframeDesignator::Seconds => 1,
-			TimeframeDesignator::Minutes => 60,
-			TimeframeDesignator::Hours => 60 * 60,
-			TimeframeDesignator::Days => 24 * 60 * 60,
-			TimeframeDesignator::Weeks => 7 * 24 * 60 * 60,
-			TimeframeDesignator::Months => 30 * 24 * 60 * 60,       //NB: is approximate
-			TimeframeDesignator::Quarters => 30 * 24 * 60 * 60 * 3, //NB: is approximate
-			TimeframeDesignator::Years => 30 * 24 * 60 * 60 * 12,   //NB: is approximate
+			TimeframeDesignator::Milliseconds => 1,
+			TimeframeDesignator::Seconds => 1_000,
+			TimeframeDesignator::Minutes => 60_000,
+			TimeframeDesignator::Hours => 3_600_000,
+			TimeframeDesignator::Days => 86_400_000,
+			TimeframeDesignator::Weeks => 604_800_000,
+			TimeframeDesignator::Months => 2_592_000_000,   //NB: is approximate (30 days)
+			TimeframeDesignator::Quarters => 7_776_000_000, //NB: is approximate (90 days)
+			TimeframeDesignator::Years => 31_536_000_000,   //NB: is approximate (365 days)
 		}
 	}
 
 	//Q: not sure if it's better to keep this on its own or move inside the Display impl - is having this be `&'static str` worth something?
 	pub const fn as_str(&self) -> &'static str {
 		match self {
+			TimeframeDesignator::Milliseconds => "ms",
 			TimeframeDesignator::Seconds => "s",
 			TimeframeDesignator::Minutes => "m",
 			TimeframeDesignator::Hours => "h",
@@ -56,6 +59,7 @@ impl FromStr for TimeframeDesignator {
 	/// All characters could be in any casee, except for m:minutes and M:months
 	fn from_str(s: &str) -> Result<Self> {
 		match s {
+			"ms" => Ok(TimeframeDesignator::Milliseconds),
 			"s" => Ok(TimeframeDesignator::Seconds),
 			"m" => Ok(TimeframeDesignator::Minutes),
 			"min" => Ok(TimeframeDesignator::Minutes),
@@ -77,9 +81,9 @@ impl FromStr for TimeframeDesignator {
 	}
 }
 
-/// Implemented over the number of seconds
+/// Implemented over the number of milliseconds
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Timeframe(pub u32);
+pub struct Timeframe(pub u64);
 impl Timeframe {
 	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {
 		let interpreted = predefined.iter().map(|&s| Self::from_str(s).unwrap()).collect::<Vec<_>>();
@@ -88,27 +92,27 @@ impl Timeframe {
 	}
 
 	pub fn duration(&self) -> Duration {
-		Duration::from_secs(self.0 as u64)
+		Duration::from_millis(self.0 as u64)
 	}
 
 	pub fn signed_duration(&self) -> jiff::SignedDuration {
-		jiff::SignedDuration::from_secs(self.0 as i64)
+		jiff::SignedDuration::from_millis(self.0 as i64)
 	}
 
 	/// Allows for defining static arrays of Timeframes easily
-	pub const fn from_naive(n: u32, designator: TimeframeDesignator) -> Self {
-		Self(n * designator.as_seconds())
+	pub const fn from_naive(n: u64, designator: TimeframeDesignator) -> Self {
+		Self(n * designator.as_millis())
 	}
 
 	#[deprecated(note = "Use `duration` instead")]
-	pub fn seconds(&self) -> u32 {
-		self.0
+	pub fn seconds(&self) -> u64 {
+		self.0 / 1_000
 	}
 
 	pub fn designator(&self) -> TimeframeDesignator {
 		TimeframeDesignator::iter()
 			.rev()
-			.find(|d| self.0 % d.as_seconds() == 0)
+			.find(|d| self.0 % d.as_millis() == 0)
 			.expect("This can only fails if we were to allow creation of 0-len timeframes")
 	}
 }
@@ -128,25 +132,25 @@ impl FromStr for Timeframe {
 			bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'");
 		}
 
-		let allowed_designators = ["s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
+		let allowed_designators = ["ms", "s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
 		let designator = TimeframeDesignator::from_str(designator_str)
 			.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following: [{:?}]"#, allowed_designators))?;
 
 		let n = if n_str.is_empty() {
 			1
 		} else {
-			n_str.parse::<u32>().map_err(|_| eyre!("Invalid number in timeframe str '{n_str}'. Expected a `u32` number."))?
+			n_str.parse::<u64>().map_err(|_| eyre!("Invalid number in timeframe str '{n_str}'. Expected a `u64` number."))?
 		};
 
-		let total_seconds = n * designator.as_seconds();
+		let total_millis = n * designator.as_millis();
 
-		Ok(Timeframe(total_seconds))
+		Ok(Timeframe(total_millis))
 	}
 }
 impl std::fmt::Display for Timeframe {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let designator = self.designator();
-		let n = self.0 / designator.as_seconds();
+		let n = self.0 / designator.as_millis();
 		let s = format!("{n}{designator}");
 
 		crate::fmt_with_width!(f, &s)
@@ -181,26 +185,32 @@ impl From<&&str> for Timeframe {
 	}
 }
 
+impl From<Duration> for Timeframe {
+	fn from(d: Duration) -> Self {
+		Timeframe(d.as_millis() as u64)
+	}
+}
+
 #[cfg(test)]
 mod timeframe_tests {
 	use super::*;
 
 	#[test]
 	fn to_str() {
-		let tf = Timeframe(5);
+		let tf = Timeframe(5_000);
 		assert_eq!(tf.to_string(), "5s".to_owned());
 	}
 
 	#[test]
 	fn deserialize() {
 		let tf: Timeframe = serde_json::from_str("\"5s\"").unwrap();
-		assert_eq!(tf, Timeframe(5));
+		assert_eq!(tf, Timeframe(5_000));
 	}
 
 	#[test]
 	fn parse_weird() {
 		let tf = Timeframe::from_str("5min").unwrap();
-		assert_eq!(tf, Timeframe(5 * 60));
+		assert_eq!(tf, Timeframe(5 * 60 * 1_000));
 
 		let tf = Timeframe::from_str("1wk").unwrap();
 		assert_eq!(tf.designator(), TimeframeDesignator::Weeks);
@@ -222,5 +232,28 @@ mod timeframe_tests {
 		assert_eq!(Timeframe::from("1h").try_as_predefined(&TFS_BYBIT), Some("60"));
 		assert_eq!(Timeframe::from("1h").try_as_predefined(&TFS_MEXC), Some("60m"));
 		assert_eq!(Timeframe::from("3M").try_as_predefined(&TFS_YAHOO), Some("3mo"));
+	}
+
+	#[test]
+	fn milliseconds_support() {
+		let tf = Timeframe::from_str("100ms").unwrap();
+		assert_eq!(tf, Timeframe(100));
+		assert_eq!(tf.to_string(), "100ms");
+
+		let tf = Timeframe::from_str("500ms").unwrap();
+		assert_eq!(tf.designator(), TimeframeDesignator::Milliseconds);
+	}
+
+	#[test]
+	fn from_duration() {
+		let d = Duration::from_millis(5000);
+		let tf = Timeframe::from(d);
+		assert_eq!(tf, Timeframe(5_000));
+		assert_eq!(tf.to_string(), "5s");
+
+		let d = Duration::from_millis(250);
+		let tf = Timeframe::from(d);
+		assert_eq!(tf, Timeframe(250));
+		assert_eq!(tf.to_string(), "250ms");
 	}
 }
