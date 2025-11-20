@@ -404,7 +404,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
-#[proc_macro_derive(MyConfigPrimitives, attributes(private_value))]
+#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -430,6 +430,11 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				attr.path().is_ident("private_value")
 			});
 
+			// Collect all attributes except private_value to forward to Helper
+			let forwarded_attrs = f.attrs.iter().filter(|attr| {
+				!attr.path().is_ident("private_value")
+			}).collect::<Vec<_>>();
+
 			// Check if type is Option<T>
 			let is_option = if let syn::Type::Path(type_path) = ty {
 				is_option_type(type_path)
@@ -440,7 +445,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			if has_private_value_attr {
 				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
 				(
-					quote! { #ident: PrivateValue },
+					quote! {
+						#(#forwarded_attrs)*
+						#ident: PrivateValue
+					},
 					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.parse().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))? },
 				)
 			} else if is_option {
@@ -451,7 +459,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 
 					match inner_type_string.as_str() {
 						"String" => (
-							quote! { #ident: Option<PrivateValue> },
+							quote! {
+								#(#forwarded_attrs)*
+								#ident: Option<PrivateValue>
+							},
 							quote! {
 								#ident: match helper.#ident {
 									Some(pv) => Some(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?),
@@ -460,11 +471,17 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							},
 						),
 						"PathBuf" => (
-							quote! { #ident: Option<v_utils::io::ExpandedPath> },
+							quote! {
+								#(#forwarded_attrs)*
+								#ident: Option<v_utils::io::ExpandedPath>
+							},
 							quote! { #ident: helper.#ident.map(|ep| ep.0) },
 						),
 						"SecretString" => (
-							quote! { #ident: Option<PrivateValue> },
+							quote! {
+								#(#forwarded_attrs)*
+								#ident: Option<PrivateValue>
+							},
 							quote! {
 								#ident: match helper.#ident {
 									Some(pv) => Some(secrecy::SecretString::new(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.into_boxed_str())),
@@ -472,23 +489,41 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 								}
 							},
 						),
-						_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
+						_ => (quote! {
+							#(#forwarded_attrs)*
+							#ident: #ty
+						}, quote! { #ident: helper.#ident }),
 					}
 				} else {
-					(quote! { #ident: #ty }, quote! { #ident: helper.#ident })
+					(quote! {
+						#(#forwarded_attrs)*
+						#ident: #ty
+					}, quote! { #ident: helper.#ident })
 				}
 			} else {
 				match type_string.as_str() {
 					"String" => (
-						quote! { #ident: PrivateValue },
+						quote! {
+							#(#forwarded_attrs)*
+							#ident: PrivateValue
+						},
 						quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? },
 					),
-					"PathBuf" => (quote! { #ident: v_utils::io::ExpandedPath }, quote! { #ident: helper.#ident.0 }),
+					"PathBuf" => (quote! {
+						#(#forwarded_attrs)*
+						#ident: v_utils::io::ExpandedPath
+					}, quote! { #ident: helper.#ident.0 }),
 					"SecretString" => (
-						quote! { #ident: PrivateValue },
+						quote! {
+							#(#forwarded_attrs)*
+							#ident: PrivateValue
+						},
 						quote! { #ident: secrecy::SecretString::new(helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.into_boxed_str()) },
 					),
-					_ => (quote! { #ident: #ty }, quote! { #ident: helper.#ident }),
+					_ => (quote! {
+						#(#forwarded_attrs)*
+						#ident: #ty
+					}, quote! { #ident: helper.#ident }),
 				}
 			}
 		})
@@ -506,6 +541,11 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				enum PrivateValue {
 					Direct(String),
 					Env { env: String },
+				}
+				impl Default for PrivateValue {
+					fn default() -> Self {
+						PrivateValue::Direct(String::new())
+					}
 				}
 				impl PrivateValue {
 					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {

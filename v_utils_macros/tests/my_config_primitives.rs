@@ -28,6 +28,8 @@ pub struct Test {
 	test_private_value_works_with_non_strings: usize,
 	optional_string: Option<String>,
 	optional_secret: Option<SecretString>,
+	#[serde(default)]
+	string_with_default: String,
 }
 
 fn main() {
@@ -57,4 +59,5 @@ optional_secret = { env = "USER" }
 		t.optional_secret.as_ref().map(secrecy::ExposeSecret::expose_secret),
 		Some(std::env::var("USER").unwrap().as_str())
 	);
+	assert_eq!(t.string_with_default, ""); // Test that serde(default) works - empty string is the default for String
 }

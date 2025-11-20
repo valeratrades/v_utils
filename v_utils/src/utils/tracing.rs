@@ -1,8 +1,30 @@
-use std::{borrow::Cow, io::Write, path::PathBuf};
+use std::{
+	borrow::Cow,
+	fs::File,
+	io::Write,
+	path::PathBuf,
+	sync::{Arc, Mutex},
+};
 
 use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
+
+/// Wrapper to allow Arc<Mutex<File>> to implement Write safely
+#[derive(Clone)]
+struct SharedFileWriter {
+	file: Arc<Mutex<File>>,
+}
+
+impl Write for SharedFileWriter {
+	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+		self.file.lock().unwrap().write(buf)
+	}
+
+	fn flush(&mut self) -> std::io::Result<()> {
+		self.file.lock().unwrap().flush()
+	}
+}
 
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
@@ -54,20 +76,20 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, bool), {
 		let path = path.into();
 
-		// Truncate the file before setting up the logger
-		{
-			let _ = std::fs::OpenOptions::new()
-				.create(true)
-				.write(true)
-				.truncate(true)
-				.open(&path)
-				.unwrap_or_else(|_| panic!("Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first", path.display()));
-		}
+		// Open the file once and share it via Arc<Mutex<>>
+		let file = std::fs::OpenOptions::new()
+			.create(true)
+			.write(true)
+			.truncate(true)
+			.open(&path)
+			.unwrap_or_else(|_| panic!("Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first", path.display()));
+
+		let shared_writer = SharedFileWriter { file: Arc::new(Mutex::new(file)) };
 
 		setup(
 			Box::new(move || {
-				let file = std::fs::OpenOptions::new().create(true).append(true).open(&path).expect("Failed to open log file");
-				Box::new(file) as Box<dyn Write>
+				// Clone the wrapper, which clones the Arc (not the file handle)
+				Box::new(shared_writer.clone()) as Box<dyn Write>
 			}),
 			stderr_errors,
 		);
