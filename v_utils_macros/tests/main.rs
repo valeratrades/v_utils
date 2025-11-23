@@ -10,4 +10,6 @@ fn tests() {
 	t.pass("tests/scream_it.rs");
 	#[cfg(feature = "cli")]
 	t.pass("tests/derive_settings.rs");
+	#[cfg(feature = "cli")]
+	t.pass("tests/settings_nix.rs");
 }

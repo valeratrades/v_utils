@@ -404,7 +404,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
-#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde))]
+#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -896,6 +896,30 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 
 //TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
 //NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
+/// Derive macro for application settings that integrates config files, environment variables, and CLI flags.
+///
+/// # Features
+/// - Loads config from multiple sources with precedence: CLI flags > Environment variables > Config file
+/// - Supports multiple config formats: TOML, JSON, YAML, JSON5, RON, INI, and Nix
+/// - Automatically searches for config files in XDG-compliant directories
+/// - Generates `SettingsFlags` struct for CLI integration with clap
+/// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
+///
+/// # Config file resolution
+/// 1. If `--config` flag is provided, uses that file (supports .nix extension)
+/// 2. Otherwise, checks for `~/.config/<app_name>.nix` first
+/// 3. Falls back to searching for other formats in:
+///    - `~/.config/<app_name>.{toml,json,yaml,json5,ron,ini}`
+///    - `~/.config/<app_name>/config.{toml,json,yaml,json5,ron,ini}`
+///
+/// # Example
+/// ```ignore
+/// #[derive(MyConfigPrimitives, Settings)]
+/// pub struct AppConfig {
+///     pub host: String,
+///     pub port: u16,
+/// }
+/// ```
 #[cfg(feature = "cli")]
 #[proc_macro_derive(Settings, attributes(settings))]
 pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
@@ -936,31 +960,65 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
 				let raw: ::v_utils::__internal::config::Config = match path {
 					Some(path) => {
-						let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
-						builder.build()?
+						// Check if it's a .nix file
+						if path.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false) {
+							let json_str = Self::eval_nix_file(path.to_str().unwrap())?;
+							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+							builder.build()?
+						} else {
+							let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
+							builder.build()?
+						}
 					}
 					None => {
-						let mut conf_files_found = Vec::new();
-						for location in locations.iter() {
-							if location.exists() {
-								conf_files_found.push(location);
+						// Check for .nix file first
+						let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
+						if std::path::Path::new(&nix_path).exists() {
+							let json_str = Self::eval_nix_file(&nix_path)?;
+							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+							builder.build()?
+						} else {
+							let mut conf_files_found = Vec::new();
+							for location in locations.iter() {
+								if location.exists() {
+									conf_files_found.push(location);
+								}
 							}
-						}
-						match conf_files_found.len() {
-							0 => {
-								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
-							},
-							1 => {
-								builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
-							},
-							_ => {
-								return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
+							match conf_files_found.len() {
+								0 => {
+									err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+								},
+								1 => {
+									builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
+								},
+								_ => {
+									return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
+								}
 							}
+							builder.build()?
 						}
-						builder.build()?
 					}
 				};
 				raw.try_deserialize().wrap_err(err_msg)
+			}
+
+			fn eval_nix_file(path: &str) -> Result<String, ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::WrapErr as _;
+				let output = std::process::Command::new("nix")
+					.arg("eval")
+					.arg("--json")
+					.arg("--impure")
+					.arg("--expr")
+					.arg(format!("import {}", path))
+					.output()
+					.wrap_err("Failed to execute nix command. Is nix installed?")?;
+
+				if !output.status.success() {
+					let stderr = String::from_utf8_lossy(&output.stderr);
+					return Err(::v_utils::__internal::eyre::eyre!("Nix evaluation failed: {}", stderr));
+				}
+
+				Ok(String::from_utf8(output.stdout)?)
 			}
 		}
 	};
@@ -1050,7 +1108,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
 		#[derive(clap::Args, Clone, Debug, Default, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
 		pub struct SettingsFlags {
-			#[arg(long)]
+			#[arg(short, long)]
 			config: Option<v_utils::io::ExpandedPath>,
 			#(#flag_quotes)*
 		}
@@ -1078,7 +1136,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 }
 
 ///NB: assumes that the child struct and the field containing it on parent are **named the same** (with adjustment for casing).
-#[proc_macro_derive(SettingsBadlyNested)]
+#[proc_macro_derive(SettingsBadlyNested, attributes(settings))]
 pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
