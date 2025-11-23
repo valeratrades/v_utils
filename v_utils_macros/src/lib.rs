@@ -1033,8 +1033,15 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		unimplemented!()
 	};
 
-	let flag_quotes = fields.iter().map(|field| {
+	let flag_quotes = fields.iter().filter_map(|field| {
 		let ty = &field.ty;
+
+		// Skip Vec fields
+		if let syn::Type::Path(type_path) = ty {
+			if is_vec_type(type_path) {
+				return None;
+			}
+		}
 
 		// check if attr is `#[settings(flatten)]`
 		let has_flatten_attr = field.attrs.iter().any(|attr| {
@@ -1048,7 +1055,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 		//HACK: hugely oversimplified (can only handle one level of nesting)
 		let ident = &field.ident;
-		match has_flatten_attr {
+		Some(match has_flatten_attr {
 			true => {
 				use quote::ToTokens as _;
 				let type_name = ty.to_token_stream().to_string();
@@ -1065,12 +1072,19 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					#ident: #clap_ty,
 				}
 			}
-		}
+		})
 	});
 
 	//HACK: code duplication. But if I produce both in single pass, it starts getting weird about types.
-	let source_quotes = fields.iter().map(|field| {
+	let source_quotes = fields.iter().filter_map(|field| {
 		let ty = &field.ty;
+
+		// Skip Vec fields
+		if let syn::Type::Path(type_path) = ty {
+			if is_vec_type(type_path) {
+				return None;
+			}
+		}
 
 		// check if attr is `#[settings(flatten)]`
 		let has_flatten_attr = field.attrs.iter().any(|attr| {
@@ -1083,7 +1097,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		});
 
 		let ident = &field.ident;
-		match has_flatten_attr {
+		Some(match has_flatten_attr {
 			true => {
 				quote! {
 					let _ = &self.#ident.collect_config(&mut map);
@@ -1101,7 +1115,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					}
 				}
 			}
-		}
+		})
 	});
 
 	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
@@ -1213,10 +1227,10 @@ fn clap_to_config(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStrea
 		}
 		// Vec/Array
 		syn::Type::Path(type_path) if is_vec_type(type_path) => {
-			// Create a new Array from the Vec
+			// Create a new Vec<Value> for the array
 			quote! {
 				{
-					let mut array = v_utils::__internal::config::Array::new();
+					let mut array = Vec::new();
 					for item in #ident.iter() {
 						array.push(v_utils::__internal::config::Value::new(
 							None,
