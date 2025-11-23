@@ -3267,7 +3267,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils"
-version = "2.9.6"
+version = "2.9.7"
 dependencies = [
  "async-sse",
  "bytes",
@@ -3306,7 +3306,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils_macros"
-version = "2.5.6"
+version = "2.5.7"
 dependencies = [
  "clap",
  "eyre",
