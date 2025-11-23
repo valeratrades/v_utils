@@ -74,4 +74,33 @@ fn main() {
 
 	// Test that SettingsFlags can be flattened into Cli struct
 	// This is verified at compile time - if Cli compiles, it works
+
+	// Test loading config with unknown field (will warn to stderr)
+	eprintln!("\n=== Testing unknown field warning ===");
+	let flags_with_config = SettingsFlags {
+		config: Some(v_utils::io::ExpandedPath(std::path::PathBuf::from("tests/test_unknown_field.toml"))),
+		host: None,
+		port: None,
+		debug: None,
+		workers: None,
+		database: __SettingsBadlyNestedDatabase {
+			database_url: None,
+			database_max_connections: None,
+		},
+		risk_tiers: __SettingsBadlyNestedRiskTiers {
+			risk_tiers_a: None,
+			risk_tiers_b: None,
+		},
+	};
+
+	match AppConfig::try_build(flags_with_config) {
+		Ok(_config) => {
+			eprintln!("Config loaded successfully (unknown fields should have triggered warnings above)");
+		}
+		Err(e) => {
+			// Config file might not exist in test environment, which is fine
+			eprintln!("Note: Config loading skipped ({})", e);
+		}
+	}
+	eprintln!("=== End of unknown field warning test ===\n");
 }

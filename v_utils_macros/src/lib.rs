@@ -926,6 +926,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
 	//DEPRECATE: split over xdg (previously was there for interop with clients targetting WASM)
 	//#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
@@ -936,6 +946,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	//let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
 	//	let xdg_conf_dir = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").unwrap()));
 	//};
+
+	// Generate field lists for validation
+	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
+
+	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
 	let try_build = quote_spanned! {name.span()=>
 		//#[cfg(not(feature = "hydrate"))]
@@ -958,16 +973,20 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
-				let raw: ::v_utils::__internal::config::Config = match path {
+				let (raw, file_config): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>) = match path {
 					Some(path) => {
 						// Check if it's a .nix file
 						if path.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false) {
 							let json_str = Self::eval_nix_file(path.to_str().unwrap())?;
+							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-							builder.build()?
+							(builder.build()?, file_only)
 						} else {
+							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
+							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
-							builder.build()?
+							(builder.build()?, file_only)
 						}
 					}
 					None => {
@@ -975,8 +994,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
 						if std::path::Path::new(&nix_path).exists() {
 							let json_str = Self::eval_nix_file(&nix_path)?;
+							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-							builder.build()?
+							(builder.build()?, file_only)
 						} else {
 							let mut conf_files_found = Vec::new();
 							for location in locations.iter() {
@@ -984,22 +1005,44 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 									conf_files_found.push(location);
 								}
 							}
-							match conf_files_found.len() {
+							let file_only = match conf_files_found.len() {
 								0 => {
 									err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+									None
 								},
 								1 => {
+									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
 									builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
+									file_builder.build().ok()
 								},
 								_ => {
 									return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
 								}
-							}
-							builder.build()?
+							};
+							(builder.build()?, file_only)
 						}
 					}
 				};
+
+				// Check for unknown configuration fields
+				if let Some(file_cfg) = file_config {
+					Self::warn_unknown_fields(&file_cfg);
+				}
+
 				raw.try_deserialize().wrap_err(err_msg)
+			}
+
+			fn warn_unknown_fields(file_config: &::v_utils::__internal::config::Config) {
+				use std::collections::{HashMap, HashSet};
+				let known_fields: HashSet<&str> = [#(#field_name_strings),*].iter().copied().collect();
+
+				if let Ok(table) = file_config.clone().try_deserialize::<HashMap<String, ::v_utils::__internal::serde_json::Value>>() {
+					for field_name in table.keys() {
+						if !known_fields.contains(field_name.as_str()) {
+							eprintln!("warning: unknown configuration field '{field_name}' will be ignored");
+						}
+					}
+				}
 			}
 
 			fn eval_nix_file(path: &str) -> Result<String, ::v_utils::__internal::eyre::Report> {
@@ -1021,16 +1064,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				Ok(String::from_utf8(output.stdout)?)
 			}
 		}
-	};
-
-	let fields = if let syn::Data::Struct(syn::DataStruct {
-		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
-		..
-	}) = ast.data
-	{
-		named
-	} else {
-		unimplemented!()
 	};
 
 	let flag_quotes = fields.iter().filter_map(|field| {
