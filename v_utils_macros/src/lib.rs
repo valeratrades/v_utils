@@ -2,7 +2,7 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro2;
-use heck::AsShoutySnakeCase;
+use heck::{AsShoutySnakeCase, AsSnakeCase};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, quote_spanned};
 use syn::{
@@ -1154,7 +1154,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
-	let lowercase_name = name.to_string().to_lowercase();
+	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
 	let fields = if let Data::Struct(syn::DataStruct {
 		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
 		..
@@ -1170,7 +1170,7 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		let ty = &field.ty;
 
 		let clap_ty = clap_compatible_option_wrapped_ty(ty);
-		let prefixed_field_name = format_ident!("{}_{}", name.to_string().to_lowercase(), ident.as_ref().unwrap());
+		let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
 		quote! {
 			#[arg(long)]
 			#prefixed_field_name: #clap_ty,
@@ -1182,9 +1182,9 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		let ty = &field.ty;
 
 		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
-		let prefixed_field_name = format_ident!("{lowercase_name}_{}", ident.as_ref().unwrap());
-		let config_value_path = format!("{lowercase_name}.{}", ident.as_ref().unwrap());
-		let source_tag = format!("flags:{}", lowercase_name);
+		let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
+		let config_value_path = format!("{}.{}", snake_case_name, ident.as_ref().unwrap());
+		let source_tag = format!("flags:{}", snake_case_name);
 		quote! {
 			if let Some(#ident) = &self.#prefixed_field_name {
 				map.insert(

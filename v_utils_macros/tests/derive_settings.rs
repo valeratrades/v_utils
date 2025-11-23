@@ -11,6 +11,8 @@ pub struct AppConfig {
 	workers: Option<usize>,
 	#[settings(flatten)]
 	database: Database,
+	#[settings(flatten)]
+	risk_tiers: RiskTiers,
 }
 
 #[allow(dead_code)]
@@ -18,6 +20,13 @@ pub struct AppConfig {
 pub struct Database {
 	url: String,
 	max_connections: u32,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+pub struct RiskTiers {
+	a: String,
+	b: String,
 }
 
 /// Example of how to use Settings with Clap
@@ -42,6 +51,10 @@ fn main() {
 			database_url: Some("postgres://localhost".to_string()),
 			database_max_connections: Some("10".to_string()),
 		},
+		risk_tiers: __SettingsBadlyNestedRiskTiers {
+			risk_tiers_a: Some("0.01".to_string()),
+			risk_tiers_b: Some("0.02".to_string()),
+		},
 	};
 
 	// Verify the SettingsFlags struct was created
@@ -51,6 +64,8 @@ fn main() {
 	assert_eq!(flags.workers, Some("4".to_string()));
 	assert_eq!(flags.database.database_url, Some("postgres://localhost".to_string()));
 	assert_eq!(flags.database.database_max_connections, Some("10".to_string()));
+	assert_eq!(flags.risk_tiers.risk_tiers_a, Some("0.01".to_string()));
+	assert_eq!(flags.risk_tiers.risk_tiers_b, Some("0.02".to_string()));
 
 	// Test that try_build method exists and compiles
 	// Note: We can't actually call try_build in a simple test because it requires
