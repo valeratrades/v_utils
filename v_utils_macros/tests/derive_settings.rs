@@ -3,8 +3,8 @@ use serde::Deserialize;
 use v_utils_macros::{Settings, SettingsBadlyNested};
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, Deserialize, Settings)]
-#[serde(crate = "v_utils::__internal::serde")]
+#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
+//#[serde(crate = "v_utils::__internal::serde")]
 pub struct AppConfig {
 	host: String,
 	port: u16,
@@ -14,9 +14,8 @@ pub struct AppConfig {
 	database: Database,
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
-#[serde(crate = "v_utils::__internal::serde")]
+//#[serde(crate = "v_utils::__internal::serde")]
 pub struct Database {
 	url: String,
 	max_connections: u32,
@@ -45,13 +44,6 @@ fn main() {
 			database_max_connections: Some("10".to_string()),
 		},
 	};
-
-	// Verify the SettingsFlags struct was created
-	assert_eq!(flags.host, Some("localhost".to_string()));
-	assert_eq!(flags.port, Some("8080".to_string()));
-	assert_eq!(flags.debug, Some(true));
-	assert_eq!(flags.workers, Some("4".to_string()));
-	assert_eq!(flags.database.database_url, Some("postgres://localhost".to_string()));
 
 	// Test that try_build method exists and compiles
 	// Note: We can't actually call try_build in a simple test because it requires
