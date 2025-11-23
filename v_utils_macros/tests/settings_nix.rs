@@ -36,8 +36,6 @@ fn main() {
 	// Test that the eval_nix_file method exists and can be called
 	// Note: This will only work if nix is installed
 	if let Ok(json_str) = TestConfig::eval_nix_file(nix_file_path.to_str().unwrap()) {
-		println!("Nix evaluation succeeded: {}", json_str);
-
 		// Verify it's valid JSON
 		let parsed: serde_json::Value = serde_json::from_str(&json_str).expect("Nix output should be valid JSON");
 

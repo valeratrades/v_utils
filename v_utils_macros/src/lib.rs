@@ -430,9 +430,9 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				attr.path().is_ident("private_value")
 			});
 
-			// Collect all attributes except private_value to forward to Helper
+			// Collect all attributes except private_value and settings to forward to Helper
 			let forwarded_attrs = f.attrs.iter().filter(|attr| {
-				!attr.path().is_ident("private_value")
+				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings")
 			}).collect::<Vec<_>>();
 
 			// Check if type is Option<T>
