@@ -6,7 +6,7 @@ mod xdg_with_lib {
 			#[macro_export]
 			macro_rules! $fn_name {
 				($subpath: expr) => {{
-					let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
+					let dirs = $crate::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
 					dirs.$dir_type($subpath).unwrap()
 				}};
 				() => {
@@ -22,7 +22,7 @@ mod xdg_with_lib {
 			#[macro_export]
 			macro_rules! $fn_name {
 				($subpath: expr) => {{
-					let dirs = xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
+					let dirs = $crate::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
 					let path = std::path::PathBuf::from($subpath);
 					let parent = path.parent().unwrap_or(std::path::Path::new(""));
 					let base_dir = dirs.$dir_type(parent).unwrap();

@@ -36,7 +36,8 @@ pub mod __internal {
 	pub extern crate config;
 	#[cfg(feature = "cli")]
 	pub extern crate serde_json;
-	#[cfg(feature = "cli")]
+
+	#[cfg(feature = "xdg")]
 	pub extern crate xdg;
 }
 
