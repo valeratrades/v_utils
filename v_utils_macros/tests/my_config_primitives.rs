@@ -30,6 +30,11 @@ pub struct Test {
 	optional_secret: Option<SecretString>,
 	#[serde(default)]
 	string_with_default: String,
+	#[serde(default = "__default_num_of_retries")]
+	pub num_of_retries: u8,
+}
+fn __default_num_of_retries() -> u8 {
+	3
 }
 
 fn main() {
@@ -60,4 +65,5 @@ optional_secret = { env = "USER" }
 		Some(std::env::var("USER").unwrap().as_str())
 	);
 	assert_eq!(t.string_with_default, ""); // Test that serde(default) works - empty string is the default for String
+	assert_eq!(t.num_of_retries, 3); // Test that custom default function works
 }
