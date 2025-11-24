@@ -404,7 +404,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
-#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings))]
+#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -430,9 +430,19 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				attr.path().is_ident("private_value")
 			});
 
-			// Collect all attributes except private_value and settings to forward to Helper
+			// Check if field has #[primitives(skip)] attribute
+			let has_primitives_skip_attr = f.attrs.iter().any(|attr| {
+				if attr.path().is_ident("primitives") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "skip";
+					}
+				}
+				false
+			});
+
+			// Collect all attributes except private_value, primitives, and settings to forward to Helper
 			let forwarded_attrs = f.attrs.iter().filter(|attr| {
-				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings")
+				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives")
 			}).collect::<Vec<_>>();
 
 			// Check if type is Option<T>
@@ -442,7 +452,13 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				false
 			};
 
-			if has_private_value_attr {
+			// If field has #[primitives(skip)], don't apply PrivateValue transformation
+			if has_primitives_skip_attr {
+				(quote! {
+					#(#forwarded_attrs)*
+					#ident: #ty
+				}, quote! { #ident: helper.#ident })
+			} else if has_private_value_attr {
 				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
 				(
 					quote! {

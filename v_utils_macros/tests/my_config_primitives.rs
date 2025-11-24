@@ -32,6 +32,8 @@ pub struct Test {
 	string_with_default: String,
 	#[serde(default = "__default_num_of_retries")]
 	pub num_of_retries: u8,
+	#[primitives(skip)]
+	skipped_string: String,
 }
 fn __default_num_of_retries() -> u8 {
 	3
@@ -48,6 +50,7 @@ port = "8080"
 test_private_value_works_with_non_strings = 1234
 optional_string = { env = "USER" }
 optional_secret = { env = "USER" }
+skipped_string = "this should not be wrapped in PrivateValue"
 "#;
 
 	let t: Test = toml::from_str(toml_str).expect("Failed to deserialize");
@@ -66,4 +69,5 @@ optional_secret = { env = "USER" }
 	);
 	assert_eq!(t.string_with_default, ""); // Test that serde(default) works - empty string is the default for String
 	assert_eq!(t.num_of_retries, 3); // Test that custom default function works
+	assert_eq!(t.skipped_string, "this should not be wrapped in PrivateValue"); // Test that #[primitives(skip)] works
 }
