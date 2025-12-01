@@ -1,0 +1,18 @@
+host = "testhost"
+port = 8080
+debug = true
+workers = 4
+
+# This field should NOT trigger a warning because it has #[settings(skip)]
+internal_state = "should_be_ignored"
+
+# This is truly unknown and SHOULD trigger a warning
+truly_unknown_field = "this_should_warn"
+
+[database]
+url = "postgres://localhost"
+max_connections = 10
+
+[risk_tiers]
+a = "0.01"
+b = "0.02"

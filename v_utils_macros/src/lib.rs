@@ -963,8 +963,23 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	//	let xdg_conf_dir = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").unwrap()));
 	//};
 
-	// Generate field lists for validation
-	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
+	// Generate field lists for validation (exclude skipped fields)
+	let all_field_names: Vec<_> = fields
+		.iter()
+		.filter_map(|f| {
+			// Check if field has #[settings(skip)]
+			let has_skip_attr = f.attrs.iter().any(|attr| {
+				if attr.path().is_ident("settings") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "skip";
+					}
+				}
+				false
+			});
+
+			if has_skip_attr { None } else { Some(f.ident.as_ref().unwrap().to_string()) }
+		})
+		.collect();
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
@@ -1092,7 +1107,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		// check if attr is `#[settings(flatten)]`
+		// check if attr is `#[settings(flatten)]` or `#[settings(skip)]`
 		let has_flatten_attr = field.attrs.iter().any(|attr| {
 			if attr.path().is_ident("settings") {
 				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
@@ -1101,6 +1116,20 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 			false
 		});
+
+		let has_skip_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "skip";
+				}
+			}
+			false
+		});
+
+		// Skip fields with #[settings(skip)]
+		if has_skip_attr {
+			return None;
+		}
 
 		//HACK: hugely oversimplified (can only handle one level of nesting)
 		let ident = &field.ident;
@@ -1135,7 +1164,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		// check if attr is `#[settings(flatten)]`
+		// check if attr is `#[settings(flatten)]` or `#[settings(skip)]`
 		let has_flatten_attr = field.attrs.iter().any(|attr| {
 			if attr.path().is_ident("settings") {
 				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
@@ -1144,6 +1173,20 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 			false
 		});
+
+		let has_skip_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "skip";
+				}
+			}
+			false
+		});
+
+		// Skip fields with #[settings(skip)]
+		if has_skip_attr {
+			return None;
+		}
 
 		let ident = &field.ident;
 		Some(match has_flatten_attr {

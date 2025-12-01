@@ -13,6 +13,9 @@ pub struct AppConfig {
 	database: Database,
 	#[settings(flatten)]
 	risk_tiers: RiskTiers,
+	/// This field should be skipped - not in CLI flags or config
+	#[settings(skip)]
+	internal_state: String,
 }
 
 #[allow(dead_code)]
@@ -74,6 +77,28 @@ fn main() {
 
 	// Test that SettingsFlags can be flattened into Cli struct
 	// This is verified at compile time - if Cli compiles, it works
+
+	// Test that skipped field is not present in SettingsFlags
+	// The fact that this compiles proves that 'internal_state' field is NOT in SettingsFlags
+	// If it were present, we would need to initialize it above
+	let _test_skip: fn() = || {
+		let _flags_without_internal_state = SettingsFlags {
+			config: None,
+			host: None,
+			port: None,
+			debug: None,
+			workers: None,
+			database: __SettingsBadlyNestedDatabase {
+				database_url: None,
+				database_max_connections: None,
+			},
+			risk_tiers: __SettingsBadlyNestedRiskTiers {
+				risk_tiers_a: None,
+				risk_tiers_b: None,
+			},
+			// NOTE: internal_state is NOT here because it has #[settings(skip)]
+		};
+	};
 
 	// Test loading config with unknown field (will warn to stderr)
 	eprintln!("\n=== Testing unknown field warning ===");
