@@ -1136,7 +1136,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		Some(match has_flatten_attr {
 			true => {
 				use quote::ToTokens as _;
-				let type_name = ty.to_token_stream().to_string();
+				// Extract inner type if Option<T>
+				let inner_type = if let syn::Type::Path(type_path) = ty {
+					if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
+				} else {
+					ty
+				};
+				let type_name = inner_type.to_token_stream().to_string();
 				let nested_struct_name = format_ident!("__SettingsBadlyNested{type_name}");
 				quote! {
 					#[clap(flatten)]

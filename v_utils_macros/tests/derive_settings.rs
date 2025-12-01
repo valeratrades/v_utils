@@ -13,6 +13,9 @@ pub struct AppConfig {
 	database: Database,
 	#[settings(flatten)]
 	risk_tiers: RiskTiers,
+	/// Optional nested config - should work with flatten
+	#[settings(flatten)]
+	logging: Option<Logging>,
 	/// This field should be skipped - not in CLI flags or config
 	#[settings(skip)]
 	internal_state: String,
@@ -30,6 +33,13 @@ pub struct Database {
 pub struct RiskTiers {
 	a: String,
 	b: String,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+pub struct Logging {
+	level: String,
+	file: Option<String>,
 }
 
 /// Example of how to use Settings with Clap
@@ -57,6 +67,11 @@ fn main() {
 		risk_tiers: __SettingsBadlyNestedRiskTiers {
 			risk_tiers_a: Some("0.01".to_string()),
 			risk_tiers_b: Some("0.02".to_string()),
+		},
+		// Optional flattened field - uses same nested struct pattern
+		logging: __SettingsBadlyNestedLogging {
+			logging_level: Some("debug".to_string()),
+			logging_file: Some("/var/log/app.log".to_string()),
 		},
 	};
 
@@ -96,6 +111,10 @@ fn main() {
 				risk_tiers_a: None,
 				risk_tiers_b: None,
 			},
+			logging: __SettingsBadlyNestedLogging {
+				logging_level: None,
+				logging_file: None,
+			},
 			// NOTE: internal_state is NOT here because it has #[settings(skip)]
 		};
 	};
@@ -115,6 +134,10 @@ fn main() {
 		risk_tiers: __SettingsBadlyNestedRiskTiers {
 			risk_tiers_a: None,
 			risk_tiers_b: None,
+		},
+		logging: __SettingsBadlyNestedLogging {
+			logging_level: None,
+			logging_file: None,
 		},
 	};
 
