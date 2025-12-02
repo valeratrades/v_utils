@@ -17,7 +17,8 @@ xdg = [
     "dep:xdg",
     "v_utils_macros/xdg",
 ] # have to separate it, because `xdg` lib behaves weirdly under wasm
-cli = ["v_utils_macros/cli", "dep:config", "dep:tokio", "tokio/io-std"]
+cli = ["v_utils_macros/cli", "dep:config"]
+break-wasm = ["dep:tokio", "tokio/io-std"]
 trades = ["dep:jiff", "dep:strum"]
 macros = ["v_utils_macros"]
 tracing = [

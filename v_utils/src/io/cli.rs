@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-#[cfg(feature = "cli")]
+#[cfg(feature = "break-wasm")]
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 /// Result of a confirm_all prompt
@@ -46,7 +46,7 @@ pub fn confirm_blocking<T: AsRef<str>>(message: T) -> bool {
 ///		println!("Opening order...");
 ///}
 ///```
-#[cfg(feature = "cli")]
+#[cfg(feature = "break-wasm")]
 pub async fn confirm<T: AsRef<str>>(message: T) -> bool {
 	let mut stdout = io::stdout();
 
@@ -107,7 +107,7 @@ pub fn confirm_all_blocking<T: AsRef<str>>(message: T) -> ConfirmAllResult {
 ///		ConfirmAllResult::All => println!("Processing all remaining..."),
 ///}
 ///```
-#[cfg(feature = "cli")]
+#[cfg(feature = "break-wasm")]
 pub async fn confirm_all<T: AsRef<str>>(message: T) -> ConfirmAllResult {
 	let mut stdout = io::stdout();
 
