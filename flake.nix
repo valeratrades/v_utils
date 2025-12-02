@@ -30,7 +30,9 @@
             { name = "rust-doc"; args = { package = "v_utils"; }; }
             "rust-clippy"
             "rust-machete"
-            #"rust-sorted" #dbg: something weird with it un-formatting it
+            "rust-sorted" #TEST: if mismatches with treefmt, just nuke, whatever
+            "rust-unused-features"
+            "rust-sorted-derives"
             "tokei"
           ];
           jobsOther = [ "loc-badge" ];
