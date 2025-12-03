@@ -37,7 +37,7 @@ pub use tracing::*;
 
 /// # HACK
 /// Assumes that `color_eyre` is in scope
-#[cfg(feature = "tracing")]
+#[cfg(all(feature = "tracing", feature = "xdg"))]
 #[macro_export]
 macro_rules! clientside {
 	() => {
@@ -47,6 +47,20 @@ macro_rules! clientside {
 	($fname:expr) => {
 		color_eyre::install().unwrap();
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME")).fname($fname));
+	};
+}
+
+/// Fallback when xdg is not available - logs to stdout
+#[cfg(all(feature = "tracing", not(feature = "xdg")))]
+#[macro_export]
+macro_rules! clientside {
+	() => {
+		color_eyre::install().unwrap();
+		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::Stdout);
+	};
+	($fname:expr) => {
+		color_eyre::install().unwrap();
+		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::Stdout);
 	};
 }
 
