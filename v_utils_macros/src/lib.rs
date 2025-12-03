@@ -959,7 +959,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	};
 	#[cfg(not(feature = "xdg"))]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
-		let xdg_conf_dir = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").expect("HOME environment variable not set")));
+		let xdg_conf_dir = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+			#[cfg(windows)]
+			{
+				std::env::var("APPDATA").expect("APPDATA environment variable not set")
+			}
+			#[cfg(not(windows))]
+			{
+				format!("{}/.config", std::env::var("HOME").expect("HOME environment variable not set"))
+			}
+		});
 	};
 
 	// Generate field lists for validation (exclude skipped fields)
