@@ -146,50 +146,143 @@ mod xdg_with_lib {
 
 #[cfg(not(feature = "xdg"))]
 mod xdg_no_deps {
-	macro_rules! impl_backup_xdg_dir_fn {
-		($method_name:ident, $fallback_fn:path) => {
-			#[doc = concat!("Will create xdg_dir/<crate_name>/$subpath/ (\"\" for no subpath; subpath is a **DIR**)")]
-			#[macro_export]
-			macro_rules! $method_name {
-				($subpath: expr) => {{
-					let base_path = $fallback_fn();
-					let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
-					if !$subpath.is_empty() {
-						dir = dir.join($subpath);
-					}
-					std::fs::create_dir_all(&dir).unwrap();
-					dir
-				}};
+	/// Will create $XDG_DATA_HOME/<crate_name>/$subpath/ ("" for no subpath; subpath is a **DIR**)
+	#[macro_export]
+	macro_rules! xdg_data_dir {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_data_fallback();
+			let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			if !$subpath.is_empty() {
+				dir = dir.join($subpath);
 			}
-		};
+			std::fs::create_dir_all(&dir).unwrap();
+			dir
+		}};
 	}
 
-	macro_rules! impl_backup_xdg_file_fn {
-		($method_name:ident, $fallback_fn:path) => {
-			#[doc = concat!("Will create xdg_dir/<crate_name>/ and return the path to the file specified in $subpath")]
-			#[macro_export]
-			macro_rules! $method_name {
-				($subpath: expr) => {{
-					let base_path = $fallback_fn();
-					let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
-					let path = std::path::PathBuf::from($subpath);
-					let parent = path.parent().unwrap_or(std::path::Path::new(""));
-					let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
-					std::fs::create_dir_all(&dir).unwrap();
-					base_dir.join(&path)
-				}};
-			}
-		};
+	/// Will create $XDG_DATA_HOME/<crate_name>/ and return the path to the file specified in $subpath
+	#[macro_export]
+	macro_rules! xdg_data_file {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_data_fallback();
+			let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			let path = std::path::PathBuf::from($subpath);
+			let parent = path.parent().unwrap_or(std::path::Path::new(""));
+			let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
+			std::fs::create_dir_all(&dir).unwrap();
+			base_dir.join(&path)
+		}};
 	}
 
-	impl_backup_xdg_dir_fn!(xdg_data_dir, $crate::io::xdg::xdg_data_fallback);
-	impl_backup_xdg_file_fn!(xdg_data_file, $crate::io::xdg::xdg_data_fallback);
-	impl_backup_xdg_dir_fn!(xdg_config_dir, $crate::io::xdg::xdg_config_fallback);
-	impl_backup_xdg_file_fn!(xdg_config_file, $crate::io::xdg::xdg_config_fallback);
-	impl_backup_xdg_dir_fn!(xdg_cache_dir, $crate::io::xdg::xdg_cache_fallback);
-	impl_backup_xdg_file_fn!(xdg_cache_file, $crate::io::xdg::xdg_cache_fallback);
-	impl_backup_xdg_dir_fn!(xdg_state_dir, $crate::io::xdg::xdg_state_fallback);
-	impl_backup_xdg_file_fn!(xdg_state_file, $crate::io::xdg::xdg_state_fallback);
-	impl_backup_xdg_dir_fn!(xdg_runtime_dir, $crate::io::xdg::xdg_runtime_fallback);
-	impl_backup_xdg_file_fn!(xdg_runtime_file, $crate::io::xdg::xdg_runtime_fallback);
+	/// Will create $XDG_CONFIG_HOME/<crate_name>/$subpath/ ("" for no subpath; subpath is a **DIR**)
+	#[macro_export]
+	macro_rules! xdg_config_dir {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_config_fallback();
+			let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			if !$subpath.is_empty() {
+				dir = dir.join($subpath);
+			}
+			std::fs::create_dir_all(&dir).unwrap();
+			dir
+		}};
+	}
+
+	/// Will create $XDG_CONFIG_HOME/<crate_name>/ and return the path to the file specified in $subpath
+	#[macro_export]
+	macro_rules! xdg_config_file {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_config_fallback();
+			let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			let path = std::path::PathBuf::from($subpath);
+			let parent = path.parent().unwrap_or(std::path::Path::new(""));
+			let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
+			std::fs::create_dir_all(&dir).unwrap();
+			base_dir.join(&path)
+		}};
+	}
+
+	/// Will create $XDG_CACHE_HOME/<crate_name>/$subpath/ ("" for no subpath; subpath is a **DIR**)
+	#[macro_export]
+	macro_rules! xdg_cache_dir {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_cache_fallback();
+			let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			if !$subpath.is_empty() {
+				dir = dir.join($subpath);
+			}
+			std::fs::create_dir_all(&dir).unwrap();
+			dir
+		}};
+	}
+
+	/// Will create $XDG_CACHE_HOME/<crate_name>/ and return the path to the file specified in $subpath
+	#[macro_export]
+	macro_rules! xdg_cache_file {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_cache_fallback();
+			let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			let path = std::path::PathBuf::from($subpath);
+			let parent = path.parent().unwrap_or(std::path::Path::new(""));
+			let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
+			std::fs::create_dir_all(&dir).unwrap();
+			base_dir.join(&path)
+		}};
+	}
+
+	/// Will create $XDG_STATE_HOME/<crate_name>/$subpath/ ("" for no subpath; subpath is a **DIR**)
+	#[macro_export]
+	macro_rules! xdg_state_dir {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_state_fallback();
+			let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			if !$subpath.is_empty() {
+				dir = dir.join($subpath);
+			}
+			std::fs::create_dir_all(&dir).unwrap();
+			dir
+		}};
+	}
+
+	/// Will create $XDG_STATE_HOME/<crate_name>/ and return the path to the file specified in $subpath
+	#[macro_export]
+	macro_rules! xdg_state_file {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_state_fallback();
+			let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			let path = std::path::PathBuf::from($subpath);
+			let parent = path.parent().unwrap_or(std::path::Path::new(""));
+			let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
+			std::fs::create_dir_all(&dir).unwrap();
+			base_dir.join(&path)
+		}};
+	}
+
+	/// Will create $XDG_RUNTIME_DIR/<crate_name>/$subpath/ ("" for no subpath; subpath is a **DIR**)
+	#[macro_export]
+	macro_rules! xdg_runtime_dir {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_runtime_fallback();
+			let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			if !$subpath.is_empty() {
+				dir = dir.join($subpath);
+			}
+			std::fs::create_dir_all(&dir).unwrap();
+			dir
+		}};
+	}
+
+	/// Will create $XDG_RUNTIME_DIR/<crate_name>/ and return the path to the file specified in $subpath
+	#[macro_export]
+	macro_rules! xdg_runtime_file {
+		($subpath:expr) => {{
+			let base_path = $crate::io::xdg::xdg_runtime_fallback();
+			let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
+			let path = std::path::PathBuf::from($subpath);
+			let parent = path.parent().unwrap_or(std::path::Path::new(""));
+			let dir = if parent.as_os_str().is_empty() { base_dir.clone() } else { base_dir.join(parent) };
+			std::fs::create_dir_all(&dir).unwrap();
+			base_dir.join(&path)
+		}};
+	}
 }
