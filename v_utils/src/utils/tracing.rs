@@ -102,7 +102,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		LogDestination::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())), false);
 		}
-		#[cfg(not(target_arch = "wasm32"))]
+		#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 		LogDestination::Xdg { dname, fname, stderr_errors } => {
 			let associated_state_home = xdg::BaseDirectories::with_prefix(dname).create_state_directory("").unwrap();
 			let filename = fname.as_ref().map(|s| format!("{s}.log")).unwrap_or_else(|| ".log".to_string());
@@ -127,7 +127,7 @@ pub enum LogDestination {
 		path: PathBuf,
 		stderr_errors: bool,
 	},
-	#[cfg(not(target_arch = "wasm32"))] // no clue why, but `xdg::BaseDirectories` falls apart with it
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 	Xdg {
 		dname: String,
 		fname: Option<String>,
@@ -145,7 +145,7 @@ impl LogDestination {
 	}
 
 	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 	pub fn xdg<S: Into<String>>(name: S) -> Self {
 		LogDestination::Xdg {
 			dname: name.into(),
@@ -155,7 +155,7 @@ impl LogDestination {
 	}
 
 	/// Set custom filename for Xdg variant (creates `{fname}.log`)
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 	pub fn fname<S: Into<String>>(self, fname: S) -> Self {
 		match self {
 			LogDestination::Xdg { dname, stderr_errors, .. } => LogDestination::Xdg {
@@ -171,7 +171,7 @@ impl LogDestination {
 	pub fn stderr_errors(self, enabled: bool) -> Self {
 		match self {
 			LogDestination::File { path, .. } => LogDestination::File { path, stderr_errors: enabled },
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 			LogDestination::Xdg { dname, fname, .. } => LogDestination::Xdg {
 				dname,
 				fname,
