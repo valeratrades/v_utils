@@ -48,6 +48,9 @@ pub mod __internal {
 
 	#[cfg(feature = "xdg")]
 	pub extern crate xdg;
+
+	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
+	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
 }
 
 #[cfg(feature = "distributions")]

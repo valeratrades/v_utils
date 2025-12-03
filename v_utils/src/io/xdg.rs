@@ -1,3 +1,103 @@
+/// Returns the home directory path, platform-aware.
+/// On Unix: `$HOME`
+/// On Windows: `%USERPROFILE%`
+#[inline]
+pub fn home_dir() -> String {
+	#[cfg(windows)]
+	{
+		std::env::var("USERPROFILE").expect("USERPROFILE environment variable not set")
+	}
+	#[cfg(not(windows))]
+	{
+		std::env::var("HOME").expect("HOME environment variable not set")
+	}
+}
+
+/// Returns the XDG config home fallback path, platform-aware.
+/// On Unix: `$XDG_CONFIG_HOME` or `$HOME/.config`
+/// On Windows: `%APPDATA%`
+#[inline]
+pub fn xdg_config_fallback() -> String {
+	std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+		#[cfg(windows)]
+		{
+			std::env::var("APPDATA").expect("APPDATA environment variable not set")
+		}
+		#[cfg(not(windows))]
+		{
+			format!("{}/.config", home_dir())
+		}
+	})
+}
+
+/// Returns the XDG data home fallback path, platform-aware.
+/// On Unix: `$XDG_DATA_HOME` or `$HOME/.local/share`
+/// On Windows: `%LOCALAPPDATA%`
+#[inline]
+pub fn xdg_data_fallback() -> String {
+	std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
+		#[cfg(windows)]
+		{
+			std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable not set")
+		}
+		#[cfg(not(windows))]
+		{
+			format!("{}/.local/share", home_dir())
+		}
+	})
+}
+
+/// Returns the XDG cache home fallback path, platform-aware.
+/// On Unix: `$XDG_CACHE_HOME` or `$HOME/.cache`
+/// On Windows: `%LOCALAPPDATA%\cache`
+#[inline]
+pub fn xdg_cache_fallback() -> String {
+	std::env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
+		#[cfg(windows)]
+		{
+			format!("{}/cache", std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable not set"))
+		}
+		#[cfg(not(windows))]
+		{
+			format!("{}/.cache", home_dir())
+		}
+	})
+}
+
+/// Returns the XDG state home fallback path, platform-aware.
+/// On Unix: `$XDG_STATE_HOME` or `$HOME/.local/state`
+/// On Windows: `%LOCALAPPDATA%\state`
+#[inline]
+pub fn xdg_state_fallback() -> String {
+	std::env::var("XDG_STATE_HOME").unwrap_or_else(|_| {
+		#[cfg(windows)]
+		{
+			format!("{}/state", std::env::var("LOCALAPPDATA").expect("LOCALAPPDATA environment variable not set"))
+		}
+		#[cfg(not(windows))]
+		{
+			format!("{}/.local/state", home_dir())
+		}
+	})
+}
+
+/// Returns the XDG runtime dir fallback path, platform-aware.
+/// On Unix: `$XDG_RUNTIME_DIR` or `$HOME/.runtime`
+/// On Windows: `%TEMP%`
+#[inline]
+pub fn xdg_runtime_fallback() -> String {
+	std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| {
+		#[cfg(windows)]
+		{
+			std::env::var("TEMP").expect("TEMP environment variable not set")
+		}
+		#[cfg(not(windows))]
+		{
+			format!("{}/.runtime", home_dir())
+		}
+	})
+}
+
 #[cfg(feature = "xdg")]
 mod xdg_with_lib {
 	macro_rules! impl_xdg_dir_fn {
@@ -47,12 +147,12 @@ mod xdg_with_lib {
 #[cfg(not(feature = "xdg"))]
 mod xdg_no_deps {
 	macro_rules! impl_backup_xdg_dir_fn {
-		($method_name:ident, $env_var:expr, $fallback_dir:expr) => {
-			#[doc = concat!("Will create $", stringify!($env_var), "/<crate_name>/$subpath/ (\"\" for no subpath; subpath is a **DIR**)")]
+		($method_name:ident, $fallback_fn:path) => {
+			#[doc = concat!("Will create xdg_dir/<crate_name>/$subpath/ (\"\" for no subpath; subpath is a **DIR**)")]
 			#[macro_export]
 			macro_rules! $method_name {
 				($subpath: expr) => {{
-					let base_path = std::env::var($env_var).unwrap_or_else(|_| format!("{}/{}", std::env::var("HOME").unwrap(), $fallback_dir));
+					let base_path = $fallback_fn();
 					let mut dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
 					if !$subpath.is_empty() {
 						dir = dir.join($subpath);
@@ -65,12 +165,12 @@ mod xdg_no_deps {
 	}
 
 	macro_rules! impl_backup_xdg_file_fn {
-		($method_name:ident, $env_var:expr, $fallback_dir:expr) => {
-			#[doc = concat!("Will create $", stringify!($env_var), "/<crate_name>/ and return the path to the file specified in $subpath")]
+		($method_name:ident, $fallback_fn:path) => {
+			#[doc = concat!("Will create xdg_dir/<crate_name>/ and return the path to the file specified in $subpath")]
 			#[macro_export]
 			macro_rules! $method_name {
 				($subpath: expr) => {{
-					let base_path = std::env::var($env_var).unwrap_or_else(|_| format!("{}/{}", std::env::var("HOME").unwrap(), $fallback_dir));
+					let base_path = $fallback_fn();
 					let base_dir = std::path::PathBuf::from(base_path).join(env!("CARGO_PKG_NAME"));
 					let path = std::path::PathBuf::from($subpath);
 					let parent = path.parent().unwrap_or(std::path::Path::new(""));
@@ -82,14 +182,14 @@ mod xdg_no_deps {
 		};
 	}
 
-	impl_backup_xdg_dir_fn!(xdg_data_dir, "XDG_DATA_HOME", ".local/share");
-	impl_backup_xdg_file_fn!(xdg_data_file, "XDG_DATA_HOME", ".local/share");
-	impl_backup_xdg_dir_fn!(xdg_config_dir, "XDG_CONFIG_HOME", ".config");
-	impl_backup_xdg_file_fn!(xdg_config_file, "XDG_CONFIG_HOME", ".config");
-	impl_backup_xdg_dir_fn!(xdg_cache_dir, "XDG_CACHE_HOME", ".cache");
-	impl_backup_xdg_file_fn!(xdg_cache_file, "XDG_CACHE_HOME", ".cache");
-	impl_backup_xdg_dir_fn!(xdg_state_dir, "XDG_STATE_HOME", ".local/state");
-	impl_backup_xdg_file_fn!(xdg_state_file, "XDG_STATE_HOME", ".local/state");
-	impl_backup_xdg_dir_fn!(xdg_runtime_dir, "XDG_RUNTIME_DIR", ".runtime");
-	impl_backup_xdg_file_fn!(xdg_runtime_file, "XDG_RUNTIME_DIR", ".runtime");
+	impl_backup_xdg_dir_fn!(xdg_data_dir, $crate::io::xdg::xdg_data_fallback);
+	impl_backup_xdg_file_fn!(xdg_data_file, $crate::io::xdg::xdg_data_fallback);
+	impl_backup_xdg_dir_fn!(xdg_config_dir, $crate::io::xdg::xdg_config_fallback);
+	impl_backup_xdg_file_fn!(xdg_config_file, $crate::io::xdg::xdg_config_fallback);
+	impl_backup_xdg_dir_fn!(xdg_cache_dir, $crate::io::xdg::xdg_cache_fallback);
+	impl_backup_xdg_file_fn!(xdg_cache_file, $crate::io::xdg::xdg_cache_fallback);
+	impl_backup_xdg_dir_fn!(xdg_state_dir, $crate::io::xdg::xdg_state_fallback);
+	impl_backup_xdg_file_fn!(xdg_state_file, $crate::io::xdg::xdg_state_fallback);
+	impl_backup_xdg_dir_fn!(xdg_runtime_dir, $crate::io::xdg::xdg_runtime_fallback);
+	impl_backup_xdg_file_fn!(xdg_runtime_file, $crate::io::xdg::xdg_runtime_fallback);
 }
