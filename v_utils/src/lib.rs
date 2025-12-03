@@ -3,6 +3,15 @@
 #![allow(clippy::tabs_in_doc_comments)]
 #![feature(stmt_expr_attributes)]
 
+#[cfg(all(feature = "assert-wasm-compat", feature = "async-io"))]
+compile_error!("Feature `async-io` is not compatible with wasm.");
+
+#[cfg(all(feature = "assert-wasm-compat", feature = "full"))]
+compile_error!("Feature `full` is not compatible with wasm (pulls in console-subscriber with mio).");
+
+#[cfg(all(feature = "assert-wasm-compat", feature = "xdg"))]
+compile_error!("Feature `xdg` is not compatible with wasm.");
+
 // of course it's included unconditionally - the crate itself is called "v_utils"
 pub mod utils;
 
