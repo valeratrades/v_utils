@@ -176,8 +176,16 @@ impl From<&str> for Percent {
 //,}}}
 
 /// Signed percent wrapper that guarantees values are in the range [-1.0, 1.0] (i.e., -100% to 100%)
-#[derive(Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentS(Percent);
+
+impl std::ops::Deref for PercentS {
+	type Target = f64;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0.0
+	}
+}
 
 impl PercentS {
 	pub fn new(value: f64) -> Result<Self> {
@@ -206,8 +214,16 @@ impl<'de> Deserialize<'de> for PercentS {
 }
 
 /// Unsigned percent wrapper that guarantees values are in the range [0.0, 1.0] (i.e., 0% to 100%)
-#[derive(Clone, Copy, Debug, Default, Deref, DerefMut, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentU(Percent);
+
+impl std::ops::Deref for PercentU {
+	type Target = f64;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0.0
+	}
+}
 
 impl PercentU {
 	pub fn new(value: f64) -> Result<Self> {
