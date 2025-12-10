@@ -1,29 +1,100 @@
 use std::{
 	borrow::Cow,
 	fs::File,
-	io::Write,
+	io::{BufRead, BufReader, Seek, SeekFrom, Write},
 	path::PathBuf,
-	sync::{Arc, Mutex},
+	sync::{
+		Arc, Mutex,
+		atomic::{AtomicBool, Ordering},
+	},
+	thread,
+	time::Duration,
 };
 
 use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 
+/// Maximum log file size before trimming (20GB)
+const LOG_MAX_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
+/// How often to check log file size (1 minute)
+const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+
 /// Wrapper to allow Arc<Mutex<File>> to implement Write safely
 #[derive(Clone)]
 struct SharedFileWriter {
 	file: Arc<Mutex<File>>,
+	path: Arc<PathBuf>,
+	needs_trim: Arc<AtomicBool>,
+}
+
+impl SharedFileWriter {
+	fn do_trim(&self, file: &mut File) {
+		// Read the file content (open new handle for reading)
+		let lines: Vec<String> = match std::fs::File::open(self.path.as_ref()) {
+			Ok(f) => BufReader::new(f).lines().filter_map(|l| l.ok()).collect(),
+			Err(_) => return,
+		};
+
+		let total_lines = lines.len();
+		if total_lines < 1000 {
+			return;
+		}
+
+		// Keep the last 75% of lines
+		let lines_to_skip = total_lines / 4;
+		let remaining_lines = &lines[lines_to_skip..];
+
+		// Truncate and rewrite the file
+		if file.set_len(0).is_err() {
+			return;
+		}
+		if file.seek(SeekFrom::Start(0)).is_err() {
+			return;
+		}
+
+		for line in remaining_lines {
+			let _ = writeln!(file, "{}", line);
+		}
+		let _ = file.flush();
+
+		eprintln!("[log-guardian] Trimmed log file: removed {} lines, {} remaining", lines_to_skip, remaining_lines.len());
+	}
 }
 
 impl Write for SharedFileWriter {
 	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-		self.file.lock().unwrap().write(buf)
+		let mut file = self.file.lock().unwrap();
+
+		// Check if guardian signaled we need to trim
+		if self.needs_trim.swap(false, Ordering::Relaxed) {
+			self.do_trim(&mut file);
+		}
+
+		file.write(buf)
 	}
 
 	fn flush(&mut self) -> std::io::Result<()> {
 		self.file.lock().unwrap().flush()
 	}
+}
+
+/// Spawns a guardian thread that monitors log file size and signals when trim is needed.
+fn spawn_log_guardian(path: Arc<PathBuf>, needs_trim: Arc<AtomicBool>) {
+	thread::spawn(move || {
+		loop {
+			thread::sleep(LOG_CHECK_INTERVAL);
+
+			let file_size = match std::fs::metadata(path.as_ref()) {
+				Ok(m) => m.len(),
+				Err(_) => continue,
+			};
+
+			if file_size > LOG_MAX_SIZE_BYTES {
+				needs_trim.store(true, Ordering::Relaxed);
+			}
+		}
+	});
 }
 
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
@@ -84,7 +155,18 @@ pub fn init_subscriber(log_destination: LogDestination) {
 			.open(&path)
 			.unwrap_or_else(|_| panic!("Couldn't open {} for writing. If its parent directory doesn't exist, create it manually first", path.display()));
 
-		let shared_writer = SharedFileWriter { file: Arc::new(Mutex::new(file)) };
+		let file_arc = Arc::new(Mutex::new(file));
+		let path_arc = Arc::new(path);
+		let needs_trim = Arc::new(AtomicBool::new(false));
+
+		// Spawn guardian thread to monitor log file size
+		spawn_log_guardian(Arc::clone(&path_arc), Arc::clone(&needs_trim));
+
+		let shared_writer = SharedFileWriter {
+			file: file_arc,
+			path: path_arc,
+			needs_trim,
+		};
 
 		setup(
 			Box::new(move || {
