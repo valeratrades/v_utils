@@ -1234,6 +1234,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 }
 
 ///NB: assumes that the child struct and the field containing it on parent are **named the same** (with adjustment for casing).
+/// Supports nested structs via `#[settings(flatten)]` attribute - nesting propagates the prefix chain.
 #[proc_macro_derive(SettingsBadlyNested, attributes(settings))]
 pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
@@ -1249,33 +1250,77 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
-	let prefixed_flags = fields.iter().map(|field| {
+	let prefixed_flags = fields.iter().filter_map(|field| {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let clap_ty = clap_compatible_option_wrapped_ty(ty);
-		let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
-		quote! {
-			#[arg(long)]
-			#prefixed_field_name: #clap_ty,
+		// Check for #[settings(flatten)] attribute
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		if has_flatten_attr {
+			// For flattened nested structs, include the nested struct's flags
+			use quote::ToTokens as _;
+			// Extract inner type if Option<T>
+			let inner_type = if let syn::Type::Path(type_path) = ty {
+				if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
+			} else {
+				ty
+			};
+			let type_name = inner_type.to_token_stream().to_string();
+			// The nested struct generates __SettingsBadlyNestedNested{ParentPrefix}{TypeName}
+			let nested_struct_name = format_ident!("__SettingsBadlyNestedNested{}{}", name, type_name);
+			Some(quote! {
+				#[clap(flatten)]
+				#ident: #nested_struct_name,
+			})
+		} else {
+			let clap_ty = clap_compatible_option_wrapped_ty(ty);
+			let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
+			Some(quote! {
+				#[arg(long)]
+				#prefixed_field_name: #clap_ty,
+			})
 		}
 	});
 
-	let config_inserts = fields.iter().map(|field| {
+	// Generate config inserts for no-prefix version (called from Settings)
+	let config_inserts_no_prefix = fields.iter().filter_map(|field| {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
-		let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
-		let config_value_path = format!("{}.{}", snake_case_name, ident.as_ref().unwrap());
-		let source_tag = format!("flags:{}", snake_case_name);
-		quote! {
-			if let Some(#ident) = &self.#prefixed_field_name {
-				map.insert(
-					#config_value_path.to_owned(),
-					v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
-				);
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
 			}
+			false
+		});
+
+		if has_flatten_attr {
+			Some(quote! {
+				let _ = &self.#ident.collect_config_with_prefix(map, #snake_case_name);
+			})
+		} else {
+			let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
+			let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
+			let config_value_path = format!("{}.{}", snake_case_name, ident.as_ref().unwrap());
+			let source_tag = format!("flags:{}", snake_case_name);
+			Some(quote! {
+				if let Some(#ident) = &self.#prefixed_field_name {
+					map.insert(
+						#config_value_path.to_owned(),
+						v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
+					);
+				}
+			})
 		}
 	});
 
@@ -1286,7 +1331,118 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 			#(#prefixed_flags)*
 		}
 		impl #produced_struct_name {
+			/// Called from Settings - uses own name as prefix base
 			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
+				#(#config_inserts_no_prefix)*
+			}
+		}
+	};
+
+	//_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
+	TokenStream::from(expanded)
+}
+
+/// For double (or deeper) nested settings. The parent prefix is passed through the type name.
+/// Use on structs that are nested within `SettingsBadlyNested` structs.
+#[proc_macro_derive(SettingsBadlyNestedNested, attributes(settings))]
+pub fn derive_settings_badly_nested_nested(input: TokenStream) -> TokenStream {
+	// Parse the attribute to get parent prefix
+	let ast = parse_macro_input!(input as DeriveInput);
+	let name = &ast.ident;
+	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	// Find the #[settings(parent = "ParentName")] attribute
+	let parent_name = ast
+		.attrs
+		.iter()
+		.find_map(|attr| {
+			if attr.path().is_ident("settings") {
+				attr.parse_args_with(|input: syn::parse::ParseStream| {
+					let ident: syn::Ident = input.parse()?;
+					if ident == "parent" {
+						let _: Token![=] = input.parse()?;
+						let lit: syn::LitStr = input.parse()?;
+						Ok(Some(lit.value()))
+					} else {
+						Ok(None)
+					}
+				})
+				.ok()
+				.flatten()
+			} else {
+				None
+			}
+		})
+		.expect("SettingsBadlyNestedNested requires #[settings(parent = \"ParentTypeName\")] attribute");
+
+	let parent_snake = AsSnakeCase(&parent_name).to_string();
+	let full_prefix = format!("{}_{}", parent_snake, snake_case_name);
+
+	let prefixed_flags = fields.iter().filter_map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		// Check for #[settings(flatten)] attribute - could support even deeper nesting in future
+		let has_flatten_attr = field.attrs.iter().any(|attr| {
+			if attr.path().is_ident("settings") {
+				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+					return nested == "flatten";
+				}
+			}
+			false
+		});
+
+		if has_flatten_attr {
+			// For now, error on triple nesting - can be extended later
+			panic!("Triple nesting not yet supported in SettingsBadlyNestedNested");
+		}
+
+		let clap_ty = clap_compatible_option_wrapped_ty(ty);
+		let prefixed_field_name = format_ident!("{}_{}", full_prefix, ident.as_ref().unwrap());
+		Some(quote! {
+			#[arg(long)]
+			#prefixed_field_name: #clap_ty,
+		})
+	});
+
+	let config_inserts = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+
+		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
+		let prefixed_field_name = format_ident!("{}_{}", full_prefix, ident.as_ref().unwrap());
+		let field_name_str = ident.as_ref().unwrap().to_string();
+		let source_tag = format!("flags:{}", full_prefix);
+		quote! {
+			if let Some(#ident) = &self.#prefixed_field_name {
+				let config_path = format!("{}.{}", prefix, #field_name_str);
+				map.insert(
+					config_path,
+					v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
+				);
+			}
+		}
+	});
+
+	let produced_struct_name = format_ident!("__SettingsBadlyNestedNested{}{}", parent_name, name);
+	let expanded = quote! {
+		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
+		pub struct #produced_struct_name {
+			#(#prefixed_flags)*
+		}
+		impl #produced_struct_name {
+			/// Called from parent SettingsBadlyNested with prefix chain
+			pub fn collect_config_with_prefix(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>, parent_prefix: &str) {
+				let prefix = format!("{}.{}", parent_prefix, #snake_case_name);
 				#(#config_inserts)*
 			}
 		}
