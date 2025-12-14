@@ -1378,3 +1378,162 @@ fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream
 	}
 }
 //,}}}
+
+/// Derive macro that generates a `LiveSettings` struct for hot-reloading configuration.
+/// Requires `Settings` to be derived on the same struct first.
+///
+/// # Generated struct
+/// Creates a `LiveSettings` struct with:
+/// - `new(flags: SettingsFlags, update_freq: Duration) -> Result<Self>` - constructor
+/// - `config(&self) -> ConfigStruct` - returns current config, reloading if file changed
+/// - `initial(&self) -> ConfigStruct` - returns initial config without reload check
+///
+/// # Example
+/// ```ignore
+/// #[derive(MyConfigPrimitives, Settings, LiveSettings)]
+/// pub struct AppConfig {
+///     pub host: String,
+///     pub port: u16,
+/// }
+///
+/// // Usage:
+/// let live = LiveSettings::new(cli.settings, Duration::from_secs(5))?;
+/// let config = live.config(); // Hot-reloads if file changed
+/// ```
+#[cfg(feature = "cli")]
+#[proc_macro_derive(LiveSettings)]
+pub fn derive_live_settings(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+
+	#[cfg(feature = "xdg")]
+	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
+		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
+		let xdg_conf_dir = xdg_dirs.get_config_home().unwrap().parent().unwrap().display().to_string();
+	};
+	#[cfg(not(feature = "xdg"))]
+	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
+		let xdg_conf_dir = ::v_utils::__internal::xdg_config_fallback();
+	};
+
+	let expanded = quote! {
+		/// Thread-safe config wrapper with automatic config file hot-reload.
+		/// When `config()` is called, checks if the config file has been modified
+		/// since last load and reloads if necessary (with configurable throttling).
+		#[derive(Clone)]
+		pub struct LiveSettings {
+			config_path: Option<std::path::PathBuf>,
+			inner: std::sync::Arc<std::sync::RwLock<__LiveSettingsTimeCapsule>>,
+			flags: SettingsFlags,
+		}
+
+		struct __LiveSettingsTimeCapsule {
+			value: #name,
+			loaded_at: std::time::SystemTime,
+			update_freq: std::time::Duration,
+		}
+
+		impl std::fmt::Debug for LiveSettings {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				f.debug_struct("LiveSettings").field("config_path", &self.config_path).finish()
+			}
+		}
+
+		impl LiveSettings {
+			/// Create a new LiveSettings from CLI flags.
+			/// `update_freq` controls how often the file modification time is checked.
+			pub fn new(flags: SettingsFlags, update_freq: std::time::Duration) -> ::v_utils::__internal::eyre::Result<Self> {
+				let config_path = Self::resolve_config_path(&flags);
+				let settings = #name::try_build(flags.clone())?;
+
+				Ok(Self {
+					config_path,
+					inner: std::sync::Arc::new(std::sync::RwLock::new(__LiveSettingsTimeCapsule {
+						value: settings,
+						loaded_at: std::time::SystemTime::now(),
+						update_freq,
+					})),
+					flags,
+				})
+			}
+
+			fn resolve_config_path(flags: &SettingsFlags) -> Option<std::path::PathBuf> {
+				if let Some(ref path) = flags.config {
+					return Some(path.0.clone());
+				}
+
+				let app_name = env!("CARGO_PKG_NAME");
+				#xdg_conf_dir
+
+				let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
+				if std::path::Path::new(&nix_path).exists() {
+					return Some(std::path::PathBuf::from(nix_path));
+				}
+
+				let location_bases = [
+					format!("{xdg_conf_dir}/{app_name}"),
+					format!("{xdg_conf_dir}/{app_name}/config"),
+				];
+				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
+
+				for base in location_bases.iter() {
+					for ext in supported_exts.iter() {
+						let path = format!("{base}.{ext}");
+						if std::path::Path::new(&path).exists() {
+							return Some(std::path::PathBuf::from(path));
+						}
+					}
+				}
+
+				None
+			}
+
+			/// Get the current settings, reloading from file if it has changed.
+			pub fn config(&self) -> #name {
+				let now = std::time::SystemTime::now();
+
+				let should_reload = {
+					let capsule = self.inner.read().unwrap();
+					let age = now.duration_since(capsule.loaded_at).unwrap_or_default();
+
+					if age < capsule.update_freq {
+						return capsule.value.clone();
+					}
+
+					self.config_path
+						.as_ref()
+						.and_then(|path| std::fs::metadata(path).ok())
+						.and_then(|meta| meta.modified().ok())
+						.map(|file_mtime| {
+							let since_file_change = now.duration_since(file_mtime).unwrap_or_default();
+							since_file_change < age
+						})
+						.unwrap_or(false)
+				};
+
+				if should_reload {
+					if let Ok(new_settings) = #name::try_build(self.flags.clone()) {
+						let mut capsule = self.inner.write().unwrap();
+						capsule.value = new_settings;
+						capsule.loaded_at = now;
+					} else {
+						let mut capsule = self.inner.write().unwrap();
+						capsule.loaded_at = now;
+					}
+				} else {
+					let mut capsule = self.inner.write().unwrap();
+					capsule.loaded_at = now;
+				}
+
+				self.inner.read().unwrap().value.clone()
+			}
+
+			/// Get a direct reference to the initial settings (no reload check).
+			pub fn initial(&self) -> #name {
+				self.inner.read().unwrap().value.clone()
+			}
+		}
+	};
+
+	TokenStream::from(expanded)
+}
