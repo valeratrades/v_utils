@@ -11,9 +11,8 @@ pub struct AppConfig {
 	database: Database,
 }
 
-/// First level of nesting - Database config with nested Pool config
+/// First level of nesting - no prefix needed, defaults to "database"
 #[derive(Clone, Debug, Deserialize, SettingsNested)]
-#[settings(prefix = "database")]
 pub struct Database {
 	url: String,
 	#[settings(flatten)]

@@ -1234,19 +1234,20 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 /// Marks a struct as a nested settings section. Use with `#[settings(flatten)]` in parent.
 ///
-/// The struct must specify its prefix using `#[settings(prefix = "path")]` where path uses
-/// underscores for CLI flags (e.g., "database" or "database_pool" for deeper nesting).
+/// For first-level nesting, no prefix is needed - it defaults to the struct's snake_case name.
+/// For deeper nesting, specify `#[settings(prefix = "parent_child")]` with the full path.
 ///
 /// # Example
 /// ```ignore
+/// // First level - no prefix needed, defaults to "database"
 /// #[derive(Deserialize, SettingsNested)]
-/// #[settings(prefix = "database")]
 /// pub struct Database {
 ///     url: String,
 ///     #[settings(flatten)]
 ///     pool: Pool,
 /// }
 ///
+/// // Second level - must specify full prefix path
 /// #[derive(Deserialize, SettingsNested)]
 /// #[settings(prefix = "database_pool")]
 /// pub struct Pool {
@@ -1260,6 +1261,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
+	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
 	let fields = if let Data::Struct(syn::DataStruct {
 		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
 		..
@@ -1270,7 +1272,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
-	// Find the #[settings(prefix = "...")] attribute
+	// Find the optional #[settings(prefix = "...")] attribute, default to snake_case name
 	let prefix = ast
 		.attrs
 		.iter()
@@ -1292,7 +1294,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 				None
 			}
 		})
-		.expect("SettingsNested requires #[settings(prefix = \"...\")] attribute");
+		.unwrap_or(snake_case_name); // Default to struct's snake_case name
 
 	// Config path uses dots (e.g., "database.pool")
 	let config_prefix = prefix.replace('_', ".");
