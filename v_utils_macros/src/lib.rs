@@ -1390,7 +1390,7 @@ fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream
 ///
 /// # Example
 /// ```ignore
-/// #[derive(MyConfigPrimitives, Settings, LiveSettings)]
+/// #[derive(LiveSettings, MyConfigPrimitives, Settings)]
 /// pub struct AppConfig {
 ///     pub host: String,
 ///     pub port: u16,

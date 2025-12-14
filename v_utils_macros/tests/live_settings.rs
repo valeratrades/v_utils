@@ -4,7 +4,7 @@ use clap::Parser;
 use v_utils_macros::{LiveSettings, Settings};
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings, LiveSettings)]
+#[derive(Clone, Debug, LiveSettings, v_utils_macros::MyConfigPrimitives, Settings)]
 pub struct AppConfig {
 	host: String,
 	port: u16,
