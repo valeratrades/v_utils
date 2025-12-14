@@ -54,6 +54,4 @@ fn main() {
 	let _ = flags;
 	let _ = check_config_method;
 	let _ = check_initial_method;
-
-	println!("LiveSettings derive macro test passed!");
 }

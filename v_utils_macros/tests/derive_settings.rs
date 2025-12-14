@@ -60,16 +60,16 @@ fn main() {
 		port: Some("8080".to_string()),
 		debug: Some(true),
 		workers: Some("4".to_string()),
-		database: __SettingsBadlyNestedDatabase {
+		database: __SettingsNestedDatabase {
 			database_url: Some("postgres://localhost".to_string()),
 			database_max_connections: Some("10".to_string()),
 		},
-		risk_tiers: __SettingsBadlyNestedRiskTiers {
+		risk_tiers: __SettingsNestedRiskTiers {
 			risk_tiers_a: Some("0.01".to_string()),
 			risk_tiers_b: Some("0.02".to_string()),
 		},
 		// Optional flattened field - uses same nested struct pattern
-		logging: __SettingsBadlyNestedLogging {
+		logging: __SettingsNestedLogging {
 			logging_level: Some("debug".to_string()),
 			logging_file: Some("/var/log/app.log".to_string()),
 		},
@@ -103,15 +103,15 @@ fn main() {
 			port: None,
 			debug: None,
 			workers: None,
-			database: __SettingsBadlyNestedDatabase {
+			database: __SettingsNestedDatabase {
 				database_url: None,
 				database_max_connections: None,
 			},
-			risk_tiers: __SettingsBadlyNestedRiskTiers {
+			risk_tiers: __SettingsNestedRiskTiers {
 				risk_tiers_a: None,
 				risk_tiers_b: None,
 			},
-			logging: __SettingsBadlyNestedLogging {
+			logging: __SettingsNestedLogging {
 				logging_level: None,
 				logging_file: None,
 			},
@@ -127,15 +127,15 @@ fn main() {
 		port: None,
 		debug: None,
 		workers: None,
-		database: __SettingsBadlyNestedDatabase {
+		database: __SettingsNestedDatabase {
 			database_url: None,
 			database_max_connections: None,
 		},
-		risk_tiers: __SettingsBadlyNestedRiskTiers {
+		risk_tiers: __SettingsNestedRiskTiers {
 			risk_tiers_a: None,
 			risk_tiers_b: None,
 		},
-		logging: __SettingsBadlyNestedLogging {
+		logging: __SettingsNestedLogging {
 			logging_level: None,
 			logging_file: None,
 		},

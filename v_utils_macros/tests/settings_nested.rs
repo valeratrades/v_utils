@@ -1,6 +1,6 @@
 use clap::Parser;
 use serde::Deserialize;
-use v_utils_macros::{Settings, SettingsBadlyNested, SettingsBadlyNestedNested};
+use v_utils_macros::{Settings, SettingsNested};
 
 /// Top-level config with a nested Database section
 #[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
@@ -12,7 +12,8 @@ pub struct AppConfig {
 }
 
 /// First level of nesting - Database config with nested Pool config
-#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[settings(prefix = "database")]
 pub struct Database {
 	url: String,
 	#[settings(flatten)]
@@ -20,8 +21,9 @@ pub struct Database {
 }
 
 /// Second level of nesting - Pool config (doubly nested)
-#[derive(Clone, Debug, Deserialize, SettingsBadlyNestedNested)]
-#[settings(parent = "Database")]
+/// Note: prefix is the full path with underscores
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[settings(prefix = "database_pool")]
 pub struct Pool {
 	min_size: u32,
 	max_size: u32,
@@ -45,9 +47,9 @@ fn test_double_nesting() {
 		config: None,
 		host: Some("localhost".to_string()),
 		port: Some("8080".to_string()),
-		database: __SettingsBadlyNestedDatabase {
+		database: __SettingsNestedDatabase {
 			database_url: Some("postgres://localhost/mydb".to_string()),
-			pool: __SettingsBadlyNestedNestedDatabasePool {
+			pool: __SettingsNestedPool {
 				database_pool_min_size: Some("5".to_string()),
 				database_pool_max_size: Some("20".to_string()),
 				database_pool_timeout_ms: Some("5000".to_string()),
