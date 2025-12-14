@@ -1,7 +1,9 @@
 pub mod eyre;
 pub use eyre::*;
 
+#[deprecated(since = "0.8.0", note = "will be removed in next major version; use the `snapshot_fonts` crate instead")]
 pub mod snapshots;
+#[allow(deprecated)]
 pub use snapshots::*;
 
 pub mod format;

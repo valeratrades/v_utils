@@ -29,6 +29,7 @@ impl PlotData {
 	}
 }
 
+#[deprecated(since = "0.8.0", note = "will be removed in next major version; use the `snapshot_fonts` crate instead")]
 #[derive(Clone, Debug, Default)]
 pub struct SnapshotP {
 	prices: Vec<f64>,
@@ -37,6 +38,7 @@ pub struct SnapshotP {
 	height: usize,
 }
 /// Very not DRY
+#[allow(deprecated)]
 impl SnapshotP {
 	pub fn build<T: Into<f64> + Copy>(prices: &[T]) -> Self {
 		SnapshotP {
@@ -207,6 +209,8 @@ fn join_str_blocks_v(left: String, right: String) -> String {
 ///
 /// # Architecture
 /// Uses [SnapshotP] to build the plot, for finer control use it instead.
+#[deprecated(since = "0.8.0", note = "will be removed in next major version; use the `snapshot_fonts` crate instead")]
+#[allow(deprecated)]
 pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize, Option<T>)]) -> String {
 	let prices = prices.iter().map(|x| (*x).into()).collect::<Vec<f64>>();
 	let orders = orders.iter().map(|(i, x)| (*i, x.map(|x| x.into()))).collect::<Vec<(usize, Option<f64>)>>();

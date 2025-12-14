@@ -962,23 +962,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let xdg_conf_dir = ::v_utils::__internal::xdg_config_fallback();
 	};
 
-	// Generate field lists for validation (exclude skipped fields)
-	let all_field_names: Vec<_> = fields
-		.iter()
-		.filter_map(|f| {
-			// Check if field has #[settings(skip)]
-			let has_skip_attr = f.attrs.iter().any(|attr| {
-				if attr.path().is_ident("settings") {
-					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-						return nested == "skip";
-					}
-				}
-				false
-			});
-
-			if has_skip_attr { None } else { Some(f.ident.as_ref().unwrap().to_string()) }
-		})
-		.collect();
+	// Generate field lists for validation (include all fields)
+	// Note: #[settings(skip)] and #[settings(flatten)] only affect CLI flag generation,
+	// not config file validation - all fields are valid in config files
+	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
