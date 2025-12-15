@@ -928,6 +928,42 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///    - `~/.config/<app_name>.{toml,json,yaml,json5,ron,ini}`
 ///    - `~/.config/<app_name>/config.{toml,json,yaml,json5,ron,ini}`
 ///
+/// # Nesting
+/// Use `#[settings(flatten)]` on fields to include nested config sections. The nested struct
+/// must derive `SettingsNested`.
+///
+/// ```ignore
+/// #[derive(MyConfigPrimitives, Settings)]
+/// pub struct AppConfig {
+///     pub host: String,
+///     #[settings(flatten)]
+///     pub database: Database,
+/// }
+///
+/// // First level - no prefix needed, defaults to "database"
+/// #[derive(Deserialize, SettingsNested)]
+/// pub struct Database {
+///     pub url: String,
+///     #[settings(flatten)]
+///     pub pool: Pool,
+/// }
+///
+/// // Second level - must specify full prefix path
+/// #[derive(Deserialize, SettingsNested)]
+/// #[settings(prefix = "database_pool")]
+/// pub struct Pool {
+///     pub min_size: u32,
+///     pub max_size: u32,
+/// }
+/// ```
+///
+/// This generates CLI flags: `--database-url`, `--database-pool-min-size`, etc.
+/// Config file paths use dots: `database.url`, `database.pool.min_size`, etc.
+///
+/// For first-level nesting, `SettingsNested` uses the struct's snake_case name as prefix.
+/// For deeper nesting, you must specify `#[settings(prefix = "parent_child")]` with the
+/// full underscore-separated path.
+///
 /// # Example
 /// ```ignore
 /// #[derive(MyConfigPrimitives, Settings)]
