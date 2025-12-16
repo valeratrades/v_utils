@@ -67,3 +67,49 @@ fn test_double_nesting() {
 	// Verify CLI struct compiles with flattened settings
 	let _build_exists: fn(SettingsFlags) -> Result<AppConfig, v_utils::__internal::eyre::Report> = AppConfig::try_build;
 }
+
+#[test]
+fn test_missing_fields_error_message() {
+	// Test that the error message lists ALL missing fields, not just the first one
+	let empty_flags = SettingsFlags {
+		config: None,
+		host: None, // Missing required field
+		port: None, // Missing required field
+		database: __SettingsNestedDatabase {
+			database_url: None, // Missing required field
+			pool: __SettingsNestedPool {
+				database_pool_min_size: None,   // Missing required field
+				database_pool_max_size: None,   // Missing required field
+				database_pool_timeout_ms: None, // Missing required field
+			},
+		},
+	};
+
+	let result = AppConfig::try_build(empty_flags);
+	assert!(result.is_err(), "Should fail with missing required fields");
+
+	let err_msg = result.unwrap_err().to_string();
+
+	// Verify the error message mentions all missing fields
+	assert!(err_msg.contains("host"), "Error should mention missing 'host' field: {}", err_msg);
+	assert!(err_msg.contains("port"), "Error should mention missing 'port' field: {}", err_msg);
+	assert!(err_msg.contains("database.url"), "Error should mention missing 'database.url' field: {}", err_msg);
+	assert!(
+		err_msg.contains("database.pool.min_size"),
+		"Error should mention missing 'database.pool.min_size' field: {}",
+		err_msg
+	);
+	assert!(
+		err_msg.contains("database.pool.max_size"),
+		"Error should mention missing 'database.pool.max_size' field: {}",
+		err_msg
+	);
+	assert!(
+		err_msg.contains("database.pool.timeout_ms"),
+		"Error should mention missing 'database.pool.timeout_ms' field: {}",
+		err_msg
+	);
+
+	// Verify the error message has the correct format (lists all fields)
+	assert!(err_msg.contains("Missing required configuration fields"), "Error should have correct prefix: {}", err_msg);
+}

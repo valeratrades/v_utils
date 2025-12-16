@@ -1005,6 +1005,76 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
+	// Collect information about required fields for validation
+	let required_field_checks: Vec<_> = fields
+		.iter()
+		.filter_map(|field| {
+			let ident = &field.ident;
+			let ty = &field.ty;
+			let field_name = ident.as_ref().unwrap().to_string();
+
+			// Check for settings attributes
+			let has_flatten_attr = field.attrs.iter().any(|attr| {
+				if attr.path().is_ident("settings") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "flatten";
+					}
+				}
+				false
+			});
+
+			let has_skip_attr = field.attrs.iter().any(|attr| {
+				if attr.path().is_ident("settings") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "skip";
+					}
+				}
+				false
+			});
+
+			// Skip fields with #[settings(skip)]
+			if has_skip_attr {
+				return None;
+			}
+
+			// Check if the type is Option<T> or Vec<T> (both are not strictly required)
+			let is_optional = if let syn::Type::Path(type_path) = ty {
+				is_option_type(type_path) || is_vec_type(type_path)
+			} else {
+				false
+			};
+
+			if has_flatten_attr {
+				// For flattened fields, delegate to the nested struct's validation
+				use quote::ToTokens as _;
+				let inner_type = if let syn::Type::Path(type_path) = ty {
+					if is_option_type(type_path) {
+						// Optional nested sections are not required
+						return None;
+					} else {
+						ty
+					}
+				} else {
+					ty
+				};
+				let type_name = inner_type.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("__SettingsNested{type_name}");
+				Some(quote! {
+					missing_fields.extend(#nested_struct_name::check_required_fields(&raw));
+				})
+			} else if !is_optional {
+				// Non-optional, non-flattened field - check if it exists
+				Some(quote! {
+					if raw.get_string(#field_name).is_err() {
+						missing_fields.push(#field_name.to_string());
+					}
+				})
+			} else {
+				None
+			}
+		})
+		.collect();
+
 	let try_build = quote_spanned! {name.span()=>
 		//#[cfg(not(feature = "hydrate"))]
 		impl #name {
@@ -1024,10 +1094,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
 
-				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
+				let mut config_source: Option<String> = None;
 				let (raw, file_config): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>) = match path {
 					Some(path) => {
+						config_source = Some(path.display().to_string());
 						// Check if it's a .nix file
 						if path.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false) {
 							let json_str = Self::eval_nix_file(path.to_str().unwrap())?;
@@ -1046,6 +1117,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						// Check for .nix file first
 						let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
 						if std::path::Path::new(&nix_path).exists() {
+							config_source = Some(nix_path.clone());
 							let json_str = Self::eval_nix_file(&nix_path)?;
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 							let file_only = file_builder.clone().build().ok();
@@ -1060,10 +1132,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 							}
 							let file_only = match conf_files_found.len() {
 								0 => {
-									err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+									config_source = None;
 									None
 								},
 								1 => {
+									config_source = Some(conf_files_found[0].display().to_string());
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
 									builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
 									file_builder.build().ok()
@@ -1082,7 +1155,32 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					Self::warn_unknown_fields(&file_cfg);
 				}
 
-				raw.try_deserialize().wrap_err(err_msg)
+				// Validate all required fields before attempting deserialization
+				let mut missing_fields: Vec<String> = Vec::new();
+				#(#required_field_checks)*
+
+				if !missing_fields.is_empty() {
+					let source_info = match &config_source {
+						Some(path) => format!(" (config: '{}')", path),
+						None => format!(" (no config file found, searched in {:?})", locations),
+					};
+					return Err(::v_utils::__internal::eyre::eyre!(
+						"Missing required configuration fields{}:\n  - {}",
+						source_info,
+						missing_fields.join("\n  - ")
+					));
+				}
+
+				match raw.try_deserialize() {
+					Ok(config) => Ok(config),
+					Err(e) => {
+						let source_info = match &config_source {
+							Some(path) => format!("from '{}'", path),
+							None => format!("(no config file found, searched in {:?})", locations),
+						};
+						Err(::v_utils::__internal::eyre::eyre!("Failed to deserialize config {}: {}", source_info, e))
+					}
+				}
 			}
 
 			fn warn_unknown_fields(file_config: &::v_utils::__internal::config::Config) {
@@ -1405,6 +1503,62 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		}
 	});
 
+	// Generate required field checks for nested validation
+	let required_field_checks: Vec<_> = fields
+		.iter()
+		.filter_map(|field| {
+			let ident = &field.ident;
+			let ty = &field.ty;
+			let field_name = ident.as_ref().unwrap().to_string();
+			let config_field_path = format!("{}.{}", config_prefix, field_name);
+
+			let has_flatten_attr = field.attrs.iter().any(|attr| {
+				if attr.path().is_ident("settings") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "flatten";
+					}
+				}
+				false
+			});
+
+			// Check if the type is Option<T> or Vec<T> (both are not strictly required)
+			let is_optional = if let syn::Type::Path(type_path) = ty {
+				is_option_type(type_path) || is_vec_type(type_path)
+			} else {
+				false
+			};
+
+			if has_flatten_attr {
+				// For flattened fields, delegate to the nested struct's validation
+				use quote::ToTokens as _;
+				let inner_type = if let syn::Type::Path(type_path) = ty {
+					if is_option_type(type_path) {
+						// Optional nested sections are not required
+						return None;
+					} else {
+						ty
+					}
+				} else {
+					ty
+				};
+				let type_name = inner_type.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("__SettingsNested{type_name}");
+				Some(quote! {
+					missing.extend(#nested_struct_name::check_required_fields(config));
+				})
+			} else if !is_optional {
+				// Non-optional field - check if it exists
+				Some(quote! {
+					if config.get_string(#config_field_path).is_err() {
+						missing.push(#config_field_path.to_string());
+					}
+				})
+			} else {
+				None
+			}
+		})
+		.collect();
+
 	let produced_struct_name = format_ident!("__SettingsNested{name}");
 	let expanded = quote! {
 		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
@@ -1414,6 +1568,14 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		impl #produced_struct_name {
 			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
 				#(#config_inserts)*
+			}
+
+			/// Check for missing required fields in this nested section.
+			/// Returns a list of missing field paths (e.g., "database.url").
+			pub fn check_required_fields(config: &::v_utils::__internal::config::Config) -> Vec<String> {
+				let mut missing: Vec<String> = Vec::new();
+				#(#required_field_checks)*
+				missing
 			}
 		}
 	};
@@ -1508,6 +1670,58 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		}
 	});
 
+	// Generate required field checks for nested validation (same as SettingsNested)
+	let required_field_checks: Vec<_> = fields
+		.iter()
+		.filter_map(|field| {
+			let ident = &field.ident;
+			let ty = &field.ty;
+			let field_name = ident.as_ref().unwrap().to_string();
+			let config_field_path = format!("{}.{}", snake_case_name, field_name);
+
+			let has_flatten_attr = field.attrs.iter().any(|attr| {
+				if attr.path().is_ident("settings") {
+					if let Ok(nested) = attr.parse_args::<syn::Ident>() {
+						return nested == "flatten";
+					}
+				}
+				false
+			});
+
+			let is_optional = if let syn::Type::Path(type_path) = ty {
+				is_option_type(type_path) || is_vec_type(type_path)
+			} else {
+				false
+			};
+
+			if has_flatten_attr {
+				use quote::ToTokens as _;
+				let inner_type = if let syn::Type::Path(type_path) = ty {
+					if is_option_type(type_path) {
+						return None;
+					} else {
+						ty
+					}
+				} else {
+					ty
+				};
+				let type_name = inner_type.to_token_stream().to_string();
+				let nested_struct_name = format_ident!("__SettingsNested{type_name}");
+				Some(quote! {
+					missing.extend(#nested_struct_name::check_required_fields(config));
+				})
+			} else if !is_optional {
+				Some(quote! {
+					if config.get_string(#config_field_path).is_err() {
+						missing.push(#config_field_path.to_string());
+					}
+				})
+			} else {
+				None
+			}
+		})
+		.collect();
+
 	// Use same naming as SettingsNested for compatibility
 	let produced_struct_name = format_ident!("__SettingsNested{name}");
 	let expanded = quote! {
@@ -1518,6 +1732,12 @@ pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
 		impl #produced_struct_name {
 			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
 				#(#config_inserts)*
+			}
+
+			pub fn check_required_fields(config: &::v_utils::__internal::config::Config) -> Vec<String> {
+				let mut missing: Vec<String> = Vec::new();
+				#(#required_field_checks)*
+				missing
 			}
 		}
 	};
