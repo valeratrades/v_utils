@@ -120,9 +120,9 @@ pub fn init_subscriber(log_destination: LogDestination) {
 
 		use tracing_subscriber::filter::LevelFilter;
 
-		// Conditionally create stderr layer
+		// Conditionally create stderr layer (WARN and ERROR go to stderr)
 		let stderr_layer = if stderr_errors {
-			Some(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(true).with_filter(LevelFilter::ERROR))
+			Some(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(true).with_filter(LevelFilter::WARN))
 		} else {
 			None
 		};
@@ -187,7 +187,10 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 		LogDestination::Xdg { dname, fname, stderr_errors } => {
 			let associated_state_home = xdg::BaseDirectories::with_prefix(dname).create_state_directory("").unwrap();
-			let filename = fname.as_ref().map(|s| format!("{s}.log")).unwrap_or_else(|| ".log".to_string());
+			let filename = fname
+				.as_ref()
+				.map(|s| if s.ends_with(".log") { s.to_string() } else { format!("{s}.log") })
+				.unwrap_or_else(|| ".log".to_string());
 			let log_path = associated_state_home.join(filename);
 			destination_is_path(log_path, stderr_errors, setup);
 		}
