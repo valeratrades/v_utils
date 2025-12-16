@@ -17,7 +17,13 @@ xdg = [
     "dep:xdg",
     "v_utils_macros/xdg",
 ] # have to separate it, because `xdg` lib behaves weirdly under wasm
-cli = ["v_utils_macros/cli", "dep:config", "dep:facet", "dep:facet-json", "dep:facet-toml"]
+cli = [
+    "v_utils_macros/cli",
+    "dep:config",
+    "dep:facet",
+    "dep:facet-json",
+    "dep:facet-toml",
+]
 async-io = ["dep:tokio", "tokio/io-std"]
 assert-wasm-compat = []
 trades = ["dep:jiff", "dep:strum"]
@@ -47,9 +53,6 @@ full = [
 async-sse = { version = "^5.1.0", optional = true }
 bytes = { version = "^1.10.1", optional = true }
 config = { version = "^0.15.18", optional = true }
-facet = { workspace = true, optional = true }
-facet-json = { version = "^0.32", optional = true }
-facet-toml = { version = "^0.32", optional = true }
 console-subscriber = { version = "0.5.0", optional = true }
 console_error_panic_hook = { version = "^0.1.7", optional = true }
 console_log = { version = "^1.0.0", optional = true }
@@ -59,6 +62,9 @@ derive_more = { version = "2.0.1", features = ["full"] }
 dirs = { version = "^6.0.0", optional = true }
 # unconditional
 eyre.workspace = true
+facet = { workspace = true, optional = true }
+facet-json = { version = "^0.32", optional = true }
+facet-toml = { version = "^0.32", optional = true }
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { version = "^0.3.31", optional = true }
 jiff = { version = "^0.2.15", features = ["serde"], optional = true }
