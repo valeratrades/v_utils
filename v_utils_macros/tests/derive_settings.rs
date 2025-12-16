@@ -1,10 +1,11 @@
+#![allow(dead_code, unused_imports)]
+
 use clap::Parser;
 use serde::Deserialize;
-use v_utils_macros::{Settings, SettingsBadlyNested};
+use v_utils_macros::{Settings, SettingsNested};
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
-pub struct AppConfig {
+struct AppConfig {
 	host: String,
 	port: u16,
 	debug: bool,
@@ -21,22 +22,29 @@ pub struct AppConfig {
 	internal_state: String,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
 pub struct Database {
 	url: String,
 	max_connections: u32,
+	#[settings(flatten)]
+	pool: Pool,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+/// Second level of nesting - Pool config (doubly nested)
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[settings(prefix = "database_pool")]
+pub struct Pool {
+	min_size: u32,
+	max_size: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
 pub struct RiskTiers {
 	a: String,
 	b: String,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug, Deserialize, SettingsBadlyNested)]
+#[derive(Clone, Debug, Deserialize, SettingsNested)]
 pub struct Logging {
 	level: String,
 	file: Option<String>,
@@ -45,7 +53,6 @@ pub struct Logging {
 /// Example of how to use Settings with Clap
 /// The Settings derive macro generates a `SettingsFlags` struct
 /// which can be flattened into your CLI struct
-#[allow(dead_code)]
 #[derive(Debug, Parser)]
 struct Cli {
 	#[clap(flatten)]
@@ -63,6 +70,10 @@ fn main() {
 		database: __SettingsNestedDatabase {
 			database_url: Some("postgres://localhost".to_string()),
 			database_max_connections: Some("10".to_string()),
+			pool: __SettingsNestedPool {
+				database_pool_min_size: Some("5".to_string()),
+				database_pool_max_size: Some("20".to_string()),
+			},
 		},
 		risk_tiers: __SettingsNestedRiskTiers {
 			risk_tiers_a: Some("0.01".to_string()),
@@ -106,6 +117,10 @@ fn main() {
 			database: __SettingsNestedDatabase {
 				database_url: None,
 				database_max_connections: None,
+				pool: __SettingsNestedPool {
+					database_pool_min_size: None,
+					database_pool_max_size: None,
+				},
 			},
 			risk_tiers: __SettingsNestedRiskTiers {
 				risk_tiers_a: None,
@@ -130,6 +145,10 @@ fn main() {
 		database: __SettingsNestedDatabase {
 			database_url: None,
 			database_max_connections: None,
+			pool: __SettingsNestedPool {
+				database_pool_min_size: None,
+				database_pool_max_size: None,
+			},
 		},
 		risk_tiers: __SettingsNestedRiskTiers {
 			risk_tiers_a: None,

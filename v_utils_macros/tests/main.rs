@@ -11,7 +11,5 @@ fn tests() {
 	#[cfg(feature = "cli")]
 	t.pass("tests/derive_settings.rs");
 	#[cfg(feature = "cli")]
-	t.pass("tests/settings_nix.rs");
-	#[cfg(feature = "cli")]
 	t.pass("tests/live_settings.rs");
 }

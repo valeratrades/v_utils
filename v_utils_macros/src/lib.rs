@@ -404,6 +404,30 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 	expanded.into()
 }
 
+/// Generates a custom serde Deserialize implementation for config deserialization with PrivateValue support.
+///
+/// This macro handles:
+/// - String fields: wrapped with PrivateValue for env var support (`{ env = "VAR_NAME" }`)
+/// - PathBuf fields: wrapped with ExpandedPath for tilde expansion
+/// - SecretString fields: wrapped with PrivateValue and converted to SecretString
+/// - Option<T> variants of the above
+/// - `#[private_value]` attribute for custom types that should use PrivateValue + FromStr
+/// - `#[primitives(skip)]` attribute to skip transformation for a field
+/// - `#[serde(...)]` attributes are forwarded to the generated Helper struct
+///
+/// # Example
+/// ```ignore
+/// #[derive(Clone, Debug, MyConfigPrimitives)]
+/// pub struct Config {
+///     api_key: String,                    // Supports { env = "API_KEY" }
+///     config_path: PathBuf,               // Supports ~ expansion
+///     secret: SecretString,               // Supports { env = "SECRET" }
+///     #[private_value]
+///     port: Port,                         // Custom type via FromStr
+///     #[primitives(skip)]
+///     raw_value: String,                  // No transformation
+/// }
+/// ```
 #[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
@@ -916,24 +940,25 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///
 /// # Features
 /// - Loads config from multiple sources with precedence: CLI flags > Environment variables > Config file
-/// - Supports multiple config formats: TOML, JSON, YAML, JSON5, RON, INI, and Nix
+/// - Supports multiple config formats: TOML, JSON, YAML, and Nix
 /// - Automatically searches for config files in XDG-compliant directories
 /// - Generates `SettingsFlags` struct for CLI integration with clap
+/// - Uses facet for deserialization with detailed error messages
 /// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
 ///
 /// # Config file resolution
 /// 1. If `--config` flag is provided, uses that file (supports .nix extension)
 /// 2. Otherwise, checks for `~/.config/<app_name>.nix` first
 /// 3. Falls back to searching for other formats in:
-///    - `~/.config/<app_name>.{toml,json,yaml,json5,ron,ini}`
-///    - `~/.config/<app_name>/config.{toml,json,yaml,json5,ron,ini}`
+///    - `~/.config/<app_name>.{toml,json,yaml}`
+///    - `~/.config/<app_name>/config.{toml,json,yaml}`
 ///
 /// # Nesting
 /// Use `#[settings(flatten)]` on fields to include nested config sections. The nested struct
 /// must derive `SettingsNested`.
 ///
 /// ```ignore
-/// #[derive(MyConfigPrimitives, Settings)]
+/// #[derive(Facet, MyConfigPrimitives, Settings)]
 /// pub struct AppConfig {
 ///     pub host: String,
 ///     #[settings(flatten)]
@@ -941,7 +966,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// // First level - no prefix needed, defaults to "database"
-/// #[derive(Deserialize, SettingsNested)]
+/// #[derive(Facet, SettingsNested)]
 /// pub struct Database {
 ///     pub url: String,
 ///     #[settings(flatten)]
@@ -949,7 +974,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// // Second level - must specify full prefix path
-/// #[derive(Deserialize, SettingsNested)]
+/// #[derive(Facet, SettingsNested)]
 /// #[settings(prefix = "database_pool")]
 /// pub struct Pool {
 ///     pub min_size: u32,
@@ -966,7 +991,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 /// ```ignore
-/// #[derive(MyConfigPrimitives, Settings)]
+/// #[derive(Facet, MyConfigPrimitives, Settings)]
 /// pub struct AppConfig {
 ///     pub host: String,
 ///     pub port: u16,
@@ -1006,7 +1031,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
 	let try_build = quote_spanned! {name.span()=>
-		//#[cfg(not(feature = "hydrate"))]
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
@@ -1024,7 +1048,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
 
-				let mut err_msg = "Could not construct v_utils::__internal::config from aggregated sources (conf, env, flags, cache).".to_owned();
+				let mut err_msg = "Could not construct config from aggregated sources (conf, env, flags).".to_owned();
 				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
 				let (raw, file_config): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>) = match path {
 					Some(path) => {
@@ -1082,7 +1106,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					Self::warn_unknown_fields(&file_cfg);
 				}
 
-				raw.try_deserialize().wrap_err(err_msg)
+				// Deserialize with serde (which supports MyConfigPrimitives custom deserializer)
+				raw.try_deserialize().map_err(|e| {
+					// Include the root cause in the error message for better Display format
+					::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e)
+				})
 			}
 
 			fn warn_unknown_fields(file_config: &::v_utils::__internal::config::Config) {

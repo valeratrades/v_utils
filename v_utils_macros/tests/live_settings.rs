@@ -1,11 +1,11 @@
+#![allow(dead_code, unused_imports)]
+
 use std::time::Duration;
 
 use clap::Parser;
 use v_utils_macros::{LiveSettings, Settings};
-
-#[allow(dead_code)]
 #[derive(Clone, Debug, LiveSettings, v_utils_macros::MyConfigPrimitives, Settings)]
-pub struct AppConfig {
+struct AppConfig {
 	host: String,
 	port: u16,
 	debug: bool,
