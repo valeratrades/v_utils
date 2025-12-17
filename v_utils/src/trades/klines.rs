@@ -93,7 +93,7 @@ mod tests {
 	use insta::{assert_debug_snapshot, assert_snapshot};
 
 	use super::*;
-	use crate::{distributions::laplace_random_walk, utils::SnapshotP};
+	use crate::{distributions::laplace_random_walk, internal_utils::simplified_snapshots::SnapshotP};
 
 	#[test]
 	fn test_p_to_ohlc() {

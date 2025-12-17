@@ -1,10 +1,9 @@
-#![allow(dead_code, unused_imports)]
-
 use clap::Parser;
 use serde::Deserialize;
 use v_utils_macros::{Settings, SettingsNested};
 
 #[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
+#[allow(unused)]
 struct AppConfig {
 	host: String,
 	port: u16,
@@ -23,6 +22,7 @@ struct AppConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[allow(unused)]
 pub struct Database {
 	url: String,
 	max_connections: u32,
@@ -33,18 +33,21 @@ pub struct Database {
 /// Second level of nesting - Pool config (doubly nested)
 #[derive(Clone, Debug, Deserialize, SettingsNested)]
 #[settings(prefix = "database_pool")]
+#[allow(unused)]
 pub struct Pool {
 	min_size: u32,
 	max_size: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[allow(unused)]
 pub struct RiskTiers {
 	a: String,
 	b: String,
 }
 
 #[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[allow(unused)]
 pub struct Logging {
 	level: String,
 	file: Option<String>,
@@ -54,6 +57,7 @@ pub struct Logging {
 /// The Settings derive macro generates a `SettingsFlags` struct
 /// which can be flattened into your CLI struct
 #[derive(Debug, Parser)]
+#[allow(unused)]
 struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,

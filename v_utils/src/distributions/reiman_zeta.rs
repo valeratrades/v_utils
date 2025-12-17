@@ -40,7 +40,7 @@ impl ReimanZeta {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::utils::SnapshotP;
+	use crate::internal_utils::simplified_snapshots::SnapshotP;
 
 	#[test]
 	fn test_reiman_zeta() {

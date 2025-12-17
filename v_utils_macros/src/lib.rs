@@ -1030,7 +1030,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
-	let try_build = quote_spanned! {name.span()=>
+	let try_build = quote! {
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
@@ -1049,7 +1049,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
 
 				let mut err_msg = "Could not construct config from aggregated sources (conf, env, flags).".to_owned();
-				use ::v_utils::__internal::eyre::WrapErr as _; //HACK: problematic as could be re-exporting
+				#[allow(unused_imports)]
+				use ::v_utils::__internal::eyre::WrapErr as _;
 				let (raw, file_config): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>) = match path {
 					Some(path) => {
 						// Check if it's a .nix file
@@ -1267,6 +1268,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
 		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
+		#[allow(dead_code)]
 		#[derive(clap::Args, Clone, Debug, Default, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
 		pub struct SettingsFlags {
 			#[arg(short, long)]
@@ -1435,6 +1437,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 
 	let produced_struct_name = format_ident!("__SettingsNested{name}");
 	let expanded = quote! {
+		#[allow(dead_code)]
 		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
 		pub struct #produced_struct_name {
 			#(#prefixed_flags)*
@@ -1447,212 +1450,6 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 	};
 
 	//_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
-	TokenStream::from(expanded)
-}
-
-// Keep old macros for backward compatibility, but mark as deprecated
-#[deprecated(note = "Use SettingsNested instead")]
-#[proc_macro_derive(SettingsBadlyNested, attributes(settings))]
-pub fn derive_settings_badly_nested(input: TokenStream) -> TokenStream {
-	let ast = parse_macro_input!(input as DeriveInput);
-	let name = &ast.ident;
-	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
-	let fields = if let Data::Struct(syn::DataStruct {
-		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
-		..
-	}) = ast.data
-	{
-		named
-	} else {
-		unimplemented!()
-	};
-
-	let prefixed_flags = fields.iter().filter_map(|field| {
-		let ident = &field.ident;
-		let ty = &field.ty;
-
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
-
-		if has_flatten_attr {
-			use quote::ToTokens as _;
-			let inner_type = if let syn::Type::Path(type_path) = ty {
-				if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
-			} else {
-				ty
-			};
-			let type_name = inner_type.to_token_stream().to_string();
-			let nested_struct_name = format_ident!("__SettingsNested{type_name}");
-			Some(quote! {
-				#[clap(flatten)]
-				#ident: #nested_struct_name,
-			})
-		} else {
-			let clap_ty = clap_compatible_option_wrapped_ty(ty);
-			let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
-			Some(quote! {
-				#[arg(long)]
-				#prefixed_field_name: #clap_ty,
-			})
-		}
-	});
-
-	let config_inserts = fields.iter().filter_map(|field| {
-		let ident = &field.ident;
-		let ty = &field.ty;
-
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
-
-		if has_flatten_attr {
-			Some(quote! {
-				let _ = &self.#ident.collect_config(map);
-			})
-		} else {
-			let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
-			let prefixed_field_name = format_ident!("{}_{}", snake_case_name, ident.as_ref().unwrap());
-			let config_value_path = format!("{}.{}", snake_case_name, ident.as_ref().unwrap());
-			let source_tag = format!("flags:{}", snake_case_name);
-			Some(quote! {
-				if let Some(#ident) = &self.#prefixed_field_name {
-					map.insert(
-						#config_value_path.to_owned(),
-						v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
-					);
-				}
-			})
-		}
-	});
-
-	// Use same naming as SettingsNested for compatibility
-	let produced_struct_name = format_ident!("__SettingsNested{name}");
-	let expanded = quote! {
-		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
-		pub struct #produced_struct_name {
-			#(#prefixed_flags)*
-		}
-		impl #produced_struct_name {
-			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
-				#(#config_inserts)*
-			}
-		}
-	};
-
-	TokenStream::from(expanded)
-}
-
-#[deprecated(note = "Use SettingsNested instead")]
-#[proc_macro_derive(SettingsBadlyNestedNested, attributes(settings))]
-pub fn derive_settings_badly_nested_nested(input: TokenStream) -> TokenStream {
-	let ast = parse_macro_input!(input as DeriveInput);
-	let name = &ast.ident;
-	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
-	let fields = if let Data::Struct(syn::DataStruct {
-		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
-		..
-	}) = ast.data
-	{
-		named
-	} else {
-		unimplemented!()
-	};
-
-	let parent_name = ast
-		.attrs
-		.iter()
-		.find_map(|attr| {
-			if attr.path().is_ident("settings") {
-				attr.parse_args_with(|input: syn::parse::ParseStream| {
-					let ident: syn::Ident = input.parse()?;
-					if ident == "parent" {
-						let _: Token![=] = input.parse()?;
-						let lit: syn::LitStr = input.parse()?;
-						Ok(Some(lit.value()))
-					} else {
-						Ok(None)
-					}
-				})
-				.ok()
-				.flatten()
-			} else {
-				None
-			}
-		})
-		.expect("SettingsBadlyNestedNested requires #[settings(parent = \"ParentTypeName\")] attribute");
-
-	let parent_snake = AsSnakeCase(&parent_name).to_string();
-	let full_prefix = format!("{}_{}", parent_snake, snake_case_name);
-	let config_prefix = format!("{}.{}", parent_snake, snake_case_name);
-
-	let prefixed_flags = fields.iter().filter_map(|field| {
-		let ident = &field.ident;
-		let ty = &field.ty;
-
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
-
-		if has_flatten_attr {
-			panic!("Triple nesting not supported in SettingsBadlyNestedNested - use SettingsNested instead");
-		}
-
-		let clap_ty = clap_compatible_option_wrapped_ty(ty);
-		let prefixed_field_name = format_ident!("{}_{}", full_prefix, ident.as_ref().unwrap());
-		Some(quote! {
-			#[arg(long)]
-			#prefixed_field_name: #clap_ty,
-		})
-	});
-
-	let config_inserts = fields.iter().map(|field| {
-		let ident = &field.ident;
-		let ty = &field.ty;
-
-		let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
-		let prefixed_field_name = format_ident!("{}_{}", full_prefix, ident.as_ref().unwrap());
-		let field_name_str = ident.as_ref().unwrap().to_string();
-		let source_tag = format!("flags:{}", full_prefix);
-		let config_value_path = format!("{}.{}", config_prefix, field_name_str);
-		quote! {
-			if let Some(#ident) = &self.#prefixed_field_name {
-				map.insert(
-					#config_value_path.to_owned(),
-					v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
-				);
-			}
-		}
-	});
-
-	let produced_struct_name = format_ident!("__SettingsBadlyNestedNested{}{}", parent_name, name);
-	let expanded = quote! {
-		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
-		pub struct #produced_struct_name {
-			#(#prefixed_flags)*
-		}
-		impl #produced_struct_name {
-			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
-				#(#config_inserts)*
-			}
-		}
-	};
-
 	TokenStream::from(expanded)
 }
 
