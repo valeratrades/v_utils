@@ -1041,9 +1041,9 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				let location_bases = [
 					format!("{xdg_conf_dir}/{app_name}"),
-					format!("{xdg_conf_dir}/{app_name}/config"), //
+					format!("{xdg_conf_dir}/{app_name}/config"),
 				];
-				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
+				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
 				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
@@ -1068,36 +1068,32 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						}
 					}
 					None => {
-						// Check for .nix file first
-						let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
-						if std::path::Path::new(&nix_path).exists() {
-							let json_str = Self::eval_nix_file(&nix_path)?;
-							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-							let file_only = file_builder.clone().build().ok();
-							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-							(builder.build()?, file_only)
-						} else {
-							let mut conf_files_found = Vec::new();
-							for location in locations.iter() {
-								if location.exists() {
-									conf_files_found.push(location);
+						let conf_files_found: Vec<_> = locations.iter().filter(|p| p.exists()).collect();
+						match conf_files_found.len() {
+							0 => {
+								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
+								(builder.build()?, None)
+							},
+							1 => {
+								let found_path = conf_files_found[0];
+								if found_path.extension().map(|e| e == "nix").unwrap_or(false) {
+									let json_str = Self::eval_nix_file(found_path.to_str().unwrap())?;
+									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+									let file_only = file_builder.clone().build().ok();
+									let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+									(builder.build()?, file_only)
+								} else {
+									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
+									let file_only = file_builder.clone().build().ok();
+									builder = builder.add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
+									(builder.build()?, file_only)
 								}
+							},
+							_ => {
+								return Err(::v_utils::__internal::MultipleConfigsError {
+									paths: conf_files_found.into_iter().cloned().collect(),
+								}.into());
 							}
-							let file_only = match conf_files_found.len() {
-								0 => {
-									err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
-									None
-								},
-								1 => {
-									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
-									builder = builder.add_source(::v_utils::__internal::config::File::from(conf_files_found[0].as_path()).required(true));
-									file_builder.build().ok()
-								},
-								_ => {
-									return Err(::v_utils::__internal::eyre::eyre!("Multiple config files found: {:?}", conf_files_found));
-								}
-							};
-							(builder.build()?, file_only)
 						}
 					}
 				};
@@ -1587,7 +1583,7 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 			/// Create a new LiveSettings from CLI flags.
 			/// `update_freq` controls how often the file modification time is checked.
 			pub fn new(flags: SettingsFlags, update_freq: std::time::Duration) -> ::v_utils::__internal::eyre::Result<Self> {
-				let config_path = Self::resolve_config_path(&flags);
+				let config_path = Self::resolve_config_path(&flags)?;
 				let settings = #name::try_build(flags.clone())?;
 
 				Ok(Self {
@@ -1601,39 +1597,42 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 				})
 			}
 
-			fn resolve_config_path(flags: &SettingsFlags) -> Option<std::path::PathBuf> {
+			fn resolve_config_path(flags: &SettingsFlags) -> Result<Option<std::path::PathBuf>, ::v_utils::__internal::MultipleConfigsError> {
 				if let Some(ref path) = flags.config {
-					return Some(path.0.clone());
+					return Ok(Some(path.0.clone()));
 				}
 
 				let app_name = env!("CARGO_PKG_NAME");
 				#xdg_conf_dir
 
-				let nix_path = format!("{xdg_conf_dir}/{app_name}.nix");
-				if std::path::Path::new(&nix_path).exists() {
-					return Some(std::path::PathBuf::from(nix_path));
-				}
-
 				let location_bases = [
 					format!("{xdg_conf_dir}/{app_name}"),
 					format!("{xdg_conf_dir}/{app_name}/config"),
 				];
-				let supported_exts = ["toml", "json", "yaml", "json5", "ron", "ini"];
+				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 
+				let mut found: Vec<std::path::PathBuf> = Vec::new();
 				for base in location_bases.iter() {
 					for ext in supported_exts.iter() {
-						let path = format!("{base}.{ext}");
-						if std::path::Path::new(&path).exists() {
-							return Some(std::path::PathBuf::from(path));
+						let path = std::path::PathBuf::from(format!("{base}.{ext}"));
+						if path.exists() {
+							found.push(path);
 						}
 					}
 				}
 
-				None
+				match found.len() {
+					0 => Ok(None),
+					1 => Ok(Some(found.into_iter().next().unwrap())),
+					_ => Err(::v_utils::__internal::MultipleConfigsError { paths: found }),
+				}
 			}
 
 			/// Get the current settings, reloading from file if it has changed.
-			pub fn config(&self) -> #name {
+			pub fn config(&self) -> Result<#name, ::v_utils::__internal::MultipleConfigsError> {
+				// Check for multiple configs (could have been added while running)
+				Self::resolve_config_path(&self.flags)?;
+
 				let now = std::time::SystemTime::now();
 
 				let should_reload = {
@@ -1641,7 +1640,7 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 					let age = now.duration_since(capsule.loaded_at).unwrap_or_default();
 
 					if age < capsule.update_freq {
-						return capsule.value.clone();
+						return Ok(capsule.value.clone());
 					}
 
 					self.config_path
@@ -1669,7 +1668,7 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 					capsule.loaded_at = now;
 				}
 
-				self.inner.read().unwrap().value.clone()
+				Ok(self.inner.read().unwrap().value.clone())
 			}
 
 			/// Get a direct reference to the initial settings (no reload check).

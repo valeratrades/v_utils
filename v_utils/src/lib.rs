@@ -60,6 +60,13 @@ pub mod __internal {
 
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
 	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
+
+	#[cfg(feature = "cli")]
+	#[derive(Debug, thiserror::Error)]
+	#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
+	pub struct MultipleConfigsError {
+		pub paths: Vec<std::path::PathBuf>,
+	}
 }
 
 #[cfg(feature = "distributions")]

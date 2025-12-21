@@ -39,9 +39,9 @@ fn main() {
 	fn assert_debug<T: std::fmt::Debug>() {}
 	assert_debug::<LiveSettings>();
 
-	// Test that config() method exists and returns AppConfig
+	// Test that config() method exists and returns Result<AppConfig, MultipleConfigsError>
 	// We can't actually call it without a valid config file, but we can verify the signature
-	fn check_config_method(ls: &LiveSettings) -> AppConfig {
+	fn check_config_method(ls: &LiveSettings) -> Result<AppConfig, v_utils::__internal::MultipleConfigsError> {
 		ls.config()
 	}
 
