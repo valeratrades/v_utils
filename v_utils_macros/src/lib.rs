@@ -1234,8 +1234,15 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 			/// Parse error message to extract missing field path
 			fn parse_missing_field(error_str: &str) -> Option<String> {
-				// Config crate error format: "missing field `field_name`"
-				// or nested: "missing field `parent.child.field`"
+				// Config crate error format: `missing configuration field "field_name"`
+				// or nested: `missing configuration field "parent.child.field"`
+				if let Some(start) = error_str.find("missing configuration field \"") {
+					let rest = &error_str[start + 29..]; // len("missing configuration field \"") = 29
+					if let Some(end) = rest.find('"') {
+						return Some(rest[..end].to_string());
+					}
+				}
+				// Also try serde format: "missing field `field_name`"
 				if let Some(start) = error_str.find("missing field `") {
 					let rest = &error_str[start + 15..]; // len("missing field `") = 15
 					if let Some(end) = rest.find('`') {
