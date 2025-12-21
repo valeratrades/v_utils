@@ -54,6 +54,8 @@ pub mod __internal {
 	pub extern crate facet_toml;
 	#[cfg(feature = "cli")]
 	pub extern crate serde_json;
+	#[cfg(feature = "cli")]
+	pub extern crate toml;
 
 	#[cfg(feature = "xdg")]
 	pub extern crate xdg;

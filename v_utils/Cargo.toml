@@ -18,11 +18,14 @@ xdg = [
     "v_utils_macros/xdg",
 ] # have to separate it, because `xdg` lib behaves weirdly under wasm
 cli = [
+    "io",
+    # Required for confirm_blocking in Settings macro
     "v_utils_macros/cli",
     "dep:config",
     "dep:facet",
     "dep:facet-json",
     "dep:facet-toml",
+    "dep:toml",
 ]
 async-io = ["dep:tokio", "tokio/io-std"]
 assert-wasm-compat = []
@@ -78,6 +81,7 @@ serde.workspace = true
 serde_json = "^1.0.145"
 strum = { version = "^0.27.2", features = ["derive"], optional = true }
 thiserror = "2.0.17"
+toml = { version = "^0.8", optional = true }
 tracing = { version = "^0.1.41", features = ["log", "std", "async-await"] }
 
 # # optional

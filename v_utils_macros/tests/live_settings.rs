@@ -3,11 +3,19 @@
 use std::time::Duration;
 
 use clap::Parser;
+use serde::Serialize;
 use v_utils_macros::{LiveSettings, Settings};
-#[derive(Clone, Debug, LiveSettings, v_utils_macros::MyConfigPrimitives, Settings)]
+
+/// Settings struct with Default and Serialize for config auto-extension support.
+/// When a config field is missing, the macro can offer to extend the config file
+/// with default values from Default::default().
+#[derive(Clone, Debug, Default, LiveSettings, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
 struct AppConfig {
+	#[serde(default)]
 	host: String,
+	#[serde(default)]
 	port: u16,
+	#[serde(default)]
 	debug: bool,
 }
 

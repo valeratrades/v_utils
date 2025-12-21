@@ -1,55 +1,73 @@
 use clap::Parser;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
 
-#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
+/// Settings struct with Default and Serialize for config auto-extension support.
+#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
 #[allow(unused)]
 struct AppConfig {
+	#[serde(default)]
 	host: String,
+	#[serde(default)]
 	port: u16,
+	#[serde(default)]
 	debug: bool,
+	#[serde(default)]
 	workers: Option<usize>,
 	#[settings(flatten)]
+	#[serde(default)]
 	database: Database,
 	#[settings(flatten)]
+	#[serde(default)]
 	risk_tiers: RiskTiers,
 	/// Optional nested config - should work with flatten
 	#[settings(flatten)]
+	#[serde(default)]
 	logging: Option<Logging>,
 	/// This field should be skipped - not in CLI flags or config
 	#[settings(skip)]
+	#[serde(default)]
 	internal_state: String,
 }
 
-#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct Database {
+	#[serde(default)]
 	url: String,
+	#[serde(default)]
 	max_connections: u32,
 	#[settings(flatten)]
+	#[serde(default)]
 	pool: Pool,
 }
 
 /// Second level of nesting - Pool config (doubly nested)
-#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[settings(prefix = "database_pool")]
 #[allow(unused)]
 pub struct Pool {
+	#[serde(default)]
 	min_size: u32,
+	#[serde(default)]
 	max_size: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct RiskTiers {
+	#[serde(default)]
 	a: String,
+	#[serde(default)]
 	b: String,
 }
 
-#[derive(Clone, Debug, Deserialize, SettingsNested)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct Logging {
+	#[serde(default)]
 	level: String,
+	#[serde(default)]
 	file: Option<String>,
 }
 

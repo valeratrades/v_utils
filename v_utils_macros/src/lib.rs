@@ -945,6 +945,8 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// - Generates `SettingsFlags` struct for CLI integration with clap
 /// - Uses facet for deserialization with detailed error messages
 /// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
+/// - **Auto-extension**: When a field is missing from the config, offers to extend the config file
+///   with default values (requires the struct to implement `Default + Serialize`)
 ///
 /// # Config file resolution
 /// 1. If `--config` flag is provided, uses that file (supports .nix extension)
@@ -953,12 +955,29 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///    - `~/.config/<app_name>.{toml,json,yaml}`
 ///    - `~/.config/<app_name>/config.{toml,json,yaml}`
 ///
+/// # Auto-extension of Config Files
+/// When the config is missing a required field, the macro will:
+/// 1. Parse the error to identify the missing field
+/// 2. Get the default value from `Default::default()`
+/// 3. Ask the user via `confirm_blocking` if they want to extend the config
+/// 4. If confirmed, add the missing field with its default value to the config file
+/// 5. Retry loading the config
+///
+/// **Requirements for auto-extension:**
+/// - The Settings struct must derive `Default` and `serde::Serialize`
+/// - All nested structs must also derive `Default` and `serde::Serialize`
+/// - The config file must be TOML or Nix format
+///
+/// **If `Default` or `Serialize` are not implemented**, the macro still compiles
+/// and works normally, but the auto-extension feature is silently disabled.
+/// Missing fields will just show the regular error message.
+///
 /// # Nesting
 /// Use `#[settings(flatten)]` on fields to include nested config sections. The nested struct
 /// must derive `SettingsNested`.
 ///
 /// ```ignore
-/// #[derive(Facet, MyConfigPrimitives, Settings)]
+/// #[derive(Default, MyConfigPrimitives, Serialize, Settings)]
 /// pub struct AppConfig {
 ///     pub host: String,
 ///     #[settings(flatten)]
@@ -966,7 +985,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// // First level - no prefix needed, defaults to "database"
-/// #[derive(Facet, SettingsNested)]
+/// #[derive(Default, Deserialize, Serialize, SettingsNested)]
 /// pub struct Database {
 ///     pub url: String,
 ///     #[settings(flatten)]
@@ -974,7 +993,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// // Second level - must specify full prefix path
-/// #[derive(Facet, SettingsNested)]
+/// #[derive(Default, Deserialize, Serialize, SettingsNested)]
 /// #[settings(prefix = "database_pool")]
 /// pub struct Pool {
 ///     pub min_size: u32,
@@ -991,7 +1010,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///
 /// # Example
 /// ```ignore
-/// #[derive(Facet, MyConfigPrimitives, Settings)]
+/// #[derive(Default, MyConfigPrimitives, Serialize, Settings)]
 /// pub struct AppConfig {
 ///     pub host: String,
 ///     pub port: u16,
@@ -1031,9 +1050,50 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
 
 	let try_build = quote! {
+		/// Helper module for autoref specialization pattern.
+		/// This allows graceful degradation when Default + Serialize are not implemented.
+		mod __settings_default_provider {
+			use super::*;
+
+			pub struct Wrapper<T>(pub std::marker::PhantomData<T>);
+
+			pub trait GetDefault<T> {
+				fn get_default_for_path(&self, field_path: &str) -> Option<::v_utils::__internal::serde_json::Value>;
+			}
+
+			/// Fallback impl for reference - returns None (lower priority in method resolution)
+			impl<T> GetDefault<T> for &Wrapper<T> {
+				fn get_default_for_path(&self, _field_path: &str) -> Option<::v_utils::__internal::serde_json::Value> {
+					None
+				}
+			}
+
+			/// Impl for types that implement Default + Serialize (higher priority)
+			impl<T> GetDefault<T> for Wrapper<T>
+			where
+				T: Default + ::v_utils::__internal::serde::Serialize,
+			{
+				fn get_default_for_path(&self, field_path: &str) -> Option<::v_utils::__internal::serde_json::Value> {
+					let default_instance = T::default();
+					let serialized = ::v_utils::__internal::serde_json::to_value(&default_instance).ok()?;
+
+					// Navigate the path (e.g., "keybinds.movement.sneak")
+					let mut current = &serialized;
+					for part in field_path.split('.') {
+						current = current.get(part)?;
+					}
+					Some(current.clone())
+				}
+			}
+		}
+
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
 			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+				Self::try_build_internal(flags, true)
+			}
+
+			fn try_build_internal(flags: SettingsFlags, allow_extend: bool) -> Result<Self, ::v_utils::__internal::eyre::Report> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
 
@@ -1046,12 +1106,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags);
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags.clone());
 
 				let mut err_msg = "Could not construct config from aggregated sources (conf, env, flags).".to_owned();
 				#[allow(unused_imports)]
 				use ::v_utils::__internal::eyre::WrapErr as _;
-				let (raw, file_config): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>) = match path {
+				let (raw, file_config, config_path): (::v_utils::__internal::config::Config, Option<::v_utils::__internal::config::Config>, Option<std::path::PathBuf>) = match path {
 					Some(path) => {
 						// Check if it's a .nix file
 						if path.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false) {
@@ -1059,12 +1119,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-							(builder.build()?, file_only)
+							(builder.build()?, file_only, Some(path))
 						} else {
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
 							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
-							(builder.build()?, file_only)
+							(builder.build()?, file_only, Some(path))
 						}
 					}
 					None => {
@@ -1072,7 +1132,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						match conf_files_found.len() {
 							0 => {
 								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
-								(builder.build()?, None)
+								(builder.build()?, None, None)
 							},
 							1 => {
 								let found_path = conf_files_found[0];
@@ -1081,12 +1141,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 									let file_only = file_builder.clone().build().ok();
 									let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
-									(builder.build()?, file_only)
+									(builder.build()?, file_only, Some(found_path.clone()))
 								} else {
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
 									let file_only = file_builder.clone().build().ok();
 									builder = builder.add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
-									(builder.build()?, file_only)
+									(builder.build()?, file_only, Some(found_path.clone()))
 								}
 							},
 							_ => {
@@ -1099,15 +1159,45 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				};
 
 				// Check for unknown configuration fields
-				if let Some(file_cfg) = file_config {
-					Self::warn_unknown_fields(&file_cfg);
+				if let Some(ref file_cfg) = file_config {
+					Self::warn_unknown_fields(file_cfg);
 				}
 
 				// Deserialize with serde (which supports MyConfigPrimitives custom deserializer)
-				raw.try_deserialize().map_err(|e| {
-					// Include the root cause in the error message for better Display format
-					::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e)
-				})
+				match raw.try_deserialize() {
+					Ok(config) => Ok(config),
+					Err(e) => {
+						// Check if this is a missing field error and we can extend the config
+						let error_str = e.to_string();
+						if allow_extend {
+							if let Some(missing_field) = Self::parse_missing_field(&error_str) {
+								if let Some(ref config_path) = config_path {
+									// Get default values and offer to extend config
+									// Uses autoref specialization: returns Some if Default+Serialize, None otherwise
+									use __settings_default_provider::GetDefault as _;
+									let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+									if let Some(default_value) = (&wrapper).get_default_for_path(&missing_field) {
+										let prompt = format!(
+											"Missing configuration field \"{}\". Extend config with default value {}?",
+											missing_field,
+											default_value
+										);
+										if ::v_utils::io::confirm_blocking(&prompt) {
+											if let Err(extend_err) = Self::extend_config_file(config_path, &missing_field, &default_value) {
+												eprintln!("Warning: Failed to extend config: {}", extend_err);
+											} else {
+												eprintln!("Extended config with default for \"{}\"", missing_field);
+												// Retry building - recursive call with same flags
+												return Self::try_build_internal(flags, true);
+											}
+										}
+									}
+								}
+							}
+						}
+						Err(::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e))
+					}
+				}
 			}
 
 			fn warn_unknown_fields(file_config: &::v_utils::__internal::config::Config) {
@@ -1140,6 +1230,334 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 
 				Ok(String::from_utf8(output.stdout)?)
+			}
+
+			/// Parse error message to extract missing field path
+			fn parse_missing_field(error_str: &str) -> Option<String> {
+				// Config crate error format: "missing field `field_name`"
+				// or nested: "missing field `parent.child.field`"
+				if let Some(start) = error_str.find("missing field `") {
+					let rest = &error_str[start + 15..]; // len("missing field `") = 15
+					if let Some(end) = rest.find('`') {
+						return Some(rest[..end].to_string());
+					}
+				}
+				None
+			}
+
+
+			/// Extend config file with a missing field
+			fn extend_config_file(
+				config_path: &std::path::Path,
+				field_path: &str,
+				value: &::v_utils::__internal::serde_json::Value,
+			) -> Result<(), ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let ext = config_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+				match ext {
+					"toml" => Self::extend_toml_file(config_path, field_path, value),
+					"nix" => Self::extend_nix_file(config_path, field_path, value),
+					_ => Err(::v_utils::__internal::eyre::eyre!(
+						"Extending config not supported for format: {}",
+						ext
+					)),
+				}
+			}
+
+			/// Extend a TOML config file with a missing field
+			fn extend_toml_file(
+				config_path: &std::path::Path,
+				field_path: &str,
+				value: &::v_utils::__internal::serde_json::Value,
+			) -> Result<(), ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let content = std::fs::read_to_string(config_path)
+					.wrap_err_with(|| format!("Failed to read config file: {}", config_path.display()))?;
+
+				let mut doc: ::v_utils::__internal::toml::Table = content.parse()
+					.wrap_err("Failed to parse TOML config")?;
+
+				// Navigate/create the path and set the value
+				let parts: Vec<&str> = field_path.split('.').collect();
+				Self::set_toml_value(&mut doc, &parts, value)?;
+
+				let new_content = ::v_utils::__internal::toml::to_string_pretty(&doc)
+					.wrap_err("Failed to serialize TOML")?;
+
+				std::fs::write(config_path, new_content)
+					.wrap_err_with(|| format!("Failed to write config file: {}", config_path.display()))?;
+
+				Ok(())
+			}
+
+			/// Helper to set a nested value in a TOML table
+			fn set_toml_value(
+				table: &mut ::v_utils::__internal::toml::Table,
+				path: &[&str],
+				value: &::v_utils::__internal::serde_json::Value,
+			) -> Result<(), ::v_utils::__internal::eyre::Report> {
+				if path.is_empty() {
+					return Err(::v_utils::__internal::eyre::eyre!("Empty path"));
+				}
+
+				if path.len() == 1 {
+					// Final key - set the value
+					let toml_value = Self::json_to_toml(value)?;
+					table.insert(path[0].to_string(), toml_value);
+					Ok(())
+				} else {
+					// Need to navigate deeper
+					let key = path[0];
+					let nested = table.entry(key.to_string())
+						.or_insert_with(|| ::v_utils::__internal::toml::Value::Table(::v_utils::__internal::toml::Table::new()));
+
+					if let ::v_utils::__internal::toml::Value::Table(ref mut nested_table) = nested {
+						Self::set_toml_value(nested_table, &path[1..], value)
+					} else {
+						Err(::v_utils::__internal::eyre::eyre!(
+							"Expected table at '{}', found different type",
+							key
+						))
+					}
+				}
+			}
+
+			/// Convert JSON value to TOML value
+			fn json_to_toml(json: &::v_utils::__internal::serde_json::Value) -> Result<::v_utils::__internal::toml::Value, ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::serde_json::Value as JsonValue;
+				use ::v_utils::__internal::toml::Value as TomlValue;
+
+				Ok(match json {
+					JsonValue::Null => return Err(::v_utils::__internal::eyre::eyre!("TOML doesn't support null values")),
+					JsonValue::Bool(b) => TomlValue::Boolean(*b),
+					JsonValue::Number(n) => {
+						if let Some(i) = n.as_i64() {
+							TomlValue::Integer(i)
+						} else if let Some(f) = n.as_f64() {
+							TomlValue::Float(f)
+						} else {
+							return Err(::v_utils::__internal::eyre::eyre!("Unsupported number type"));
+						}
+					}
+					JsonValue::String(s) => TomlValue::String(s.clone()),
+					JsonValue::Array(arr) => {
+						let toml_arr: Result<Vec<_>, _> = arr.iter().map(Self::json_to_toml).collect();
+						TomlValue::Array(toml_arr?)
+					}
+					JsonValue::Object(obj) => {
+						let mut table = ::v_utils::__internal::toml::Table::new();
+						for (k, v) in obj {
+							table.insert(k.clone(), Self::json_to_toml(v)?);
+						}
+						TomlValue::Table(table)
+					}
+				})
+			}
+
+			/// Extend a Nix config file with a missing field
+			fn extend_nix_file(
+				config_path: &std::path::Path,
+				field_path: &str,
+				value: &::v_utils::__internal::serde_json::Value,
+			) -> Result<(), ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let content = std::fs::read_to_string(config_path)
+					.wrap_err_with(|| format!("Failed to read config file: {}", config_path.display()))?;
+
+				// Find the position to insert the new field
+				// Nix files are typically: { field1 = value1; field2 = value2; }
+				// We need to find the right nesting level and insert there
+
+				let parts: Vec<&str> = field_path.split('.').collect();
+				let nix_value = Self::json_to_nix(value);
+
+				let new_content = Self::insert_nix_field(&content, &parts, &nix_value)?;
+
+				std::fs::write(config_path, new_content)
+					.wrap_err_with(|| format!("Failed to write config file: {}", config_path.display()))?;
+
+				Ok(())
+			}
+
+			/// Convert JSON value to Nix expression string
+			fn json_to_nix(json: &::v_utils::__internal::serde_json::Value) -> String {
+				use ::v_utils::__internal::serde_json::Value as JsonValue;
+
+				match json {
+					JsonValue::Null => "null".to_string(),
+					JsonValue::Bool(b) => if *b { "true" } else { "false" }.to_string(),
+					JsonValue::Number(n) => n.to_string(),
+					JsonValue::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+					JsonValue::Array(arr) => {
+						let items: Vec<String> = arr.iter().map(Self::json_to_nix).collect();
+						format!("[ {} ]", items.join(" "))
+					}
+					JsonValue::Object(obj) => {
+						let items: Vec<String> = obj.iter()
+							.map(|(k, v)| format!("{} = {};", k, Self::json_to_nix(v)))
+							.collect();
+						format!("{{ {} }}", items.join(" "))
+					}
+				}
+			}
+
+			/// Insert a field into Nix content at the appropriate nesting level
+			fn insert_nix_field(content: &str, path: &[&str], nix_value: &str) -> Result<String, ::v_utils::__internal::eyre::Report> {
+				if path.is_empty() {
+					return Err(::v_utils::__internal::eyre::eyre!("Empty path"));
+				}
+
+				// For simplicity, we'll handle the common case of top-level and one-level nested fields
+				// More complex nesting would require a proper Nix parser
+
+				if path.len() == 1 {
+					// Top-level field: insert before the closing brace
+					Self::insert_at_level(content, path[0], nix_value, 0)
+				} else {
+					// Nested field: find the parent block and insert there
+					// First, find the parent section
+					let parent_key = path[0];
+					let remaining_path = &path[1..];
+
+					// Look for the parent block: `parent_key = {`
+					if let Some(parent_start) = content.find(&format!("{} = {{", parent_key))
+						.or_else(|| content.find(&format!("{}={{", parent_key)))
+						.or_else(|| content.find(&format!("{} ={{", parent_key)))
+						.or_else(|| content.find(&format!("{}= {{", parent_key)))
+					{
+						// Find the opening brace after parent_key
+						let brace_pos = content[parent_start..].find('{')
+							.map(|p| parent_start + p)
+							.ok_or_else(|| ::v_utils::__internal::eyre::eyre!("Malformed Nix: no opening brace for {}", parent_key))?;
+
+						// Find matching closing brace
+						let (block_content, close_pos) = Self::find_matching_brace(&content[brace_pos..])?;
+						let close_pos = brace_pos + close_pos;
+
+						// Recursively insert into the nested block
+						let updated_block = Self::insert_nix_field(&format!("{{{}}}", block_content), remaining_path, nix_value)?;
+
+						// Reconstruct the file
+						Ok(format!(
+							"{}{}{}",
+							&content[..brace_pos],
+							updated_block,
+							&content[close_pos + 1..]
+						))
+					} else {
+						// Parent block doesn't exist, create it with the full path
+						let full_nix_value = Self::build_nested_nix(remaining_path, nix_value);
+						Self::insert_at_level(content, parent_key, &full_nix_value, 0)
+					}
+				}
+			}
+
+			/// Build a nested Nix expression for a path
+			fn build_nested_nix(path: &[&str], value: &str) -> String {
+				if path.is_empty() {
+					value.to_string()
+				} else if path.len() == 1 {
+					format!("{{ {} = {}; }}", path[0], value)
+				} else {
+					let inner = Self::build_nested_nix(&path[1..], value);
+					format!("{{ {} = {}; }}", path[0], inner)
+				}
+			}
+
+			/// Find the matching closing brace and return content between braces
+			fn find_matching_brace(s: &str) -> Result<(String, usize), ::v_utils::__internal::eyre::Report> {
+				let chars: Vec<char> = s.chars().collect();
+				if chars.is_empty() || chars[0] != '{' {
+					return Err(::v_utils::__internal::eyre::eyre!("Expected opening brace"));
+				}
+
+				let mut depth = 0;
+				let mut in_string = false;
+				let mut escape_next = false;
+
+				for (i, &c) in chars.iter().enumerate() {
+					if escape_next {
+						escape_next = false;
+						continue;
+					}
+					if c == '\\' && in_string {
+						escape_next = true;
+						continue;
+					}
+					if c == '"' {
+						in_string = !in_string;
+						continue;
+					}
+					if in_string {
+						continue;
+					}
+
+					if c == '{' {
+						depth += 1;
+					} else if c == '}' {
+						depth -= 1;
+						if depth == 0 {
+							let content: String = chars[1..i].iter().collect();
+							return Ok((content, i));
+						}
+					}
+				}
+
+				Err(::v_utils::__internal::eyre::eyre!("No matching closing brace found"))
+			}
+
+			/// Insert a field at a specific brace nesting level
+			fn insert_at_level(content: &str, key: &str, value: &str, _target_depth: usize) -> Result<String, ::v_utils::__internal::eyre::Report> {
+				// Find the last closing brace at the target depth and insert before it
+				let chars: Vec<char> = content.chars().collect();
+				let mut depth = 0;
+				let mut in_string = false;
+				let mut escape_next = false;
+				let mut last_close_at_depth = None;
+
+				for (i, &c) in chars.iter().enumerate() {
+					if escape_next {
+						escape_next = false;
+						continue;
+					}
+					if c == '\\' && in_string {
+						escape_next = true;
+						continue;
+					}
+					if c == '"' {
+						in_string = !in_string;
+						continue;
+					}
+					if in_string {
+						continue;
+					}
+
+					if c == '{' {
+						depth += 1;
+					} else if c == '}' {
+						if depth == 1 {
+							last_close_at_depth = Some(i);
+						}
+						depth -= 1;
+					}
+				}
+
+				if let Some(pos) = last_close_at_depth {
+					// Insert the new field before the closing brace
+					let (before, after) = content.split_at(pos);
+					let insertion = format!("  {} = {};\n", key, value);
+
+					// Check if we need a newline before
+					let needs_newline = !before.ends_with('\n') && !before.ends_with('{');
+					let prefix = if needs_newline { "\n" } else { "" };
+
+					Ok(format!("{}{}{}{}", before, prefix, insertion, after))
+				} else {
+					Err(::v_utils::__internal::eyre::eyre!("Could not find insertion point in Nix file"))
+				}
 			}
 		}
 	};
