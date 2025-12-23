@@ -101,13 +101,13 @@ fn spawn_log_guardian(path: Arc<PathBuf>, needs_trim: Arc<AtomicBool>) {
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
 	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
-	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, stderr_errors: bool| {
+	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, stderr_errors: bool, log_dir: Option<PathBuf>| {
 		//TODO: 	console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		//TEST: if `with_ansi(false)` removes the need for `AnsiEsc` completely
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_ansi(false).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
-		let env_filter = filter_with_directives(&mut logs_during_init);
+		let env_filter = filter_with_directives(&mut logs_during_init, log_dir.as_deref());
 
 		let error_layer = ErrorLayer::default();
 
@@ -143,9 +143,9 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	fn destination_is_path<F, P>(path: P, stderr_errors: bool, setup: F)
 	where
 		P: Into<PathBuf> + Sized,
-		//F: FnOnce() -> Box<dyn Write> + 'static, {
-		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, bool), {
+		F: FnOnce(Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, bool, Option<PathBuf>), {
 		let path = path.into();
+		let log_dir = path.parent().map(|p| p.to_path_buf());
 
 		// Open the file once and share it via Arc<Mutex<>>
 		let file = std::fs::OpenOptions::new()
@@ -174,6 +174,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 				Box::new(shared_writer.clone()) as Box<dyn Write>
 			}),
 			stderr_errors,
+			log_dir,
 		);
 	}
 
@@ -182,7 +183,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 			destination_is_path(path, stderr_errors, setup);
 		}
 		LogDestination::Stdout => {
-			setup(Box::new(|| Box::new(std::io::stdout())), false);
+			setup(Box::new(|| Box::new(std::io::stdout())), false, None);
 		}
 		#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 		LogDestination::Xdg { dname, fname, stderr_errors } => {
@@ -285,17 +286,41 @@ impl From<PathBuf> for LogDestination {
 	}
 }
 
-fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>) -> EnvFilter {
+const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
+const DIRECTIVES_FILENAME: &str = "_log_directives";
+
+fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&std::path::Path>) -> EnvFilter {
 	static DEFAULT_DIRECTIVES: &str = "debug,hyper=info,hyper_util=info";
-	static DIRECTIVES_PATH: &str = ".cargo/log_directives";
 
-	let directives = std::fs::read_to_string(DIRECTIVES_PATH).map(Cow::Owned).unwrap_or_else(|_| {
-		logs_during_init.push(Box::new(|| warn!("Couldn't read log directives from `{DIRECTIVES_PATH}`, defaulting to default")));
-		Cow::Borrowed(DEFAULT_DIRECTIVES)
-	});
+	let log_dir_path = log_dir.map(|d| d.join(DIRECTIVES_FILENAME));
 
-	let directives_str = directives.clone();
-	logs_during_init.push(Box::new(move || info!("Proceeding with following log directives:\n{directives_str}")));
+	// Try .cargo/log_directives first, then _log_directives in log directory
+	let (directives, source): (Cow<'_, str>, Option<String>) = if let Ok(s) = std::fs::read_to_string(CARGO_DIRECTIVES_PATH) {
+		(Cow::Owned(s.trim().to_owned()), Some(CARGO_DIRECTIVES_PATH.to_owned()))
+	} else if let Some(ref p) = log_dir_path {
+		if let Ok(s) = std::fs::read_to_string(p) {
+			(Cow::Owned(s.trim().to_owned()), Some(p.display().to_string()))
+		} else {
+			(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
+		}
+	} else {
+		(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
+	};
+
+	match source {
+		Some(path) => {
+			let directives_str = directives.clone().into_owned();
+			logs_during_init.push(Box::new(move || info!("Using log directives from `{path}`:\n{directives_str}")));
+		}
+		None => {
+			let cargo_path = CARGO_DIRECTIVES_PATH.to_owned();
+			let log_dir_msg = log_dir_path.map(|p| p.display().to_string());
+			logs_during_init.push(Box::new(move || match log_dir_msg {
+				Some(p) => warn!("No log directives file found (checked `{cargo_path}` and `{p}`), using defaults"),
+				None => warn!("No log directives file found at `{cargo_path}`, using defaults"),
+			}));
+		}
+	}
 
 	EnvFilter::builder()
 		.parse(&directives)
