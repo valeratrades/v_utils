@@ -1,0 +1,19 @@
+# Test config file with unknown fields to trigger warnings
+host = "localhost"
+port = 8080
+debug = true
+
+# This field is NOT defined in AppConfig - should trigger warning
+unknown_top_level = "this should warn"
+
+# Another unknown field
+some_other_field = 42
+
+# Valid nested field
+[database]
+url = "postgres://localhost/test"
+max_connections = 10
+
+# Unknown nested field - should warn
+[unknown_section]
+foo = "bar"

@@ -40,3 +40,7 @@ v_utils = { path = "../v_utils", features = ["full"] }
 [[test]]
 name = "tests"
 path = "tests/main.rs"
+
+[[test]]
+name = "test_unknown_field_warning"
+path = "tests/test_unknown_field_warning.rs"
