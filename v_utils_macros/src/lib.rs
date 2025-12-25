@@ -1171,6 +1171,28 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					}
 				}
 			}
+
+			pub trait GetDefaults<T> {
+				fn get_defaults(&self) -> Option<::v_utils::__internal::serde_json::Value>;
+			}
+
+			/// Fallback impl for reference - returns None (lower priority in method resolution)
+			impl<T> GetDefaults<T> for &Wrapper<T> {
+				fn get_defaults(&self) -> Option<::v_utils::__internal::serde_json::Value> {
+					None
+				}
+			}
+
+			/// Impl for types that implement Default + Serialize (higher priority)
+			impl<T> GetDefaults<T> for Wrapper<T>
+			where
+				T: Default + ::v_utils::__internal::serde::Serialize,
+			{
+				fn get_defaults(&self) -> Option<::v_utils::__internal::serde_json::Value> {
+					let default_instance = T::default();
+					::v_utils::__internal::serde_json::to_value(&default_instance).ok()
+				}
+			}
 		}
 
 		impl #name {
@@ -1663,6 +1685,188 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				use __settings_default_provider::ComputeDiff as _;
 				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
 				(&wrapper).compute_diff(self)
+			}
+
+			/// Writes default values to the config file for fields that aren't already specified.
+			///
+			/// If the config file doesn't exist, creates a new one at `~/.config/<app_name>.nix`
+			/// with all default values.
+			///
+			/// Returns `Err` if Default + Serialize are not implemented, or if file operations fail.
+			pub fn write_defaults() -> Result<std::path::PathBuf, ::v_utils::__internal::eyre::Report> {
+				use __settings_default_provider::GetDefaults as _;
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+				let defaults = (&wrapper).get_defaults()
+					.ok_or_else(|| ::v_utils::__internal::eyre::eyre!(
+						"write_defaults requires Default + Serialize to be implemented on the struct"
+					))?;
+
+				let app_name = env!("CARGO_PKG_NAME");
+
+				#xdg_conf_dir
+
+				let location_bases = [
+					format!("{xdg_conf_dir}/{app_name}"),
+					format!("{xdg_conf_dir}/{app_name}/config"),
+				];
+				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
+
+				// Find existing config file
+				let existing_config: Option<std::path::PathBuf> = location_bases.iter()
+					.flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}"))))
+					.find(|p| p.exists());
+
+				match existing_config {
+					Some(config_path) => {
+						// Config exists - merge missing defaults
+						Self::merge_defaults_into_config(&config_path, &defaults)?;
+						Ok(config_path)
+					}
+					None => {
+						// No config exists - create new one with all defaults
+						let new_config_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.nix"));
+
+						// Ensure parent directory exists
+						if let Some(parent) = new_config_path.parent() {
+							std::fs::create_dir_all(parent)
+								.wrap_err_with(|| format!("Failed to create config directory: {}", parent.display()))?;
+						}
+
+						// Write defaults as Nix file
+						let nix_content = Self::json_to_nix_file(&defaults);
+						std::fs::write(&new_config_path, nix_content)
+							.wrap_err_with(|| format!("Failed to write config file: {}", new_config_path.display()))?;
+
+						Ok(new_config_path)
+					}
+				}
+			}
+
+			/// Merge missing default values into an existing config file
+			fn merge_defaults_into_config(
+				config_path: &std::path::Path,
+				defaults: &::v_utils::__internal::serde_json::Value,
+			) -> Result<(), ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let ext = config_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+				// Read existing config as JSON
+				let existing_json: ::v_utils::__internal::serde_json::Value = match ext {
+					"nix" => {
+						let json_str = Self::eval_nix_file(config_path.to_str().unwrap())?;
+						::v_utils::__internal::serde_json::from_str(&json_str)
+							.wrap_err("Failed to parse Nix config as JSON")?
+					}
+					"toml" => {
+						let content = std::fs::read_to_string(config_path)
+							.wrap_err_with(|| format!("Failed to read config file: {}", config_path.display()))?;
+						let table: ::v_utils::__internal::toml::Table = content.parse()
+							.wrap_err("Failed to parse TOML config")?;
+						::v_utils::__internal::serde_json::to_value(&table)
+							.wrap_err("Failed to convert TOML to JSON")?
+					}
+					_ => {
+						// For other formats, try to read as JSON directly
+						let content = std::fs::read_to_string(config_path)
+							.wrap_err_with(|| format!("Failed to read config file: {}", config_path.display()))?;
+						::v_utils::__internal::serde_json::from_str(&content)
+							.wrap_err("Failed to parse config as JSON")?
+					}
+				};
+
+				// Find fields in defaults that are missing from existing config
+				let mut missing_fields = Vec::new();
+				Self::find_missing_fields(defaults, &existing_json, String::new(), &mut missing_fields);
+
+				if missing_fields.is_empty() {
+					return Ok(()); // Nothing to add
+				}
+
+				// Add each missing field to the config
+				for (path, value) in missing_fields {
+					Self::extend_config_file(config_path, &path, &value)?;
+				}
+
+				Ok(())
+			}
+
+			/// Find fields that exist in defaults but not in existing config
+			fn find_missing_fields(
+				defaults: &::v_utils::__internal::serde_json::Value,
+				existing: &::v_utils::__internal::serde_json::Value,
+				prefix: String,
+				missing: &mut Vec<(String, ::v_utils::__internal::serde_json::Value)>,
+			) {
+				use ::v_utils::__internal::serde_json::Value;
+
+				if let Value::Object(def_map) = defaults {
+					let existing_map = existing.as_object();
+
+					for (key, def_val) in def_map {
+						let path = if prefix.is_empty() {
+							key.clone()
+						} else {
+							format!("{}.{}", prefix, key)
+						};
+
+						match existing_map.and_then(|m| m.get(key)) {
+							Some(existing_val) => {
+								// Key exists - recurse for nested objects
+								if def_val.is_object() && existing_val.is_object() {
+									Self::find_missing_fields(def_val, existing_val, path, missing);
+								}
+								// Otherwise, key exists with a value - don't override
+							}
+							None => {
+								// Key is missing - add it
+								missing.push((path, def_val.clone()));
+							}
+						}
+					}
+				}
+			}
+
+			/// Convert JSON value to a complete Nix file content
+			fn json_to_nix_file(json: &::v_utils::__internal::serde_json::Value) -> String {
+				Self::json_to_nix_value(json, 0)
+			}
+
+			/// Convert JSON value to Nix syntax with proper indentation
+			fn json_to_nix_value(json: &::v_utils::__internal::serde_json::Value, indent: usize) -> String {
+				use ::v_utils::__internal::serde_json::Value;
+
+				let indent_str = "  ".repeat(indent);
+				let inner_indent = "  ".repeat(indent + 1);
+
+				match json {
+					Value::Null => "null".to_string(),
+					Value::Bool(b) => if *b { "true" } else { "false" }.to_string(),
+					Value::Number(n) => n.to_string(),
+					Value::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+					Value::Array(arr) => {
+						if arr.is_empty() {
+							"[]".to_string()
+						} else {
+							let items: Vec<String> = arr.iter()
+								.map(|v| format!("{}{}", inner_indent, Self::json_to_nix_value(v, indent + 1)))
+								.collect();
+							format!("[\n{}\n{}]", items.join("\n"), indent_str)
+						}
+					}
+					Value::Object(obj) => {
+						if obj.is_empty() {
+							"{}".to_string()
+						} else {
+							let items: Vec<String> = obj.iter()
+								.map(|(k, v)| format!("{}{} = {};", inner_indent, k, Self::json_to_nix_value(v, indent + 1)))
+								.collect();
+							format!("{{\n{}\n{}}}", items.join("\n"), indent_str)
+						}
+					}
+				}
 			}
 		}
 	};
