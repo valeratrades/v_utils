@@ -1138,14 +1138,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 								collect_diffs(curr_val, def_val, path, diffs);
 							} else {
 								// Field exists in current but not in default (new field)
-								diffs.push(format!("+ {} = {}", path, format_value(curr_val)));
+								diffs.push(format!("{}: -> {}", path, format_value(curr_val)));
 							}
 						}
 					}
 					_ => {
 						if current != default {
-							diffs.push(format!("- {} = {}", prefix, format_value(default)));
-							diffs.push(format!("+ {} = {}", prefix, format_value(current)));
+							diffs.push(format!("{}: {} -> {}", prefix, format_value(default), format_value(current)));
 						}
 					}
 				}

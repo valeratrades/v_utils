@@ -47,17 +47,14 @@ fn main() {
 		assert!(config.diff_from_defaults().is_none());
 	}
 
-	// Test 2: Single field changed - shows both old and new values
+	// Test 2: Single field changed - shows old -> new format
 	{
 		let config = Config {
 			host: "custom-host".to_string(),
 			..Default::default()
 		};
 		let diff = config.diff_from_defaults().unwrap();
-		insta::assert_snapshot!(diff, @r###"
-  - host = "localhost"
-  + host = "custom-host"
-  "###);
+		insta::assert_snapshot!(diff, @r###"host: "localhost" -> "custom-host""###);
 	}
 
 	// Test 3: Multiple fields changed (port same as default, should not appear)
@@ -70,10 +67,8 @@ fn main() {
 		};
 		let diff = config.diff_from_defaults().unwrap();
 		insta::assert_snapshot!(diff, @r###"
-  - debug = false
-  + debug = true
-  - host = "localhost"
-  + host = "production"
+  debug: false -> true
+  host: "localhost" -> "production"
   "###);
 	}
 
@@ -90,14 +85,10 @@ fn main() {
 		};
 		let diff = config.diff_from_defaults().unwrap();
 		insta::assert_snapshot!(diff, @r###"
-  - database.max_connections = 0
-  + database.max_connections = 10
-  - database.url = ""
-  + database.url = "postgres://localhost/db"
-  - host = "localhost"
-  + host = "app-server"
-  - port = 8080
-  + port = 9000
+  database.max_connections: 0 -> 10
+  database.url: "" -> "postgres://localhost/db"
+  host: "localhost" -> "app-server"
+  port: 8080 -> 9000
   "###);
 	}
 
@@ -111,9 +102,6 @@ fn main() {
 			..Default::default()
 		};
 		let diff = config.diff_from_defaults().unwrap();
-		insta::assert_snapshot!(diff, @r###"
-  - database.url = ""
-  + database.url = "postgres://localhost/db"
-  "###);
+		insta::assert_snapshot!(diff, @r###"database.url: "" -> "postgres://localhost/db""###);
 	}
 }
