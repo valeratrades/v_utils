@@ -1085,6 +1085,92 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					Some(current.clone())
 				}
 			}
+
+			pub trait ComputeDiff<T> {
+				fn compute_diff(&self, current: &T) -> Option<String>;
+			}
+
+			/// Fallback impl for reference - returns None (lower priority in method resolution)
+			impl<T> ComputeDiff<T> for &Wrapper<T> {
+				fn compute_diff(&self, _current: &T) -> Option<String> {
+					None
+				}
+			}
+
+			/// Impl for types that implement Default + Serialize (higher priority)
+			impl<T> ComputeDiff<T> for Wrapper<T>
+			where
+				T: Default + ::v_utils::__internal::serde::Serialize,
+			{
+				fn compute_diff(&self, current: &T) -> Option<String> {
+					let default_instance = T::default();
+					let current_json = ::v_utils::__internal::serde_json::to_value(current).ok()?;
+					let default_json = ::v_utils::__internal::serde_json::to_value(&default_instance).ok()?;
+
+					let mut diffs = Vec::new();
+					collect_diffs(&current_json, &default_json, String::new(), &mut diffs);
+
+					if diffs.is_empty() {
+						None
+					} else {
+						Some(diffs.join("\n"))
+					}
+				}
+			}
+
+			fn collect_diffs(
+				current: &::v_utils::__internal::serde_json::Value,
+				default: &::v_utils::__internal::serde_json::Value,
+				prefix: String,
+				diffs: &mut Vec<String>,
+			) {
+				use ::v_utils::__internal::serde_json::Value;
+
+				match (current, default) {
+					(Value::Object(curr_map), Value::Object(def_map)) => {
+						for (key, curr_val) in curr_map {
+							let path = if prefix.is_empty() {
+								key.clone()
+							} else {
+								format!("{}.{}", prefix, key)
+							};
+							if let Some(def_val) = def_map.get(key) {
+								collect_diffs(curr_val, def_val, path, diffs);
+							} else {
+								// Field exists in current but not in default (new field)
+								diffs.push(format!("+ {} = {}", path, format_value(curr_val)));
+							}
+						}
+					}
+					_ => {
+						if current != default {
+							diffs.push(format!("- {} = {}", prefix, format_value(default)));
+							diffs.push(format!("+ {} = {}", prefix, format_value(current)));
+						}
+					}
+				}
+			}
+
+			fn format_value(value: &::v_utils::__internal::serde_json::Value) -> String {
+				use ::v_utils::__internal::serde_json::Value;
+
+				match value {
+					Value::String(s) => format!("\"{}\"", s),
+					Value::Null => "null".to_string(),
+					Value::Bool(b) => b.to_string(),
+					Value::Number(n) => n.to_string(),
+					Value::Array(arr) => {
+						let items: Vec<String> = arr.iter().map(format_value).collect();
+						format!("[{}]", items.join(", "))
+					}
+					Value::Object(obj) => {
+						let items: Vec<String> = obj.iter()
+							.map(|(k, v)| format!("{}: {}", k, format_value(v)))
+							.collect();
+						format!("{{{}}}", items.join(", "))
+					}
+				}
+			}
 		}
 
 		impl #name {
@@ -1565,6 +1651,18 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				} else {
 					Err(::v_utils::__internal::eyre::eyre!("Could not find insertion point in Nix file"))
 				}
+			}
+
+			/// Returns a string showing fields that differ from default values.
+			///
+			/// Returns `None` if Default + Serialize are not implemented,
+			/// or if all values match defaults.
+			///
+			/// Each line shows: `field.path = "value"`
+			pub fn diff_from_defaults(&self) -> Option<String> {
+				use __settings_default_provider::ComputeDiff as _;
+				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+				(&wrapper).compute_diff(self)
 			}
 		}
 	};

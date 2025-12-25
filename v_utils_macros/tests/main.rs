@@ -14,4 +14,6 @@ fn tests() {
 	t.pass("tests/live_settings.rs");
 	#[cfg(feature = "cli")]
 	t.pass("tests/settings_no_default.rs");
+	#[cfg(feature = "cli")]
+	t.pass("tests/diff_from_defaults.rs");
 }
