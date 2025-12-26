@@ -63,6 +63,7 @@ macro_rules! clientside {
 	};
 }
 
+/// **Warning**: Consider using `strum` crate instead - this macro is likely redundant for most use cases.
 #[macro_export]
 macro_rules! define_str_enum {
   ($(#[$meta:meta])* $vis:vis enum $name:ident {
