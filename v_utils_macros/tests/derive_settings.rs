@@ -24,8 +24,8 @@ struct AppConfig {
 	#[settings(flatten)]
 	#[serde(default)]
 	logging: Option<Logging>,
-	/// This field should be skipped - not in CLI flags or config
-	#[settings(skip)]
+	/// This field should be skipped from CLI flags (but still in config)
+	#[settings(skip(flag))]
 	#[serde(default)]
 	internal_state: String,
 }
@@ -152,7 +152,7 @@ fn main() {
 				logging_level: None,
 				logging_file: None,
 			},
-			// NOTE: internal_state is NOT here because it has #[settings(skip)]
+			// NOTE: internal_state is NOT here because it has #[settings(skip(flag))]
 		};
 	};
 

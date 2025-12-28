@@ -89,6 +89,63 @@ fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
 
 //,}}}
 
+/// Parsed field-level settings attributes
+///
+/// Supports:
+/// - `#[settings(skip)]` - skip both flags and env
+/// - `#[settings(skip(flag))]` - skip only CLI flag generation
+/// - `#[settings(skip(env))]` - skip only env var binding
+/// - `#[settings(skip(flag, env))]` - skip both (same as `skip`)
+/// - `#[settings(flatten)]` - flatten nested struct
+#[derive(Default)]
+struct SettingsFieldAttrs {
+	flatten: bool,
+	skip_flag: bool,
+	skip_env: bool,
+}
+
+impl SettingsFieldAttrs {
+	fn parse(attrs: &[syn::Attribute]) -> Self {
+		let mut result = Self::default();
+		for attr in attrs {
+			if attr.path().is_ident("settings") {
+				let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
+					while !input.is_empty() {
+						let ident: syn::Ident = input.parse()?;
+						if ident == "flatten" {
+							result.flatten = true;
+						} else if ident == "skip" {
+							// Check if followed by parentheses with specific targets
+							if input.peek(token::Paren) {
+								let content;
+								syn::parenthesized!(content in input);
+								while !content.is_empty() {
+									let target: syn::Ident = content.parse()?;
+									if target == "flag" {
+										result.skip_flag = true;
+									} else if target == "env" {
+										result.skip_env = true;
+									}
+									// Skip comma if present
+									let _ = content.parse::<Option<Token![,]>>();
+								}
+							} else {
+								// Plain `skip` means skip both
+								result.skip_flag = true;
+								result.skip_env = true;
+							}
+						}
+						// Skip comma if present
+						let _ = input.parse::<Option<Token![,]>>();
+					}
+					Ok(())
+				});
+			}
+		}
+		result
+	}
+}
+
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
 /// For some reason not a `HashSet`, no clue why.
@@ -1062,7 +1119,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	};
 
 	// Generate field lists for validation (include all fields)
-	// Note: #[settings(skip)] and #[settings(flatten)] only affect CLI flag generation,
+	// Note: #[settings(skip)], #[settings(skip(flag))], #[settings(skip(env))], and #[settings(flatten)] only affect CLI flag/env generation,
 	// not config file validation - all fields are valid in config files
 	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
 
@@ -1899,32 +1956,20 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		// check if attr is `#[settings(flatten)]` or `#[settings(skip)]`
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
 
-		let has_skip_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "skip";
-				}
-			}
-			false
-		});
+		// Skip fields with both skip_flag and skip_env (completely hidden from CLI)
+		if field_attrs.skip_flag && field_attrs.skip_env {
+			return None;
+		}
 
-		// Skip fields with #[settings(skip)]
-		if has_skip_attr {
+		// Skip fields with skip_flag (no CLI flag generation)
+		if field_attrs.skip_flag {
 			return None;
 		}
 
 		let ident = &field.ident;
-		Some(match has_flatten_attr {
+		Some(match field_attrs.flatten {
 			true => {
 				use quote::ToTokens as _;
 				// Extract inner type if Option<T>
@@ -1942,7 +1987,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 			false => {
 				let clap_ty = clap_compatible_option_wrapped_ty(ty);
-				if use_env {
+				// Only add env binding if use_env is enabled AND skip_env is not set
+				if use_env && !field_attrs.skip_env {
 					let env_var_name = AsShoutySnakeCase(ident.as_ref().unwrap().to_string()).to_string();
 					quote! {
 						#[arg(long, env = #env_var_name)]
@@ -1969,32 +2015,15 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		// check if attr is `#[settings(flatten)]` or `#[settings(skip)]`
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
 
-		let has_skip_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "skip";
-				}
-			}
-			false
-		});
-
-		// Skip fields with #[settings(skip)]
-		if has_skip_attr {
+		// Skip fields with skip_flag (not in SettingsFlags struct, so can't collect from them)
+		if field_attrs.skip_flag {
 			return None;
 		}
 
 		let ident = &field.ident;
-		Some(match has_flatten_attr {
+		Some(match field_attrs.flatten {
 			true => {
 				quote! {
 					let _ = &self.#ident.collect_config(&mut map);
@@ -2120,16 +2149,14 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
 
-		if has_flatten_attr {
+		// Skip fields with skip_flag (no CLI flag generation)
+		if field_attrs.skip_flag {
+			return None;
+		}
+
+		if field_attrs.flatten {
 			// For flattened nested structs, include the nested struct's flags
 			use quote::ToTokens as _;
 			let inner_type = if let syn::Type::Path(type_path) = ty {
@@ -2146,7 +2173,8 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		} else {
 			let clap_ty = clap_compatible_option_wrapped_ty(ty);
 			let prefixed_field_name = format_ident!("{}_{}", prefix, ident.as_ref().unwrap());
-			if use_env {
+			// Only add env binding if use_env is enabled AND skip_env is not set
+			if use_env && !field_attrs.skip_env {
 				let env_var_name = AsShoutySnakeCase(prefixed_field_name.to_string()).to_string();
 				Some(quote! {
 					#[arg(long, env = #env_var_name)]
@@ -2165,16 +2193,14 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let has_flatten_attr = field.attrs.iter().any(|attr| {
-			if attr.path().is_ident("settings") {
-				if let Ok(nested) = attr.parse_args::<syn::Ident>() {
-					return nested == "flatten";
-				}
-			}
-			false
-		});
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
 
-		if has_flatten_attr {
+		// Skip fields with skip_flag (not in the struct, so can't collect from them)
+		if field_attrs.skip_flag {
+			return None;
+		}
+
+		if field_attrs.flatten {
 			Some(quote! {
 				let _ = &self.#ident.collect_config(map);
 			})
