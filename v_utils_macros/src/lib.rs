@@ -485,7 +485,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 ///     raw_value: String,                  // No transformation
 /// }
 /// ```
-#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives))]
+#[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives, default))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
@@ -521,9 +521,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				false
 			});
 
-			// Collect all attributes except private_value, primitives, and settings to forward to Helper
+			// Collect all attributes except private_value, primitives, settings, and default to forward to Helper
+			// (default is for SmartDefault, not for serde)
 			let forwarded_attrs = f.attrs.iter().filter(|attr| {
-				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives")
+				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives") && !attr.path().is_ident("default")
 			}).collect::<Vec<_>>();
 
 			// Check if type is Option<T>
@@ -1129,6 +1130,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		/// Helper module for autoref specialization pattern.
 		/// This allows graceful degradation when Default + Serialize are not implemented.
 		mod __settings_default_provider {
+			#[allow(unused_imports)]
 			use super::*;
 
 			pub struct Wrapper<T>(pub std::marker::PhantomData<T>);
