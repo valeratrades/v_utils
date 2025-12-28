@@ -1032,6 +1032,25 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		unimplemented!()
 	};
 
+	// Parse #[settings(use_env = true)] struct-level attribute
+	let use_env = ast.attrs.iter().any(|attr| {
+		if attr.path().is_ident("settings") {
+			attr.parse_args_with(|input: syn::parse::ParseStream| {
+				let ident: syn::Ident = input.parse()?;
+				if ident == "use_env" {
+					let _: Token![=] = input.parse()?;
+					let lit: syn::LitBool = input.parse()?;
+					Ok(lit.value)
+				} else {
+					Ok(false)
+				}
+			})
+			.unwrap_or(false)
+		} else {
+			false
+		}
+	});
+
 	#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
 		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
@@ -1923,9 +1942,17 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 			false => {
 				let clap_ty = clap_compatible_option_wrapped_ty(ty);
-				quote! {
-					#[arg(long)]
-					#ident: #clap_ty,
+				if use_env {
+					let env_var_name = AsShoutySnakeCase(ident.as_ref().unwrap().to_string()).to_string();
+					quote! {
+						#[arg(long, env = #env_var_name)]
+						#ident: #clap_ty,
+					}
+				} else {
+					quote! {
+						#[arg(long)]
+						#ident: #clap_ty,
+					}
 				}
 			}
 		})
@@ -2060,29 +2087,31 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
-	// Find the optional #[settings(prefix = "...")] attribute, default to snake_case name
-	let prefix = ast
-		.attrs
-		.iter()
-		.find_map(|attr| {
-			if attr.path().is_ident("settings") {
-				attr.parse_args_with(|input: syn::parse::ParseStream| {
+	// Find the optional #[settings(prefix = "...", use_env = true)] attributes
+	let mut prefix = None;
+	let mut use_env = false;
+	for attr in &ast.attrs {
+		if attr.path().is_ident("settings") {
+			let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
+				while !input.is_empty() {
 					let ident: syn::Ident = input.parse()?;
 					if ident == "prefix" {
 						let _: Token![=] = input.parse()?;
 						let lit: syn::LitStr = input.parse()?;
-						Ok(Some(lit.value()))
-					} else {
-						Ok(None)
+						prefix = Some(lit.value());
+					} else if ident == "use_env" {
+						let _: Token![=] = input.parse()?;
+						let lit: syn::LitBool = input.parse()?;
+						use_env = lit.value;
 					}
-				})
-				.ok()
-				.flatten()
-			} else {
-				None
-			}
-		})
-		.unwrap_or(snake_case_name); // Default to struct's snake_case name
+					// Skip comma if present
+					let _ = input.parse::<Option<Token![,]>>();
+				}
+				Ok(())
+			});
+		}
+	}
+	let prefix = prefix.unwrap_or(snake_case_name);
 
 	// Config path uses dots (e.g., "database.pool")
 	let config_prefix = prefix.replace('_', ".");
@@ -2117,10 +2146,18 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		} else {
 			let clap_ty = clap_compatible_option_wrapped_ty(ty);
 			let prefixed_field_name = format_ident!("{}_{}", prefix, ident.as_ref().unwrap());
-			Some(quote! {
-				#[arg(long)]
-				#prefixed_field_name: #clap_ty,
-			})
+			if use_env {
+				let env_var_name = AsShoutySnakeCase(prefixed_field_name.to_string()).to_string();
+				Some(quote! {
+					#[arg(long, env = #env_var_name)]
+					#prefixed_field_name: #clap_ty,
+				})
+			} else {
+				Some(quote! {
+					#[arg(long)]
+					#prefixed_field_name: #clap_ty,
+				})
+			}
 		}
 	});
 
