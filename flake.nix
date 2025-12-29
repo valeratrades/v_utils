@@ -4,7 +4,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     pre-commit-hooks.url = "github:cachix/git-hooks.nix/ca5b894d3e3e151ffc1db040b6ce4dcc75d31c37";
-    v-utils.url = "github:valeratrades/.github";
+    v-utils.url = "github:valeratrades/.github/v1.2.1";
   };
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils }:
@@ -23,8 +23,9 @@
         pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        workflowContents = v-utils.ci {
-          inherit pkgs; lastSupportedVersion = "nightly-2025-10-12";
+        github = v-utils.github {
+          inherit pkgs pname; lastSupportedVersion = "nightly-2025-10-12";
+          langs = [ "rs" ];
           jobsErrors = [ "rust-tests" ];
           jobsWarnings = [
             { name = "rust-doc"; args = { package = "v_utils"; }; }
@@ -44,30 +45,27 @@
           inherit stdenv;
           shellHook =
             pre-commit-check.shellHook +
-            workflowContents.shellHook +
+            github.shellHook +
             ''
                             cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
 
-                            cargo -Zscript -q ${v-utils.hooks.appendCustom} ./.git/hooks/pre-commit
-                            cp -f ${(v-utils.hooks.treefmt) {inherit pkgs;}} ./.treefmt.toml
-                            cp -f ${(v-utils.hooks.preCommit) { inherit pkgs pname; }} ./.git/hooks/custom.sh
+                            cp -f ${(v-utils.files.treefmt) {inherit pkgs;}} ./.treefmt.toml
 
                             mkdir -p ./.cargo
               							cp -f ${(v-utils.files.rust.config {inherit pkgs;})} ./.cargo/config.toml
                             cp -f ${(v-utils.files.rust.toolchain {inherit pkgs;})} ./.cargo/rust-toolchain.toml
                             cp -f ${(v-utils.files.rust.rustfmt {inherit pkgs;})} ./rustfmt.toml
                             cp -f ${(v-utils.files.rust.deny {inherit pkgs;})} ./deny.toml
-                            cp -f ${(v-utils.files.gitignore { inherit pkgs; langs = ["rs"];})} ./.gitignore
 
                             cp -f ${readme} ./README.md
             '';
 
           buildInputs = [
-            mold-wrapped
+            mold
             openssl
             pkg-config
             rust
-          ] ++ pre-commit-check.enabledPackages;
+          ] ++ pre-commit-check.enabledPackages ++ github.enabledPackages;
         };
       }
     );
