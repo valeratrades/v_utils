@@ -101,13 +101,15 @@ fn spawn_log_guardian(path: Arc<PathBuf>, needs_trim: Arc<AtomicBool>) {
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
 	let mut logs_during_init: Vec<Box<dyn FnOnce()>> = Vec::new();
+	let compiled_directives = log_destination.compiled_directives;
+
 	let mut setup = |make_writer: Box<dyn Fn() -> Box<dyn Write> + Send + Sync>, stderr_errors: bool, log_dir: Option<PathBuf>| {
 		//TODO: 	console_error_panic_hook::set_once(); // for wasm32 targets exclusively.
 		//let tokio_console_artifacts_filter = EnvFilter::new("tokio[trace]=off,runtime[trace]=off");
 		//TEST: if `with_ansi(false)` removes the need for `AnsiEsc` completely
 		let formatting_layer = tracing_subscriber::fmt::layer().json().pretty().with_writer(make_writer).with_ansi(false).with_file(true).with_line_number(true)/*.with_filter(tokio_console_artifacts_filter)*/;
 
-		let env_filter = filter_with_directives(&mut logs_during_init, log_dir.as_deref());
+		let env_filter = filter_with_directives(&mut logs_during_init, log_dir.as_deref(), compiled_directives);
 
 		let error_layer = ErrorLayer::default();
 
@@ -178,15 +180,16 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		);
 	}
 
-	match log_destination {
-		LogDestination::File { path, stderr_errors } => {
+	let stderr_errors = log_destination.stderr_errors;
+	match log_destination.kind {
+		LogDestinationKind::File { path } => {
 			destination_is_path(path, stderr_errors, setup);
 		}
-		LogDestination::Stdout => {
+		LogDestinationKind::Stdout => {
 			setup(Box::new(|| Box::new(std::io::stdout())), false, None);
 		}
 		#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-		LogDestination::Xdg { dname, fname, stderr_errors } => {
+		LogDestinationKind::Xdg { dname, fname } => {
 			let associated_state_home = xdg::BaseDirectories::with_prefix(dname).create_state_directory("").unwrap();
 			let filename = fname
 				.as_ref()
@@ -206,103 +209,107 @@ pub fn init_subscriber(log_destination: LogDestination) {
 }
 
 #[derive(Clone, Debug, Default)]
-pub enum LogDestination {
+pub struct LogDestination {
+	pub kind: LogDestinationKind,
+	pub stderr_errors: bool,
+	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
+	pub compiled_directives: Option<&'static str>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub enum LogDestinationKind {
 	#[default]
 	Stdout,
 	File {
 		path: PathBuf,
-		stderr_errors: bool,
 	},
 	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 	Xdg {
 		dname: String,
 		fname: Option<String>,
-		stderr_errors: bool,
 	},
 }
 
 impl LogDestination {
-	/// Helper for creating [File](LogDestination::File) variant
+	/// Helper for creating File variant
 	pub fn file<P: Into<PathBuf>>(path: P) -> Self {
-		LogDestination::File {
-			path: path.into(),
+		LogDestination {
+			kind: LogDestinationKind::File { path: path.into() },
 			stderr_errors: false,
+			compiled_directives: None,
 		}
 	}
 
-	/// Helper for creating [XdgDataHome](LogDestination::Xdg) variant
+	/// Helper for creating Xdg variant
 	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 	pub fn xdg<S: Into<String>>(name: S) -> Self {
-		LogDestination::Xdg {
-			dname: name.into(),
-			fname: None,
+		LogDestination {
+			kind: LogDestinationKind::Xdg { dname: name.into(), fname: None },
 			stderr_errors: false,
+			compiled_directives: None,
 		}
 	}
 
 	/// Set custom filename for Xdg variant (creates `{fname}.log`)
 	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	pub fn fname<S: Into<String>>(self, fname: S) -> Self {
-		match self {
-			LogDestination::Xdg { dname, stderr_errors, .. } => LogDestination::Xdg {
-				dname,
-				fname: Some(fname.into()),
-				stderr_errors,
-			},
-			_ => self,
+	pub fn fname<S: Into<String>>(mut self, fname: S) -> Self {
+		if let LogDestinationKind::Xdg { dname, .. } = self.kind {
+			self.kind = LogDestinationKind::Xdg { dname, fname: Some(fname.into()) };
 		}
+		self
 	}
 
 	/// Enable/disable ERROR level logging to stderr
-	pub fn stderr_errors(self, enabled: bool) -> Self {
-		match self {
-			LogDestination::File { path, .. } => LogDestination::File { path, stderr_errors: enabled },
-			#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-			LogDestination::Xdg { dname, fname, .. } => LogDestination::Xdg {
-				dname,
-				fname,
-				stderr_errors: enabled,
-			},
-			other => other,
-		}
+	pub fn stderr_errors(mut self, enabled: bool) -> Self {
+		self.stderr_errors = enabled;
+		self
+	}
+
+	/// Set compile-time embedded directives (takes priority over file-based directives).
+	/// Typically used with `option_env!("LOG_DIRECTIVES")` in the downstream crate.
+	pub fn compiled_directives(mut self, directives: Option<&'static str>) -> Self {
+		self.compiled_directives = directives;
+		self
 	}
 }
+
 impl From<&str> for LogDestination {
 	fn from(s: &str) -> Self {
-		if s == "stdout" {
-			LogDestination::Stdout
-		} else {
-			LogDestination::File {
-				path: s.into(),
-				stderr_errors: false,
-			}
-		}
+		if s == "stdout" { LogDestination::default() } else { LogDestination::file(s) }
 	}
 }
 
 impl From<PathBuf> for LogDestination {
 	fn from(path: PathBuf) -> Self {
-		LogDestination::File { path, stderr_errors: false }
+		LogDestination::file(path)
 	}
 }
 
 const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
 const DIRECTIVES_FILENAME: &str = "_log_directives";
 
-fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&std::path::Path>) -> EnvFilter {
+fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&std::path::Path>, compiled_directives: Option<&'static str>) -> EnvFilter {
 	static DEFAULT_DIRECTIVES: &str = "debug,hyper=info,hyper_util=info";
 
 	let log_dir_path = log_dir.map(|d| d.join(DIRECTIVES_FILENAME));
 
-	// Try .cargo/log_directives first, then _log_directives in log directory
+	// Priority order:
+	// 1. .cargo/log_directives file (for development - highest priority)
+	// 2. _log_directives in log directory (for runtime override of installed binaries)
+	// 3. Compiled-in directives (production defaults, embedded via build.rs)
+	// 4. Hard-coded default directives
 	let (directives, source): (Cow<'_, str>, Option<String>) = if let Ok(s) = std::fs::read_to_string(CARGO_DIRECTIVES_PATH) {
 		(Cow::Owned(s.trim().to_owned()), Some(CARGO_DIRECTIVES_PATH.to_owned()))
 	} else if let Some(ref p) = log_dir_path {
 		if let Ok(s) = std::fs::read_to_string(p) {
 			(Cow::Owned(s.trim().to_owned()), Some(p.display().to_string()))
+		} else if let Some(compiled) = compiled_directives {
+			(Cow::Borrowed(compiled), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
 		} else {
 			(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
 		}
+	} else if let Some(compiled) = compiled_directives {
+		(Cow::Borrowed(compiled), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
 	} else {
 		(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
 	};
