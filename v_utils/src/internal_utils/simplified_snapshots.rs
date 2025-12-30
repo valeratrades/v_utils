@@ -233,7 +233,7 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 
 //TODO!!!!!: `plot_xy()`, that would have explicit axis markings in the expected locations (for now make strictly positive to avoid logic for dynamically positioning the axis).
 
-#[cfg(test)]
+#[cfg(all(test, feature = "distributions"))]
 mod tests {
 	use insta::assert_snapshot;
 	use rand::{Rng, SeedableRng, rngs::StdRng};

@@ -88,7 +88,7 @@ pub struct Close {
 	pub timestamp: Timestamp,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "distributions"))]
 mod tests {
 	use insta::{assert_debug_snapshot, assert_snapshot};
 

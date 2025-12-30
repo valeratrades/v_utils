@@ -288,6 +288,10 @@ impl From<PathBuf> for LogDestination {
 const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
 const DIRECTIVES_FILENAME: &str = "_log_directives";
 
+fn normalize_directives(s: &str) -> String {
+	s.lines().map(|l| l.trim()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect::<Vec<_>>().join(",")
+}
+
 fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&std::path::Path>, compiled_directives: Option<&'static str>) -> EnvFilter {
 	static DEFAULT_DIRECTIVES: &str = "debug,hyper=info,hyper_util=info";
 
@@ -298,18 +302,19 @@ fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir
 	// 2. _log_directives in log directory (for runtime override of installed binaries)
 	// 3. Compiled-in directives (production defaults, embedded via build.rs)
 	// 4. Hard-coded default directives
+
 	let (directives, source): (Cow<'_, str>, Option<String>) = if let Ok(s) = std::fs::read_to_string(CARGO_DIRECTIVES_PATH) {
-		(Cow::Owned(s.trim().to_owned()), Some(CARGO_DIRECTIVES_PATH.to_owned()))
+		(Cow::Owned(normalize_directives(&s)), Some(CARGO_DIRECTIVES_PATH.to_owned()))
 	} else if let Some(ref p) = log_dir_path {
 		if let Ok(s) = std::fs::read_to_string(p) {
-			(Cow::Owned(s.trim().to_owned()), Some(p.display().to_string()))
+			(Cow::Owned(normalize_directives(&s)), Some(p.display().to_string()))
 		} else if let Some(compiled) = compiled_directives {
-			(Cow::Borrowed(compiled), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
+			(Cow::Owned(normalize_directives(compiled)), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
 		} else {
 			(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
 		}
 	} else if let Some(compiled) = compiled_directives {
-		(Cow::Borrowed(compiled), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
+		(Cow::Owned(normalize_directives(compiled)), Some("compiled-in (LOG_DIRECTIVES)".to_owned()))
 	} else {
 		(Cow::Borrowed(DEFAULT_DIRECTIVES), None)
 	};
@@ -344,4 +349,29 @@ fn trace_the_init() {
 	tracing::trace!("Executed as {exe:?} in {dir:?}\n", exe = current_exe(), dir = current_dir(),);
 	tracing::trace!("Arguments: {args:#?}\n", args = args);
 	tracing::trace!("Environment: {vars:#?}\n", vars = vars);
+}
+
+#[cfg(test)]
+mod tests {
+	use tracing_subscriber::EnvFilter;
+
+	use super::*;
+
+	#[test]
+	fn normalize_directives_handles_mixed_formats() {
+		let input = r#"
+
+debug,hyper=info,hyper_util=info
+# this is a comment
+warn
+  trace
+my_crate=debug
+
+"#;
+		let normalized = normalize_directives(input);
+		assert_eq!(normalized, "debug,hyper=info,hyper_util=info,warn,trace,my_crate=debug");
+
+		// Verify it actually parses
+		EnvFilter::builder().parse(&normalized).expect("normalized directives should parse");
+	}
 }
