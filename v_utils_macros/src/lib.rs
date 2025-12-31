@@ -2461,11 +2461,6 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 				Ok(self.inner.read().unwrap().value.clone())
 			}
-
-			/// Get a direct reference to the initial settings (no reload check).
-			pub fn initial(&self) -> #name {
-				self.inner.read().unwrap().value.clone()
-			}
 		}
 	};
 

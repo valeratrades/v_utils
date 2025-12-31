@@ -53,13 +53,7 @@ fn main() {
 		ls.config()
 	}
 
-	// Test that initial() method exists and returns AppConfig
-	fn check_initial_method(ls: &LiveSettings) -> AppConfig {
-		ls.initial()
-	}
-
 	// Suppress unused warnings
 	let _ = flags;
 	let _ = check_config_method;
-	let _ = check_initial_method;
 }
