@@ -466,11 +466,15 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// This macro handles:
 /// - String fields: wrapped with PrivateValue for env var support (`{ env = "VAR_NAME" }`)
 /// - PathBuf fields: wrapped with ExpandedPath for tilde expansion
-/// - SecretString fields: wrapped with PrivateValue and converted to SecretString
+/// - SecretString fields: wrapped with PrivateValue and converted to SecretString (debug shows `[REDACTED]`)
 /// - Option<T> variants of the above
 /// - `#[private_value]` attribute for custom types that should use PrivateValue + FromStr
 /// - `#[primitives(skip)]` attribute to skip transformation for a field
 /// - `#[serde(...)]` attributes are forwarded to the generated Helper struct
+///
+/// # SecretString
+/// The `secrecy` crate's `SecretString` already implements `Debug` to show `[REDACTED]`,
+/// so debug-printing structs with secret fields is safe by default.
 ///
 /// # Example
 /// ```ignore
@@ -478,7 +482,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// pub struct Config {
 ///     api_key: String,                    // Supports { env = "API_KEY" }
 ///     config_path: PathBuf,               // Supports ~ expansion
-///     secret: SecretString,               // Supports { env = "SECRET" }
+///     secret: SecretString,               // Supports { env = "SECRET" }, debug shows [REDACTED]
 ///     #[private_value]
 ///     port: Port,                         // Custom type via FromStr
 ///     #[primitives(skip)]

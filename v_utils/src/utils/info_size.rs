@@ -9,7 +9,7 @@ use strum::{EnumIter, IntoEnumIterator as _};
 pub struct InfoSize(pub u64);
 
 /// Whether the unit represents bits or bytes
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InfoSizeKind {
 	Bit,
 	Byte,
@@ -199,7 +199,7 @@ impl From<&&str> for InfoSize {
 }
 
 /// SI (decimal) vs IEC (binary) prefix
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum InfoSizePrefix {
 	#[default]
 	None,
@@ -217,7 +217,7 @@ pub enum InfoSizePrefix {
 	Pebi,
 }
 
-#[derive(Clone, Copy, Debug, Default, EnumIter, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, EnumIter, Eq, PartialEq)]
 pub enum InfoSizeUnit {
 	// Bits (lowercase b)
 	Bit,

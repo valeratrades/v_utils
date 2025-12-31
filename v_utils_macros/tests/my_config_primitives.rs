@@ -70,4 +70,8 @@ skipped_string = "this should not be wrapped in PrivateValue"
 	assert_eq!(t.string_with_default, ""); // Test that serde(default) works - empty string is the default for String
 	assert_eq!(t.num_of_retries, 3); // Test that custom default function works
 	assert_eq!(t.skipped_string, "this should not be wrapped in PrivateValue"); // Test that #[primitives(skip)] works
+
+	// Test that SecretString fields show [REDACTED] in debug output (handled by secrecy crate)
+	let debug_output = format!("{:?}", t);
+	assert!(debug_output.contains("[REDACTED]"), "SecretString should show [REDACTED] in debug output, got: {}", debug_output);
 }
