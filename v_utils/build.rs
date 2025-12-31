@@ -1,6 +1,6 @@
 use std::process::Command;
 
-const DEPRECATE_AT_VERSION: &str = "v2.0.0";
+const DEPRECATE_AT_VERSION: &str = "v3.0.0";
 
 fn main() {
 	// Embed git commit hash (fallback to "unknown" if git unavailable, e.g., in Nix sandbox)
