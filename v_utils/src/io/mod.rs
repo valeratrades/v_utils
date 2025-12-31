@@ -5,7 +5,11 @@ pub mod expanded_path;
 pub use expanded_path::*;
 
 pub mod files;
+#[allow(deprecated)]
 pub use files::*;
+
+pub mod file_open;
+pub use file_open::{Client as FileOpenClient, OpenMode as FileOpenMode, open as file_open};
 
 pub mod progress_bar;
 pub use progress_bar::*;

@@ -844,9 +844,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4b4619134eacbf531940e1b03c6b6dd8ee59a807d5986843dd0ad4f5e3289f"
 dependencies = [
  "autocfg",
- "facet-core",
- "facet-macros",
+ "facet-core 0.32.2",
+ "facet-macros 0.32.2",
  "static_assertions",
+]
+
+[[package]]
+name = "facet"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f00d2cc18d1078029c4f94a382875815e28b66f012215b54ef4fa0936e80f6dc"
+dependencies = [
+ "autocfg",
+ "facet-core 0.41.0",
+ "facet-macros 0.41.0",
 ]
 
 [[package]]
@@ -861,13 +872,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "facet-core"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1d17e38e07927e33d1b9e90e953da46f4efe75462be12d1e6aca4d039ecfa6a"
+dependencies = [
+ "autocfg",
+ "impls",
+]
+
+[[package]]
 name = "facet-json"
 version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "207de5ab4db7d7bfa4b4f4b00efb99e80e2c4e3e377e48290306b5b55f9871a8"
 dependencies = [
- "facet",
- "facet-core",
+ "facet 0.32.2",
+ "facet-core 0.32.2",
  "facet-reflect",
  "facet-solver",
  "itoa",
@@ -885,10 +906,21 @@ version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a57734c5ab2e5129aceaf4356f6ac860f1d94a399d060620a5f28cfb39066e5"
 dependencies = [
- "facet-macro-types",
+ "facet-macro-types 0.32.2",
  "proc-macro2",
  "quote",
  "unsynn",
+]
+
+[[package]]
+name = "facet-macro-parse"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b2e7965c0671048597607938de32c7f39727832048311258d7b988d1bfd5971"
+dependencies = [
+ "facet-macro-types 0.41.0",
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -903,13 +935,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "facet-macro-types"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3581126b27216d82b2a72232673e84a38363f2b76f9585b4f279c9eb58da4c3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unsynn",
+]
+
+[[package]]
 name = "facet-macros"
 version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea3bf698bfad966cabf75ea62cdb27ddc3ba6d1e1a4bf571a7fa5b2e58b8788d"
 dependencies = [
- "facet-core",
- "facet-macros-impl",
+ "facet-core 0.32.2",
+ "facet-macros-impl 0.32.2",
+]
+
+[[package]]
+name = "facet-macros"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac47f0b6eb4fa50f8417ddc62c8d389283bee86d827261bab98f824fb315e8f6"
+dependencies = [
+ "facet-macros-impl 0.41.0",
 ]
 
 [[package]]
@@ -918,8 +970,22 @@ version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cb6fbeca0fd17867f070a337b265098a99e2913478a9e0ff8b950c6f57fae74"
 dependencies = [
- "facet-macro-parse",
- "facet-macro-types",
+ "facet-macro-parse 0.32.2",
+ "facet-macro-types 0.32.2",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "unsynn",
+]
+
+[[package]]
+name = "facet-macros-impl"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2875e4a39494af823f83bfc2aacf4eb84afa31a93c520d4f2897cc580a944ea"
+dependencies = [
+ "facet-macro-parse 0.41.0",
+ "facet-macro-types 0.41.0",
  "proc-macro2",
  "quote",
  "strsim",
@@ -932,8 +998,8 @@ version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af2085db4003e228e6be4ddf8d5702f3ced25ae98390afd0956788d8a999b57a"
 dependencies = [
- "facet-core",
- "facet-macros",
+ "facet-core 0.32.2",
+ "facet-macros 0.32.2",
 ]
 
 [[package]]
@@ -942,7 +1008,7 @@ version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b529841f1cb511288edd65cad33517ad9e0ff38e2d9c6ecd95d4e1e273d403f"
 dependencies = [
- "facet-core",
+ "facet-core 0.32.2",
  "facet-reflect",
  "strsim",
 ]
@@ -954,7 +1020,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1594dacf86139dc0c2188d9a57b967acd50f11f3bcb9af0a9f12679c8df6f34"
 dependencies = [
  "ariadne",
- "facet-core",
+ "facet-core 0.32.2",
  "facet-reflect",
  "facet-solver",
  "log",
@@ -3544,7 +3610,7 @@ dependencies = [
  "derive_more",
  "dirs",
  "eyre",
- "facet",
+ "facet 0.41.0",
  "facet-json",
  "facet-toml",
  "function_name",
