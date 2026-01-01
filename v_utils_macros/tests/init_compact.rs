@@ -11,7 +11,7 @@ pub struct TrailingStop {
 #[derive(CompactFormatNamed, Debug, PartialEq)]
 pub struct Empty {}
 
-#[derive(CompactFormatMap, Debug, PartialEq, Clone)]
+#[derive(Clone, CompactFormatMap, Debug, PartialEq)]
 pub struct Position {
 	pub take_profit: f64,
 	pub stop_loss: f64,
@@ -25,7 +25,7 @@ pub struct Order {
 
 // To match your example: '{p=tpsl:t0.4884:s0.5190;c=50%}'
 // Outer is CompactFormatMap, inner `p` field is CompactFormatNamed
-#[derive(CompactFormatNamed, Debug, PartialEq, Clone)]
+#[derive(Clone, CompactFormatNamed, Debug, PartialEq)]
 pub struct TpSl {
 	pub take_profit: f64,
 	pub stop_loss: f64,

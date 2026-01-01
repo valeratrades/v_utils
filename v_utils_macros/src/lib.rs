@@ -379,7 +379,7 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 /// ```rust
 /// # use v_utils_macros::{CompactFormatNamed, CompactFormatMap};
 /// # use std::str::FromStr;
-/// #[derive(CompactFormatMap, Debug, PartialEq, Clone)]
+/// #[derive(Clone, CompactFormatMap, Debug, PartialEq)]
 /// pub struct Position {
 ///     pub take_profit: f64,
 ///     pub stop_loss: f64,

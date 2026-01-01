@@ -47,6 +47,7 @@
             deny = true;
             workspace = {
               "./v_utils" = [ "git_version" "log_directives" { deprecate = "v3.0.0"; } ];
+              "./v_utils_macros" = [{ deprecate = "v3.0.0"; }];
             };
           };
         };
