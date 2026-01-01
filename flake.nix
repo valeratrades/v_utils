@@ -31,7 +31,7 @@
             { name = "rust-doc"; args = { package = "v_utils"; }; }
             "rust-clippy"
             "rust-machete"
-            "rust-sorted" #TEST: if mismatches with treefmt, just nuke, whatever
+            "rust-sorted"
             "rust-unused-features"
             "rust-sorted-derives"
             "tokei"
@@ -42,8 +42,12 @@
 
         rs = v-utils.rs {
           inherit pkgs;
-          build.workspace = {
-            "./v_utils" = [ "git_version" "log_directives" { deprecate = "v3.0.0"; } ];
+          build = {
+            enable = true;
+            deny = true;
+            workspace = {
+              "./v_utils" = [ "git_version" "log_directives" { deprecate = "v3.0.0"; } ];
+            };
           };
         };
       in
@@ -58,8 +62,6 @@
               cp -f ${v-utils.files.licenses.blue_oak} ./LICENSE
 
               cp -f ${(v-utils.files.treefmt) {inherit pkgs;}} ./.treefmt.toml
-
-              cp -f ${(v-utils.files.rust.deny {inherit pkgs;})} ./deny.toml
 
               cp -f ${readme} ./README.md
             '';
