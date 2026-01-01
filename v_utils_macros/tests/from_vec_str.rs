@@ -1,6 +1,6 @@
-use v_utils_macros::{CompactFormat, OptionalFieldsFromVecStr, VecFieldsFromVecStr};
+use v_utils_macros::{CompactFormatNamed, OptionalFieldsFromVecStr, VecFieldsFromVecStr};
 
-#[derive(Clone, CompactFormat, Debug, PartialEq)]
+#[derive(Clone, CompactFormatNamed, Debug, PartialEq)]
 struct TrailingStop {
 	percent: f64,
 }

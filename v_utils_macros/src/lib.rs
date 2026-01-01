@@ -204,10 +204,10 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///```rust
 ///#[cfg(feature = "macros")] {
 ///#[cfg(feature = "trades")] {
-///use v_utils::macros::CompactFormat;
+///use v_utils::macros::CompactFormatNamed;
 ///use v_utils::trades::{Timeframe, TimeframeDesignator};
 ///
-///#[derive(CompactFormat, Debug, PartialEq)]
+///#[derive(CompactFormatNamed, Debug, PartialEq)]
 ///pub struct SAR {
 ///	 pub start: f64,
 ///	 pub increment: f64,
@@ -223,8 +223,8 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///}
 ///}
 ///```
-#[proc_macro_derive(CompactFormat)]
-pub fn derive_compact_format(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(CompactFormatNamed)]
+pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
 	let fields = if let Data::Struct(syn::DataStruct {
@@ -271,8 +271,37 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 			type Err = v_utils::__internal::eyre::Report;
 
 			fn from_str(s: &str) -> v_utils::__internal::eyre::Result<Self> {
+				// Split on first ':' to separate name from params
 				let (name, params_part) = s.split_once(':').unwrap_or((s, ""));
-				let params_split = if (params_part == "" || params_part == "_" ) { Vec::new() } else { params_part.split(':').collect::<Vec<&str>>() };
+
+				// Brace-aware splitting: don't split on ':' inside {...}
+				fn split_respecting_braces(s: &str) -> Vec<&str> {
+					let mut result = Vec::new();
+					let mut depth = 0;
+					let mut start = 0;
+					for (i, c) in s.char_indices() {
+						match c {
+							'{' => depth += 1,
+							'}' => depth -= 1,
+							':' if depth == 0 => {
+								result.push(&s[start..i]);
+								start = i + 1;
+							}
+							_ => {}
+						}
+					}
+					if start < s.len() {
+						result.push(&s[start..]);
+					}
+					result
+				}
+
+				let params_split = if params_part == "" || params_part == "_" {
+					Vec::new()
+				} else {
+					split_respecting_braces(params_part)
+				};
+
 				if params_split.len() != #n_fields {
 					v_utils::__internal::eyre::bail!("Expected {} fields, got {}", #n_fields, params_split.len());
 				}
@@ -302,6 +331,165 @@ pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 
 				#(#display_fields)*
 
+				std::result::Result::Ok(())
+			}
+		}
+	};
+
+	expanded.into()
+}
+
+/// Deprecated alias for [`CompactFormatNamed`]
+#[deprecated(since = "2.12.0", note = "Use CompactFormatNamed instead")]
+#[proc_macro_derive(CompactFormat)]
+pub fn derive_compact_format(input: TokenStream) -> TokenStream {
+	derive_compact_format_named(input)
+}
+
+/// Dictionary-style compact format, serializing to `{key=value;...}` syntax
+///
+/// Unlike [`CompactFormatNamed`], this format doesn't include the struct name prefix.
+/// Fields are serialized as key-value pairs where keys are first characters of field names.
+/// This format is designed for nesting inside other compact formats.
+///
+/// The format uses Nix-style dictionary syntax:
+/// - Wrapped in curly braces: `{...}`
+/// - Key-value pairs separated by `=`
+/// - Pairs delimited by `;`
+///
+/// # Example
+/// ```rust
+/// # use v_utils_macros::CompactFormatMap;
+/// # use std::str::FromStr;
+/// #[derive(CompactFormatMap, Debug, PartialEq)]
+/// pub struct Position {
+///     pub take_profit: f64,
+///     pub stop_loss: f64,
+/// }
+///
+/// let pos = Position { take_profit: 0.4884, stop_loss: 0.5190 };
+/// assert_eq!(pos.to_string(), "{t=0.4884;s=0.519}");
+///
+/// let parsed = Position::from_str("{t=0.5;s=0.3}").unwrap();
+/// assert_eq!(parsed, Position { take_profit: 0.5, stop_loss: 0.3 });
+/// ```
+///
+/// # Nesting with CompactFormatNamed
+/// This format is designed to work seamlessly when nested inside `CompactFormatNamed`:
+/// ```rust
+/// # use v_utils_macros::{CompactFormatNamed, CompactFormatMap};
+/// # use std::str::FromStr;
+/// #[derive(CompactFormatMap, Debug, PartialEq, Clone)]
+/// pub struct Position {
+///     pub take_profit: f64,
+///     pub stop_loss: f64,
+/// }
+///
+/// #[derive(CompactFormatNamed, Debug, PartialEq)]
+/// pub struct Order {
+///     pub position: Position,
+///     pub count: u32,
+/// }
+///
+/// let order = Order {
+///     position: Position { take_profit: 0.4884, stop_loss: 0.5190 },
+///     count: 50,
+/// };
+/// // Serializes to: "order:p{t=0.4884;s=0.519}:c50"
+/// ```
+#[proc_macro_derive(CompactFormatMap)]
+pub fn derive_compact_format_map(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as DeriveInput);
+	let name = &ast.ident;
+	let fields = if let Data::Struct(syn::DataStruct {
+		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!()
+	};
+
+	let mut first_chars: Vec<char> = Vec::new();
+	for field in fields {
+		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap();
+		if !first_chars.contains(&first_char) {
+			first_chars.push(first_char);
+		} else {
+			panic!("Field names must have unique first characters");
+		}
+	}
+
+	let n_fields = fields.len();
+
+	let map_fields_to_chars = fields.iter().map(|f| {
+		let ident = &f.ident;
+		let ty = &f.ty;
+		let first_char = ident.as_ref().unwrap().to_string().chars().next().unwrap();
+		quote! {
+			#ident: provided_params.get(&#first_char)
+				.ok_or_else(|| v_utils::__internal::eyre::eyre!("Missing field '{}' (key '{}')", stringify!(#ident), #first_char))?
+				.parse::<#ty>()?,
+		}
+	});
+
+	let display_fields = fields.iter().enumerate().map(|(i, f)| {
+		let ident = &f.ident;
+		let first_char = ident.as_ref().unwrap().to_string().chars().next().unwrap();
+		if i == 0 {
+			quote! {
+				write!(f, "{}={}", #first_char, self.#ident)?;
+			}
+		} else {
+			quote! {
+				write!(f, ";{}={}", #first_char, self.#ident)?;
+			}
+		}
+	});
+
+	let expanded = quote! {
+		impl std::str::FromStr for #name {
+			type Err = v_utils::__internal::eyre::Report;
+
+			fn from_str(s: &str) -> v_utils::__internal::eyre::Result<Self> {
+				// Strip outer braces if present
+				let inner = s.strip_prefix('{')
+					.and_then(|s| s.strip_suffix('}'))
+					.ok_or_else(|| v_utils::__internal::eyre::eyre!("CompactFormatMap must be wrapped in {{...}}, got: {}", s))?;
+
+				if inner.is_empty() && #n_fields > 0 {
+					v_utils::__internal::eyre::bail!("Expected {} fields, got empty map", #n_fields);
+				}
+
+				let pairs: Vec<&str> = if inner.is_empty() { Vec::new() } else { inner.split(';').collect() };
+				if pairs.len() != #n_fields {
+					v_utils::__internal::eyre::bail!("Expected {} fields, got {}", #n_fields, pairs.len());
+				}
+
+				let mut provided_params: std::collections::HashMap<char, &str> = std::collections::HashMap::new();
+				for pair in pairs {
+					let (key, value) = pair.split_once('=')
+						.ok_or_else(|| v_utils::__internal::eyre::eyre!("Invalid key=value pair: {}", pair))?;
+					if let Some(first_char) = key.chars().next() {
+						if key.len() != 1 {
+							v_utils::__internal::eyre::bail!("Key must be a single character, got: {}", key);
+						}
+						provided_params.insert(first_char, value);
+					}
+				}
+
+				Ok(#name {
+					#(#map_fields_to_chars)*
+				})
+			}
+		}
+
+		impl std::fmt::Display for #name {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				write!(f, "{{")?;
+				#(#display_fields)*
+				write!(f, "}}")?;
 				std::result::Result::Ok(())
 			}
 		}
