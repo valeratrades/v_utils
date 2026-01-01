@@ -8,4 +8,9 @@ resolver = "1"
 eyre = { version = "^0.6.12" } # not color-eyre, that one is for client-side
 facet = { version = "^0.41" }
 heck = { version = "^0.5.0" }
+insta = { version = "^1.45.1" }
+quote = { version = "^1.0.42" }
 serde = { version = "^1.0.228", features = ["derive"] }
+serde_json = { version = "^1.0.148" }
+toml = { version = "^0.9" }
+trybuild = { version = "^1.0.114", features = ["diff"] }
