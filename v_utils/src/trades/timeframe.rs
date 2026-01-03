@@ -104,7 +104,7 @@ impl Timeframe {
 		Self(n * designator.as_millis())
 	}
 
-	#[deprecated(note = "Use `duration` instead")]
+	#[deprecated(since = "v3.0.0", note = "Use `duration` instead")]
 	pub fn seconds(&self) -> u64 {
 		self.0 / 1_000
 	}

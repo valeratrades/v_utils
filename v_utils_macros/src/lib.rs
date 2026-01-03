@@ -340,7 +340,7 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 }
 
 /// Deprecated alias for [`CompactFormatNamed`]
-#[deprecated(since = "2.12.0", note = "Use CompactFormatNamed instead")]
+#[deprecated(since = "v3.0.0", note = "Use CompactFormatNamed instead")]
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 	derive_compact_format_named(input)

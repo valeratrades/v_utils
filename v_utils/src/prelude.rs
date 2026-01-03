@@ -24,13 +24,13 @@ pub use tracing::{Span, debug, error, field::Empty, info, instrument, trace, war
 
 pub use crate::{clientside, io::ExpandedPath, other::*, trades::*};
 
-#[deprecated(note = "Use main `prelude` instead")]
+#[deprecated(since = "v3.0.0", note = "Use main `prelude` instead")]
 pub mod clientside {
 	pub use super::*;
 	pub use crate::clientside;
 }
 
-#[deprecated(note = "Use main `prelude` instead")]
+#[deprecated(since = "v3.0.0", note = "Use main `prelude` instead")]
 pub mod libside {
 	pub use super::*;
 }
