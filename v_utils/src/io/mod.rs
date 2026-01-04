@@ -8,8 +8,10 @@ pub mod files;
 #[allow(deprecated)]
 pub use files::*;
 
+#[cfg(feature = "async-io")]
 pub mod file_open;
-pub use file_open::{Client as FileOpenClient, OpenMode as FileOpenMode, open as file_open};
+#[cfg(feature = "async-io")]
+pub use file_open::{Client as FileOpenClient, OpenMode as FileOpenMode, open as file_open, open_blocking as file_open_blocking};
 
 pub mod progress_bar;
 pub use progress_bar::*;

@@ -1,7 +1,7 @@
-use std::{path::Path, process::Command};
+use std::path::Path;
 
 use eyre::{Result, WrapErr, eyre};
-use tokio::sync::oneshot;
+use tokio::{process::Command, sync::oneshot};
 
 /// Mode for opening a file
 #[derive(Debug, Default)]
@@ -26,16 +26,16 @@ pub enum OpenMode {
 /// use v_utils::io::file_open::Client;
 ///
 /// // Simple open
-/// Client::default().open(&path)?;
+/// Client::default().open(&path).await?;
 ///
 /// // Open with git sync
-/// Client::default().git(true).open(&path)?;
+/// Client::default().git(true).open(&path).await?;
 ///
 /// // Force create and open
-/// Client::default().mode(OpenMode::Force).open(&path)?;
+/// Client::default().mode(OpenMode::Force).open(&path).await?;
 ///
 /// // Open in pager with git sync
-/// Client::default().git(true).mode(OpenMode::Pager).open(&path)?;
+/// Client::default().git(true).mode(OpenMode::Pager).open(&path).await?;
 /// ```
 #[derive(Debug, Default)]
 pub struct Client {
@@ -57,12 +57,12 @@ impl Client {
 	}
 
 	/// Open the file at the given path
-	pub fn open<P: AsRef<Path>>(self, path: P) -> Result<()> {
+	pub async fn open<P: AsRef<Path>>(self, path: P) -> Result<()> {
 		let path = path.as_ref();
-		if self.git { self.open_with_git(path) } else { self.open_file(path) }
+		if self.git { self.open_with_git(path).await } else { self.open_file(path).await }
 	}
 
-	fn open_file(self, path: &Path) -> Result<()> {
+	async fn open_file(self, path: &Path) -> Result<()> {
 		let p = path.display();
 		match self.mode {
 			OpenMode::Normal => {
@@ -73,6 +73,7 @@ impl Client {
 					.arg("-c")
 					.arg(format!("$EDITOR {p}"))
 					.status()
+					.await
 					.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
 			}
 			OpenMode::Force => {
@@ -80,13 +81,14 @@ impl Client {
 					.arg("-c")
 					.arg(format!("$EDITOR {p}"))
 					.status()
+					.await
 					.map_err(|_| eyre!("$EDITOR env variable is not defined or permission lacking to create the file: {p}"))?;
 			}
 			OpenMode::Pager => {
 				if !path.exists() {
 					return Err(eyre!("File does not exist"));
 				}
-				Command::new("sh").arg("-c").arg(format!("less {p}")).status()?;
+				Command::new("sh").arg("-c").arg(format!("less {p}")).status().await?;
 			}
 			// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
 			OpenMode::Read => {
@@ -97,21 +99,22 @@ impl Client {
 					.arg("-c")
 					.arg(format!("nvim -R {p}"))
 					.status()
+					.await
 					.map_err(|_| eyre!("nvim is not found in path"))?;
 			}
 			OpenMode::Mock(rx) => {
 				if !path.exists() {
 					return Err(eyre!("File does not exist"));
 				}
-				// Block until signal is received (or sender is dropped)
-				let _ = rx.blocking_recv();
+				// Wait until signal is received (or sender is dropped)
+				let _ = rx.await;
 			}
 		}
 
 		Ok(())
 	}
 
-	fn open_with_git(self, path: &Path) -> Result<()> {
+	async fn open_with_git(self, path: &Path) -> Result<()> {
 		let metadata = match std::fs::metadata(path) {
 			Ok(metadata) => metadata,
 			Err(e) => match self.mode {
@@ -130,7 +133,7 @@ impl Client {
 			false => path.parent().unwrap().display(),
 		};
 
-		Command::new("sh").arg("-c").arg(format!("git -C \"{sp}\" pull")).status().with_context(|| {
+		Command::new("sh").arg("-c").arg(format!("git -C \"{sp}\" pull")).status().await.with_context(|| {
 			format!(
 				"Failed to pull from Git repository at '{}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.",
 				sp
@@ -138,12 +141,14 @@ impl Client {
 		})?;
 
 		self.open_file(path)
+			.await
 			.with_context(|| format!("Failed to open file at '{}'. Use `OpenMode::Force` and ensure you have necessary permissions", path.display()))?;
 
 		Command::new("sh")
 			.arg("-c")
 			.arg(format!("git -C \"{sp}\" add -A && git -C \"{sp}\" commit -m \".\" && git -C \"{sp}\" push"))
 			.status()
+			.await
 			.with_context(|| {
 				format!(
 					"Failed to commit or push to Git repository at '{}'. Ensure you have the necessary permissions and the repository is correctly configured.",
@@ -156,6 +161,11 @@ impl Client {
 }
 
 /// Convenience function: opens file with default settings
-pub fn open<P: AsRef<Path>>(path: P) -> Result<()> {
-	Client::default().open(path)
+pub async fn open<P: AsRef<Path>>(path: P) -> Result<()> {
+	Client::default().open(path).await
+}
+
+/// Convenience function: opens file with default settings (blocking)
+pub fn open_blocking<P: AsRef<Path>>(path: P) -> Result<()> {
+	tokio::runtime::Runtime::new().unwrap().block_on(open(path))
 }
