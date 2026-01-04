@@ -1,9 +1,10 @@
 use std::{path::Path, process::Command};
 
 use eyre::{Result, WrapErr, eyre};
+use tokio::sync::oneshot;
 
 /// Mode for opening a file
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Default)]
 pub enum OpenMode {
 	/// Opens file in $EDITOR, errors if file doesn't exist
 	#[default]
@@ -14,6 +15,8 @@ pub enum OpenMode {
 	Read,
 	/// Opens file in less pager
 	Pager,
+	/// Mock mode for testing - waits for signal then returns without opening anything
+	Mock(oneshot::Receiver<()>),
 }
 
 /// Builder for opening files with various options.
@@ -34,7 +37,7 @@ pub enum OpenMode {
 /// // Open in pager with git sync
 /// Client::default().git(true).mode(OpenMode::Pager).open(&path)?;
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct Client {
 	git: bool,
 	mode: OpenMode,
@@ -59,7 +62,7 @@ impl Client {
 		if self.git { self.open_with_git(path) } else { self.open_file(path) }
 	}
 
-	fn open_file(&self, path: &Path) -> Result<()> {
+	fn open_file(self, path: &Path) -> Result<()> {
 		let p = path.display();
 		match self.mode {
 			OpenMode::Normal => {
@@ -96,12 +99,19 @@ impl Client {
 					.status()
 					.map_err(|_| eyre!("nvim is not found in path"))?;
 			}
+			OpenMode::Mock(rx) => {
+				if !path.exists() {
+					return Err(eyre!("File does not exist"));
+				}
+				// Block until signal is received (or sender is dropped)
+				let _ = rx.blocking_recv();
+			}
 		}
 
 		Ok(())
 	}
 
-	fn open_with_git(&self, path: &Path) -> Result<()> {
+	fn open_with_git(self, path: &Path) -> Result<()> {
 		let metadata = match std::fs::metadata(path) {
 			Ok(metadata) => metadata,
 			Err(e) => match self.mode {
