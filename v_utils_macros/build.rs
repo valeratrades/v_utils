@@ -173,8 +173,9 @@ fn patch_legacy_v_prefix(path: &std::path::Path, content: &str) {
 		let trimmed = line.trim_start();
 		if trimmed.starts_with("#[deprecated") {
 			if let Some(since_version) = extract_since(trimmed) {
-				if let Some(corrected_version) = since_version.strip_prefix('v') {
+				if since_version.starts_with('v') {
 					// Strip the 'v' prefix
+					let corrected_version = &since_version[1..];
 					let new_line = line
 						.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
 						.replace(&format!("since=\"{}\"", since_version), &format!("since = \"{}\"", corrected_version));
@@ -218,7 +219,7 @@ fn update_since_in_file(path: &str, line_num: usize, old_line: &str, target_vers
 	let lines: Vec<&str> = content.lines().collect();
 
 	// Verify line still matches
-	if lines.get(line_num) != Some(&old_line) {
+	if lines.get(line_num) != Some(&old_line.as_ref()) {
 		return Ok(()); // Line changed, skip
 	}
 
@@ -247,10 +248,10 @@ fn update_deprecated_since(line: &str, version: &str) -> String {
 		let after_since = &trimmed[since_start + 5..];
 		// Find the = and the quoted value
 		if let Some(eq_pos) = after_since.find('=') {
-			let after_eq = after_since[eq_pos + 1..].trim_start();
-			if let Some(inside_quotes) = after_eq.strip_prefix('"') {
-				if let Some(end_quote) = inside_quotes.find('"') {
-					let after_value = &inside_quotes[end_quote + 1..];
+			let after_eq = &after_since[eq_pos + 1..].trim_start();
+			if after_eq.starts_with('"') {
+				if let Some(end_quote) = after_eq[1..].find('"') {
+					let after_value = &after_eq[end_quote + 2..];
 					return format!("{}{}since = \"{}\"{}", indent, before_since, version, after_value);
 				}
 			}
