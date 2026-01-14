@@ -54,11 +54,11 @@ impl SharedFileWriter {
 		}
 
 		for line in remaining_lines {
-			let _ = writeln!(file, "{}", line);
+			let _ = writeln!(file, "{line}");
 		}
 		let _ = file.flush();
 
-		eprintln!("[log-guardian] Trimmed log file: removed {} lines, {} remaining", lines_to_skip, remaining_lines.len());
+		eprintln!("[log-guardian] Trimmed log file: removed {lines_to_skip} lines, {} remaining", remaining_lines.len());
 	}
 }
 
@@ -215,21 +215,6 @@ pub struct LogDestination {
 	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
 	pub compiled_directives: Option<&'static str>,
 }
-
-#[derive(Clone, Debug, Default)]
-pub enum LogDestinationKind {
-	#[default]
-	Stdout,
-	File {
-		path: PathBuf,
-	},
-	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	Xdg {
-		dname: String,
-		fname: Option<String>,
-	},
-}
-
 impl LogDestination {
 	/// Helper for creating File variant
 	pub fn file<P: Into<PathBuf>>(path: P) -> Self {
@@ -271,6 +256,20 @@ impl LogDestination {
 		self.compiled_directives = directives;
 		self
 	}
+}
+
+#[derive(Clone, Debug, Default)]
+pub enum LogDestinationKind {
+	#[default]
+	Stdout,
+	File {
+		path: PathBuf,
+	},
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
+	Xdg {
+		dname: String,
+		fname: Option<String>,
+	},
 }
 
 impl From<&str> for LogDestination {

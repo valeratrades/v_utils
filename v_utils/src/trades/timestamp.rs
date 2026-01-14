@@ -21,5 +21,5 @@ pub fn guess_timestamp_unsafe(timestamp: String) -> Result<Timestamp> {
 		return Ok(Timestamp::from_nanosecond(nanos as i128).unwrap());
 	}
 
-	bail!("Couldn't parse timestamp: {}", timestamp)
+	bail!("Couldn't parse timestamp: {timestamp}")
 }

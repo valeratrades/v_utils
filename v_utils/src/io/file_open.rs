@@ -1,10 +1,10 @@
 use std::{env, path::Path};
 
-use eyre::{Result, WrapErr, eyre};
+use eyre::{Result, WrapErr, bail, eyre};
 use tokio::{process::Command, sync::oneshot};
 
 /// Position in a file (line and optional column)
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Position {
 	pub line: u32,
 	pub col: Option<u32>,
@@ -17,7 +17,7 @@ impl Position {
 }
 
 /// Known editors with line:col support
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Editor {
 	Nvim,
 	Helix,
@@ -46,21 +46,21 @@ impl Editor {
 			(Self::Nvim, Some(pos)) => {
 				// nvim +line file or nvim "+call cursor(line, col)" file
 				match pos.col {
-					Some(col) => format!("$EDITOR \"+call cursor({}, {})\" \"{p}\"", pos.line, col),
+					Some(col) => format!("$EDITOR \"+call cursor({}, {col})\" \"{p}\"", pos.line),
 					None => format!("$EDITOR +{} \"{p}\"", pos.line),
 				}
 			}
 			(Self::Helix, Some(pos)) => {
 				// helix file:line:col
 				match pos.col {
-					Some(col) => format!("$EDITOR \"{p}:{}:{}\"", pos.line, col),
+					Some(col) => format!("$EDITOR \"{p}:{}:{col}\"", pos.line),
 					None => format!("$EDITOR \"{p}:{}\"", pos.line),
 				}
 			}
 			(Self::Vscode, Some(pos)) => {
 				// code --goto file:line:col
 				match pos.col {
-					Some(col) => format!("$EDITOR --goto \"{p}:{}:{}\"", pos.line, col),
+					Some(col) => format!("$EDITOR --goto \"{p}:{}:{col}\"", pos.line),
 					None => format!("$EDITOR --goto \"{p}:{}\"", pos.line),
 				}
 			}
@@ -148,7 +148,7 @@ impl Client {
 		match self.mode {
 			OpenMode::Normal => {
 				if !path.exists() {
-					return Err(eyre!("File does not exist"));
+					bail!("File does not exist");
 				}
 				let cmd = editor.format_open_cmd(path, self.position);
 				Command::new("sh").arg("-c").arg(cmd).status().await.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
@@ -164,14 +164,14 @@ impl Client {
 			}
 			OpenMode::Pager => {
 				if !path.exists() {
-					return Err(eyre!("File does not exist"));
+					bail!("File does not exist");
 				}
 				Command::new("sh").arg("-c").arg(format!("less {p}")).status().await?;
 			}
 			// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
 			OpenMode::Read => {
 				if !path.exists() {
-					return Err(eyre!("File does not exist"));
+					bail!("File does not exist");
 				}
 				Command::new("sh")
 					.arg("-c")
@@ -205,10 +205,7 @@ impl Client {
 		};
 
 		Command::new("sh").arg("-c").arg(format!("git -C \"{sp}\" pull")).status().await.with_context(|| {
-			format!(
-				"Failed to pull from Git repository at '{}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.",
-				sp
-			)
+			format!("Failed to pull from Git repository at '{sp}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.")
 		})?;
 
 		self.open_file(path)
@@ -220,12 +217,7 @@ impl Client {
 			.arg(format!("git -C \"{sp}\" add -A && git -C \"{sp}\" commit -m \".\" && git -C \"{sp}\" push"))
 			.status()
 			.await
-			.with_context(|| {
-				format!(
-					"Failed to commit or push to Git repository at '{}'. Ensure you have the necessary permissions and the repository is correctly configured.",
-					sp
-				)
-			})?;
+			.with_context(|| format!("Failed to commit or push to Git repository at '{sp}'. Ensure you have the necessary permissions and the repository is correctly configured."))?;
 
 		Ok(())
 	}

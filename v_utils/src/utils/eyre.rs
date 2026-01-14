@@ -53,7 +53,7 @@ pub fn truncate_msg<S: AsRef<str>>(s: S) -> String {
 	} else if s.chars().count() > MAX_LINES * CHARS_IN_A_LINE {
 		let start_cut = &s[..(MAX_LINES * CHARS_IN_A_LINE / 2)];
 		let end_cut = &s[s.len() - (MAX_LINES * CHARS_IN_A_LINE / 2)..];
-		format!("{}{truncation_message}{}", start_cut, end_cut)
+		format!("{start_cut}{truncation_message}{end_cut}")
 	} else {
 		s.to_owned()
 	}

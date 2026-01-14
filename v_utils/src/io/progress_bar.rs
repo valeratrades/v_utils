@@ -28,12 +28,12 @@ impl ProgressBar {
 		let display_i = (i as f64 * scalar) as usize;
 		let display_total = (self.total * scalar) as usize;
 
-		println!("{}", CLEAR);
+		println!("{CLEAR}");
 		println!("[{}{}]", "*".repeat(display_i), " ".repeat(display_total - display_i));
 
 		let since_timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timestamp_ms;
 		let progress_left_scalar = (self.total - i as f64) / i as f64;
 		let left_s = (since_timestamp_ms as f64 * progress_left_scalar / 1000.0) as usize;
-		println!("Time left: ≈ {}s", left_s);
+		println!("Time left: ≈ {left_s}s");
 	}
 }

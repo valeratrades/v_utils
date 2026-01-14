@@ -3,7 +3,7 @@ use std::{
 	process::Command,
 };
 
-use eyre::{Result, WrapErr, eyre};
+use eyre::{Result, WrapErr, bail, eyre};
 
 #[deprecated(since = "v3.0.0", note = "Use `file_open::OpenMode` instead")]
 pub enum OpenMode {
@@ -20,7 +20,7 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 	match mode {
 		OpenMode::Normal => {
 			if !path.exists() {
-				return Err(eyre!("File does not exist"));
+				bail!("File does not exist");
 			}
 			Command::new("sh")
 				.arg("-c")
@@ -37,14 +37,14 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 		}
 		OpenMode::Pager => {
 			if !path.exists() {
-				return Err(eyre!("File does not exist"));
+				bail!("File does not exist");
 			}
 			Command::new("sh").arg("-c").arg(format!("less {p}")).status()?;
 		}
 		// Only works with nvim as I can't be bothered to look up "readonly" flag for all editors
 		OpenMode::Read => {
 			if !path.exists() {
-				return Err(eyre!("File does not exist"));
+				bail!("File does not exist");
 			}
 			Command::new("sh")
 				.arg("-c")
@@ -80,10 +80,7 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 	};
 
 	Command::new("sh").arg("-c").arg(format!("git -C \"{sp}\" pull")).status().with_context(|| {
-		format!(
-			"Failed to pull from Git repository at '{}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.",
-			sp
-		)
+		format!("Failed to pull from Git repository at '{sp}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.")
 	})?;
 
 	if let Some(open_mode) = open_mode {
@@ -94,12 +91,7 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 		.arg("-c")
 		.arg(format!("git -C \"{sp}\" add -A && git -C \"{sp}\" commit -m \".\" && git -C \"{sp}\" push"))
 		.status()
-		.with_context(|| {
-			format!(
-				"Failed to commit or push to Git repository at '{}'. Ensure you have the necessary permissions and the repository is correctly configured.",
-				sp
-			)
-		})?;
+		.with_context(|| format!("Failed to commit or push to Git repository at '{sp}'. Ensure you have the necessary permissions and the repository is correctly configured."))?;
 
 	Ok(())
 }

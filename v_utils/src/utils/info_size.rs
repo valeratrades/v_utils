@@ -7,14 +7,6 @@ use strum::{EnumIter, IntoEnumIterator as _};
 /// Information size, stored internally as number of bits
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct InfoSize(pub u64);
-
-/// Whether the unit represents bits or bytes
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InfoSizeKind {
-	Bit,
-	Byte,
-}
-
 impl InfoSize {
 	/// Create from a number and unit
 	pub const fn from_parts(n: u64, unit: InfoSizeUnit) -> Self {
@@ -129,6 +121,13 @@ impl InfoSize {
 	}
 }
 
+/// Whether the unit represents bits or bytes
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InfoSizeKind {
+	Bit,
+	Byte,
+}
+
 impl FromStr for InfoSize {
 	type Err = eyre::Report;
 
@@ -142,7 +141,7 @@ impl FromStr for InfoSize {
 
 		let (n_str, unit_str) = match split_point {
 			Some(pos) => s.split_at(pos),
-			None => bail!("InfoSize string '{}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc.", s),
+			None => bail!("InfoSize string '{s}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc."),
 		};
 
 		let unit = InfoSizeUnit::from_str(unit_str)?;
@@ -150,9 +149,7 @@ impl FromStr for InfoSize {
 		let n = if n_str.is_empty() {
 			1
 		} else {
-			n_str
-				.parse::<u64>()
-				.map_err(|_| eyre!("Invalid number in InfoSize string '{}'. Expected a `u64` number.", n_str))?
+			n_str.parse::<u64>().map_err(|_| eyre!("Invalid number in InfoSize string '{n_str}'. Expected a `u64` number."))?
 		};
 
 		Ok(InfoSize(n * unit.as_bits()))
@@ -338,7 +335,7 @@ impl FromStr for InfoSizeUnit {
 		if s.len() > 1 {
 			let first_char = s.chars().next().unwrap();
 			if first_char.is_ascii_lowercase() && first_char != 'b' {
-				bail!("Invalid unit '{}': prefix must be uppercase (e.g., 'KB' not 'kB')", s);
+				bail!("Invalid unit '{s}': prefix must be uppercase (e.g., 'KB' not 'kB')");
 			}
 		}
 
@@ -367,7 +364,7 @@ impl FromStr for InfoSizeUnit {
 			"GiB" => Ok(InfoSizeUnit::Gibibyte),
 			"TiB" => Ok(InfoSizeUnit::Tebibyte),
 			"PiB" => Ok(InfoSizeUnit::Pebibyte),
-			_ => bail!("Invalid info size unit: {}", s),
+			_ => bail!("Invalid info size unit: {s}"),
 		}
 	}
 }

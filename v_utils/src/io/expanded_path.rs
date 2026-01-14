@@ -8,6 +8,24 @@ use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, derive_new::new)]
 pub struct ExpandedPath(pub PathBuf);
+impl ExpandedPath {
+	pub fn inner(self) -> PathBuf {
+		self.0
+	}
+
+	pub fn display(&self) -> std::path::Display<'_> {
+		self.0.display()
+	}
+
+	pub fn parent(&self) -> Option<ExpandedPath> {
+		self.0.parent().map(|p| ExpandedPath(p.to_path_buf()))
+	}
+
+	pub fn join<P: AsRef<Path>>(&self, path: P) -> ExpandedPath {
+		ExpandedPath(self.0.join(path))
+	}
+}
+
 impl<'de> Deserialize<'de> for ExpandedPath {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
@@ -68,23 +86,5 @@ impl std::ops::Deref for ExpandedPath {
 
 	fn deref(&self) -> &Self::Target {
 		&self.0
-	}
-}
-
-impl ExpandedPath {
-	pub fn inner(self) -> PathBuf {
-		self.0
-	}
-
-	pub fn display(&self) -> std::path::Display<'_> {
-		self.0.display()
-	}
-
-	pub fn parent(&self) -> Option<ExpandedPath> {
-		self.0.parent().map(|p| ExpandedPath(p.to_path_buf()))
-	}
-
-	pub fn join<P: AsRef<Path>>(&self, path: P) -> ExpandedPath {
-		ExpandedPath(self.0.join(path))
 	}
 }

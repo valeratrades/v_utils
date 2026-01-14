@@ -45,7 +45,7 @@ impl std::fmt::LowerExp for NowThen {
 }
 
 fn format_number_compactly(mut n: f64, precision: f64) -> (f64, &'static str) {
-	assert!(precision >= 0.0, "Precision can't be negative, the hell? {:?}", precision);
+	assert!(precision >= 0.0, "Precision can't be negative, the hell? {precision:?}");
 	let mut thousands = 0;
 	while n.abs() >= 1000.0 {
 		n /= 1000.0;

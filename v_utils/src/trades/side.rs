@@ -8,6 +8,15 @@ pub enum Side {
 	Buy,
 	Sell,
 }
+impl Side {
+	pub fn to_str(&self) -> &'static str {
+		match self {
+			Side::Buy => "BUY",
+			Side::Sell => "SELL",
+		}
+	}
+}
+
 impl FromStr for Side {
 	type Err = String;
 
@@ -15,15 +24,7 @@ impl FromStr for Side {
 		match s.to_uppercase().as_str() {
 			"BUY" => Ok(Side::Buy),
 			"SELL" => Ok(Side::Sell),
-			_ => Err(format!("Invalid side: {}", s)),
-		}
-	}
-}
-impl Side {
-	pub fn to_str(&self) -> &'static str {
-		match self {
-			Side::Buy => "BUY",
-			Side::Sell => "SELL",
+			_ => Err(format!("Invalid side: {s}")),
 		}
 	}
 }

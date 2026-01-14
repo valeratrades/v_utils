@@ -76,7 +76,7 @@ impl FromStr for TimeframeDesignator {
 			"Q" => Ok(TimeframeDesignator::Quarters),
 			"y" => Ok(TimeframeDesignator::Years),
 			"Y" => Ok(TimeframeDesignator::Years),
-			_ => bail!("Invalid timeframe designator: {}", s),
+			_ => bail!("Invalid timeframe designator: {s}"),
 		}
 	}
 }
@@ -134,7 +134,7 @@ impl FromStr for Timeframe {
 
 		let allowed_designators = ["ms", "s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
 		let designator = TimeframeDesignator::from_str(designator_str)
-			.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following: [{:?}]"#, allowed_designators))?;
+			.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following: [{allowed_designators:?}]"#))?;
 
 		let n = if n_str.is_empty() {
 			1

@@ -9,10 +9,6 @@ struct PlotData {
 	offset: f64,
 	blocks: [char; 9],
 }
-
-static SINGLE_PLOT_WIDTH: usize = 90;
-static SINGLE_PLOT_HEIGHT: usize = 12;
-
 impl PlotData {
 	fn new(min_val: f64, max_val: f64, height: usize) -> Self {
 		let data_range = max_val - min_val;
@@ -34,6 +30,9 @@ impl PlotData {
 		self.offset -= 1.0;
 	}
 }
+
+static SINGLE_PLOT_WIDTH: usize = 90;
+static SINGLE_PLOT_HEIGHT: usize = 12;
 
 #[derive(Clone, Debug, Default)]
 pub struct SnapshotP {
@@ -203,7 +202,7 @@ impl SnapshotP {
 
 fn join_str_blocks_v(left: String, right: String) -> String {
 	assert_eq!(left.split('\n').count(), right.split('\n').count());
-	left.lines().zip(right.lines()).map(|(l, r)| format!("{}{}", l, r)).collect::<Vec<String>>().join("\n")
+	left.lines().zip(right.lines()).map(|(l, r)| format!("{l}{r}")).collect::<Vec<String>>().join("\n")
 }
 
 /// # Panics

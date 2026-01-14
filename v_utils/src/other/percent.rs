@@ -66,7 +66,7 @@ impl FromStr for Percent {
 				false => f,
 			}
 		} else {
-			return Err(eyre!("Failed to parse \"{s}\" to percent"));
+			bail!("Failed to parse \"{s}\" to percent");
 		};
 
 		Ok(Percent(percent))
@@ -80,7 +80,7 @@ impl Serialize for Percent {
 		let percent_number = self.0 * 100.;
 		let s = match percent_number.fract() == 0. {
 			true => format!("{}%", percent_number as isize),
-			false => format!("{}%", percent_number),
+			false => format!("{percent_number}%"),
 		};
 		s.serialize(serializer)
 	}
@@ -96,12 +96,12 @@ impl std::fmt::Display for Percent {
 					Some(p) => format!("{:.*}", p, percent_number),
 					None => utils::format_significant_digits(percent_number, 2),
 				};
-				format!("{}%", num_string)
+				format!("{num_string}%")
 			}
 		};
 		if f.sign_plus() {
 			let sign = if self.0 >= 0. { "+" } else { "" };
-			s = format!("{}{}", sign, s);
+			s = format!("{sign}{s}");
 		}
 
 		// these ones are default
@@ -116,7 +116,7 @@ impl std::fmt::Display for Percent {
 				None => write!(f, "{:width$}", s, width = w),
 			}
 		} else {
-			write!(f, "{}", s)
+			write!(f, "{s}")
 		}
 	}
 }
@@ -178,21 +178,20 @@ impl From<&str> for Percent {
 /// Signed percent wrapper that guarantees values are in the range [-1.0, 1.0] (i.e., -100% to 100%)
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentS(Percent);
+impl PercentS {
+	pub fn new(value: f64) -> Result<Self> {
+		if !(-1.0..=1.0).contains(&value) {
+			bail!("PercentS value {value} is outside valid range [-1.0, 1.0]");
+		}
+		Ok(PercentS(Percent(value)))
+	}
+}
 
 impl std::ops::Deref for PercentS {
 	type Target = f64;
 
 	fn deref(&self) -> &Self::Target {
 		&self.0.0
-	}
-}
-
-impl PercentS {
-	pub fn new(value: f64) -> Result<Self> {
-		if !(-1.0..=1.0).contains(&value) {
-			return Err(eyre!("PercentS value {value} is outside valid range [-1.0, 1.0]"));
-		}
-		Ok(PercentS(Percent(value)))
 	}
 }
 
@@ -216,21 +215,20 @@ impl<'de> Deserialize<'de> for PercentS {
 /// Unsigned percent wrapper that guarantees values are in the range [0.0, 1.0] (i.e., 0% to 100%)
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentU(Percent);
-
-impl std::ops::Deref for PercentU {
-	type Target = f64;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0.0
-	}
-}
-
 impl PercentU {
 	pub fn new(value: f64) -> Result<Self> {
 		if !(0.0..=1.0).contains(&value) {
 			bail!("PercentU value {value} is outside valid range [0.0, 1.0]");
 		}
 		Ok(PercentU(Percent(value)))
+	}
+}
+
+impl std::ops::Deref for PercentU {
+	type Target = f64;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0.0
 	}
 }
 

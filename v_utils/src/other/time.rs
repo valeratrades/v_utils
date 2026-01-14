@@ -1,4 +1,4 @@
-use eyre::{Result, WrapErr, eyre};
+use eyre::{Result, WrapErr, bail, eyre};
 use serde::{Deserialize, Serialize, de};
 
 /// Meant to work with %H:%M and %H:%M:%S and %M:%S
@@ -62,35 +62,35 @@ impl<'de> Deserialize<'de> for Timelike {
 fn time_to_units(time: &str) -> Result<u32> {
 	// If there are no colons, try to parse as seconds directly
 	if !time.contains(':') {
-		return time.parse().wrap_err_with(|| eyre!("Invalid time format: Could not parse '{}' as seconds", time));
+		return time.parse().wrap_err_with(|| eyre!("Invalid time format: Could not parse '{time}' as seconds"));
 	}
 
 	let mut split = time.split(':');
 
 	let first = split
 		.next()
-		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?
+		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'"))?
 		.parse::<u32>()
-		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
+		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'"))?;
 
 	let second = split
 		.next()
-		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?
+		.ok_or_else(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'"))?
 		.parse::<u32>()
-		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
+		.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'"))?;
 
 	let units = match split.next() {
 		Some(third) => {
 			let third = third
 				.parse::<u32>()
-				.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time))?;
+				.wrap_err_with(|| eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'"))?;
 			first * 3600 + second * 60 + third
 		}
 		None => first * 60 + second,
 	};
 
 	if split.next().is_some() {
-		return Err(eyre!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{}'", time));
+		bail!("Invalid time format: Expected one of %H:%M, %H:%M:%S, or %M:%S, got '{time}'");
 	}
 
 	Ok(units)
