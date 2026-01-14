@@ -67,7 +67,7 @@ pub async fn confirm<T: AsRef<str>>(message: T) -> bool {
 	}
 }
 
-/// Confirm with user before proceeding, with an [A]ll option (blocking version).
+/// Confirm with user before proceeding, with an \[A]ll option (blocking version).
 ///```rust
 ///use v_utils::io::{confirm_all_blocking, ConfirmAllResult};
 ///match confirm_all_blocking("Process this file?") {
@@ -98,7 +98,7 @@ pub fn confirm_all_blocking<T: AsRef<str>>(message: T) -> ConfirmAllResult {
 	}
 }
 
-/// Confirm with user before proceeding, with an [A]ll option (async version).
+/// Confirm with user before proceeding, with an \[A]ll option (async version).
 ///```rust,ignore
 ///use v_utils::io::{confirm_all, ConfirmAllResult};
 ///match confirm_all("Process this file?").await {
