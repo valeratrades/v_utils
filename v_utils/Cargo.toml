@@ -66,11 +66,11 @@ dirs = { version = "^6.0.0", optional = true }
 # unconditional
 eyre.workspace = true
 facet = { workspace = true, optional = true }
-facet-json = { version = "^0.41", optional = true }
-facet-toml = { version = "^0.41", optional = true }
+facet-json = { version = "^0.42", optional = true }
+facet-toml = { version = "^0.42", optional = true }
 function_name = "^0.3.0" # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { version = "^0.3.31", optional = true }
-jiff = { version = "^0.2.17", features = ["serde"], optional = true }
+jiff = { version = "^0.2.18", features = ["serde"], optional = true }
 libc = { version = "^0.2", optional = true }
 macro-attr = { version = "0.2.0", features = ["unstable-macros-1-1"] }
 quote = { workspace = true, optional = true }
@@ -85,7 +85,7 @@ toml = { workspace = true, optional = true }
 tracing = { version = "^0.1.44", features = ["log", "std", "async-await"] }
 
 # # optional
-tokio = { version = "^1.48.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
+tokio = { version = "^1.49.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
 tracing-error = { version = "^0.2.1", optional = true }
 tracing-log = { version = "^0.2.0", optional = true }
 xdg = { version = "^3.0.0", optional = true }

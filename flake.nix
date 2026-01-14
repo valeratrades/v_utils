@@ -38,7 +38,7 @@
         readme = v-utils.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
 
         rs = v-utils.rs {
-          inherit pkgs;
+          inherit pkgs rust;
           build = {
             enable = true;
             deny = true;

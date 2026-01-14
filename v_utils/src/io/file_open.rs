@@ -1,7 +1,74 @@
-use std::path::Path;
+use std::{env, path::Path};
 
 use eyre::{Result, WrapErr, eyre};
 use tokio::{process::Command, sync::oneshot};
+
+/// Position in a file (line and optional column)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Position {
+	pub line: u32,
+	pub col: Option<u32>,
+}
+
+impl Position {
+	pub fn new(line: u32, col: Option<u32>) -> Self {
+		Self { line, col }
+	}
+}
+
+/// Known editors with line:col support
+#[derive(Debug, Clone, Copy)]
+enum Editor {
+	Nvim,
+	Helix,
+	Vscode,
+	Unknown,
+}
+
+impl Editor {
+	/// Detect editor from $EDITOR environment variable
+	fn detect() -> Self {
+		let editor = env::var("EDITOR").unwrap_or_default();
+		let editor_name = Path::new(&editor).file_name().and_then(|s| s.to_str()).unwrap_or(&editor);
+
+		match editor_name {
+			"nvim" | "vim" | "vi" => Self::Nvim,
+			"hx" | "helix" => Self::Helix,
+			"code" | "code-insiders" => Self::Vscode,
+			_ => Self::Unknown,
+		}
+	}
+
+	/// Format command arguments for opening file at position
+	fn format_open_cmd(&self, path: &Path, position: Option<Position>) -> String {
+		let p = path.display();
+		match (self, position) {
+			(Self::Nvim, Some(pos)) => {
+				// nvim +line file or nvim "+call cursor(line, col)" file
+				match pos.col {
+					Some(col) => format!("$EDITOR \"+call cursor({}, {})\" \"{p}\"", pos.line, col),
+					None => format!("$EDITOR +{} \"{p}\"", pos.line),
+				}
+			}
+			(Self::Helix, Some(pos)) => {
+				// helix file:line:col
+				match pos.col {
+					Some(col) => format!("$EDITOR \"{p}:{}:{}\"", pos.line, col),
+					None => format!("$EDITOR \"{p}:{}\"", pos.line),
+				}
+			}
+			(Self::Vscode, Some(pos)) => {
+				// code --goto file:line:col
+				match pos.col {
+					Some(col) => format!("$EDITOR --goto \"{p}:{}:{}\"", pos.line, col),
+					None => format!("$EDITOR --goto \"{p}:{}\"", pos.line),
+				}
+			}
+			// Unknown editor or no position - just open the file
+			(_, _) => format!("$EDITOR \"{p}\""),
+		}
+	}
+}
 
 /// Mode for opening a file
 #[derive(Debug, Default)]
@@ -15,8 +82,6 @@ pub enum OpenMode {
 	Read,
 	/// Opens file in less pager
 	Pager,
-	/// Mock mode for testing - waits for signal then returns without opening anything
-	Mock(oneshot::Receiver<()>),
 }
 
 /// Builder for opening files with various options.
@@ -36,11 +101,18 @@ pub enum OpenMode {
 ///
 /// // Open in pager with git sync
 /// Client::default().git(true).mode(OpenMode::Pager).open(&path).await?;
+///
+/// // Open at specific line
+/// Client::default().at(Position::new(42, None)).open(&path).await?;
+///
+/// // Open at specific line and column
+/// Client::default().at(Position::new(42, Some(10))).open(&path).await?;
 /// ```
 #[derive(Debug, Default)]
 pub struct Client {
 	git: bool,
 	mode: OpenMode,
+	position: Option<Position>,
 }
 
 impl Client {
@@ -56,6 +128,14 @@ impl Client {
 		self
 	}
 
+	/// Set position to open file at (line and optional column)
+	///
+	/// Only works with known editors (nvim, helix, vscode). For unknown editors, position is ignored.
+	pub fn at(mut self, position: Position) -> Self {
+		self.position = Some(position);
+		self
+	}
+
 	/// Open the file at the given path
 	pub async fn open<P: AsRef<Path>>(self, path: P) -> Result<()> {
 		let path = path.as_ref();
@@ -64,22 +144,20 @@ impl Client {
 
 	async fn open_file(self, path: &Path) -> Result<()> {
 		let p = path.display();
+		let editor = Editor::detect();
 		match self.mode {
 			OpenMode::Normal => {
 				if !path.exists() {
 					return Err(eyre!("File does not exist"));
 				}
-				Command::new("sh")
-					.arg("-c")
-					.arg(format!("$EDITOR {p}"))
-					.status()
-					.await
-					.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
+				let cmd = editor.format_open_cmd(path, self.position);
+				Command::new("sh").arg("-c").arg(cmd).status().await.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
 			}
 			OpenMode::Force => {
+				let cmd = editor.format_open_cmd(path, self.position);
 				Command::new("sh")
 					.arg("-c")
-					.arg(format!("$EDITOR {p}"))
+					.arg(cmd)
 					.status()
 					.await
 					.map_err(|_| eyre!("$EDITOR env variable is not defined or permission lacking to create the file: {p}"))?;
@@ -101,13 +179,6 @@ impl Client {
 					.status()
 					.await
 					.map_err(|_| eyre!("nvim is not found in path"))?;
-			}
-			OpenMode::Mock(rx) => {
-				if !path.exists() {
-					return Err(eyre!("File does not exist"));
-				}
-				// Wait until signal is received (or sender is dropped)
-				let _ = rx.await;
 			}
 		}
 

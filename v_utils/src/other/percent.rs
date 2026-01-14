@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign};
-use eyre::{Result, eyre};
+use eyre::{Result, bail, eyre};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::utils;
@@ -228,7 +228,7 @@ impl std::ops::Deref for PercentU {
 impl PercentU {
 	pub fn new(value: f64) -> Result<Self> {
 		if !(0.0..=1.0).contains(&value) {
-			return Err(eyre!("PercentU value {value} is outside valid range [0.0, 1.0]"));
+			bail!("PercentU value {value} is outside valid range [0.0, 1.0]");
 		}
 		Ok(PercentU(Percent(value)))
 	}
