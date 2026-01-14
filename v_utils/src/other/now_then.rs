@@ -69,6 +69,7 @@ fn format_number_compactly(mut n: f64, precision: f64) -> (f64, &'static str) {
 	};
 
 	// format, then subtract one, and try format again; if within precision from original, commit.
+	//LOOP: naturally bounded by [precision](n_precision)
 	loop {
 		if !n_str.contains('.') {
 			break;
@@ -108,14 +109,17 @@ mod tests {
 
 	#[test]
 	fn display_1() {
-		let nt = NowThen::new(69420.0, 67000.0);
-		insta::assert_snapshot!(nt.to_string(), @"69+2.42K");
-
-		let nt = NowThen::new(0.517563, 0.498);
-		insta::assert_snapshot!(nt.to_string(), @"0.52+0.0196");
-
-		let nt = NowThen::new(0.527563, 0.498);
-		insta::assert_snapshot!(nt.to_string(), @"0.53+0.0296");
+		let s = format!(
+			"{nt1}\n{nt2}\n{nt3}",
+			nt1 = NowThen::new(69420.0, 67000.0),
+			nt2 = NowThen::new(0.517563, 0.498),
+			nt3 = NowThen::new(0.527563, 0.498),
+		);
+		insta::assert_snapshot!(s, @"
+		69+2.42K
+		0.52+0.0196
+		0.53+0.0296
+		");
 	}
 
 	#[test]
