@@ -32,7 +32,7 @@ impl SharedFileWriter {
 	fn do_trim(&self, file: &mut File) {
 		// Read the file content (open new handle for reading)
 		let lines: Vec<String> = match std::fs::File::open(self.path.as_ref()) {
-			Ok(f) => BufReader::new(f).lines().filter_map(|l| l.ok()).collect(),
+			Ok(f) => BufReader::new(f).lines().map_while(Result::ok).collect(),
 			Err(_) => return,
 		};
 

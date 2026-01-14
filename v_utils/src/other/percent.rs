@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use derive_more::{Add, AddAssign, Deref, DerefMut, Div, DivAssign, From, Into, Mul, MulAssign, Neg, Sub, SubAssign};
-use eyre::{Result, bail, eyre};
+use eyre::{Result, bail};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::utils;

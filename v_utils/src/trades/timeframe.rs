@@ -92,7 +92,7 @@ impl Timeframe {
 	}
 
 	pub fn duration(&self) -> Duration {
-		Duration::from_millis(self.0 as u64)
+		Duration::from_millis(self.0)
 	}
 
 	pub fn signed_duration(&self) -> jiff::SignedDuration {
