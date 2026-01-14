@@ -5,7 +5,7 @@ use std::{
 
 use eyre::{Result, WrapErr, bail, eyre};
 
-#[deprecated(since = "v3.0.0", note = "Use `file_open::OpenMode` instead")]
+#[deprecated(since = "3.0.0", note = "Use `file_open::OpenMode` instead")]
 pub enum OpenMode {
 	Normal,
 	Force,
@@ -13,7 +13,7 @@ pub enum OpenMode {
 	Pager,
 }
 
-#[deprecated(since = "v3.0.0", note = "Use `file_open::Client::default().mode(mode).open(path)` instead")]
+#[deprecated(since = "3.0.0", note = "Use `file_open::Client::default().mode(mode).open(path)` instead")]
 #[allow(deprecated)]
 pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 	let p = path.display();
@@ -58,7 +58,7 @@ pub fn open_with_mode(path: &Path, mode: OpenMode) -> Result<()> {
 }
 
 /// Wrapper around `open_with_mode` that syncs with git. If `open_mode` provided, it will open the file in-between.
-#[deprecated(since = "v3.0.0", note = "Use `file_open::Client::default().git(true).open(path)` instead")]
+#[deprecated(since = "3.0.0", note = "Use `file_open::Client::default().git(true).open(path)` instead")]
 #[allow(deprecated)]
 pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result<()> {
 	let metadata = match std::fs::metadata(path) {
@@ -97,7 +97,7 @@ pub fn sync_file_with_git(path: &PathBuf, open_mode: Option<OpenMode>) -> Result
 }
 
 /// Convenience function.
-#[deprecated(since = "v3.0.0", note = "Use `file_open::open(path)` instead")]
+#[deprecated(since = "3.0.0", note = "Use `file_open::open(path)` instead")]
 pub fn open(path: &Path) -> Result<()> {
 	#[allow(deprecated)]
 	open_with_mode(path, OpenMode::Normal)
