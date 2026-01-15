@@ -44,21 +44,21 @@ impl Editor {
 		let p = path.display();
 		match (self, position) {
 			(Self::Nvim, Some(pos)) => {
-				// nvim +line file or nvim "+call cursor(line, col)" file
+				// nvim "+call cursor(line, col) | normal zz" file - positions cursor and centers view
 				match pos.col {
-					Some(col) => format!("$EDITOR \"+call cursor({}, {col})\" \"{p}\"", pos.line),
-					None => format!("$EDITOR +{} \"{p}\"", pos.line),
+					Some(col) => format!("$EDITOR \"+call cursor({}, {col}) | normal zz\" \"{p}\"", pos.line),
+					None => format!("$EDITOR \"+call cursor({}, 1) | normal zz\" \"{p}\"", pos.line),
 				}
 			}
 			(Self::Helix, Some(pos)) => {
-				// helix file:line:col
+				// helix file:line:col (helix centers by default)
 				match pos.col {
 					Some(col) => format!("$EDITOR \"{p}:{}:{col}\"", pos.line),
 					None => format!("$EDITOR \"{p}:{}\"", pos.line),
 				}
 			}
 			(Self::Vscode, Some(pos)) => {
-				// code --goto file:line:col
+				// code --goto file:line:col (vscode centers by default)
 				match pos.col {
 					Some(col) => format!("$EDITOR --goto \"{p}:{}:{col}\"", pos.line),
 					None => format!("$EDITOR --goto \"{p}:{}\"", pos.line),
@@ -107,6 +107,7 @@ pub enum OpenMode {
 ///
 /// // Open at specific line and column
 /// Client::default().at(Position::new(42, Some(10))).open(&path).await?;
+///
 /// ```
 #[derive(Debug, Default)]
 pub struct Client {
