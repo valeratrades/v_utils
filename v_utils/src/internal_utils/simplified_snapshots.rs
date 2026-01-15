@@ -103,8 +103,8 @@ impl SnapshotP {
 
 		let min_step = (max_val - min_val) / 100.0;
 		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1].chars().take_while(|&c| c == '0').count() + 1;
-		let max_str = format!("{:.f_len$}", max_val).trim_end_matches(".0").to_string();
-		let min_str = format!("{:.f_len$}", min_val).trim_end_matches(".0").to_string();
+		let max_str = format!("{max_val:.f_len$}").trim_end_matches(".0").to_string();
+		let min_str = format!("{min_val:.f_len$}").trim_end_matches(".0").to_string();
 		let side_panel_width = max_str.len().max(min_str.len());
 		let mut side_panel = String::with_capacity(height * side_panel_width);
 		for i in 0..height {
@@ -158,8 +158,8 @@ impl SnapshotP {
 
 		let min_step = (max_val - min_val) / 100.0;
 		let f_len = min_step.to_string().split('.').collect::<Vec<&str>>()[1].chars().take_while(|&c| c == '0').count() + 1;
-		let max_str = format!("{:.f_len$}", max_val).trim_end_matches(".0").to_string();
-		let min_str = format!("{:.f_len$}", min_val).trim_end_matches(".0").to_string();
+		let max_str = format!("{max_val:.f_len$}").trim_end_matches(".0").to_string();
+		let min_str = format!("{min_val:.f_len$}").trim_end_matches(".0").to_string();
 		let side_panel_width = max_str.len().max(min_str.len());
 		let mut side_panel = String::with_capacity(height * side_panel_width);
 		for i in 0..height {

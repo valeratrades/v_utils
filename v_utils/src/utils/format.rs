@@ -29,7 +29,7 @@ pub fn format_significant_digits(n: f64, sig_digits: usize) -> String {
 
 	let full = format!("{:.12}", n.abs());
 	if !full.contains('.') {
-		return format!("{:.1}", n);
+		return format!("{n:.1}");
 	}
 
 	let first_sig = full.chars().position(|c| c != '0' && c != '.').unwrap_or(0);

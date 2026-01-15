@@ -40,7 +40,7 @@ impl std::fmt::Display for NowThen {
 impl std::fmt::LowerExp for NowThen {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let diff = Percent::from((self.now - self.then) / self.then);
-		write!(f, "{:e}{:+}", self.now, diff)
+		write!(f, "{:e}{diff:+}", self.now)
 	}
 }
 
