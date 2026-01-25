@@ -734,13 +734,34 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				}, quote! { #ident: helper.#ident })
 			} else if has_private_value_attr {
 				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
-				(
-					quote! {
-						#(#forwarded_attrs)*
-						#ident: PrivateValue
-					},
-					quote! { #ident: helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.parse().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))? },
-				)
+				if is_option {
+					// Handle Option<T> with #[private_value] - extract inner type for explicit FromStr call
+					let inner_type = if let syn::Type::Path(type_path) = ty {
+						extract_option_inner_type(type_path)
+					} else {
+						panic!("Option type expected for #[private_value] on Option field")
+					};
+					(
+						quote! {
+							#(#forwarded_attrs)*
+							#ident: Option<PrivateValue>
+						},
+						quote! {
+							#ident: match helper.#ident {
+								Some(pv) => Some(<#inner_type as std::str::FromStr>::from_str(&pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?).map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))?),
+								None => None,
+							}
+						},
+					)
+				} else {
+					(
+						quote! {
+							#(#forwarded_attrs)*
+							#ident: PrivateValue
+						},
+						quote! { #ident: <#ty as std::str::FromStr>::from_str(&helper.#ident.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?).map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))? },
+					)
+				}
 			} else if is_option {
 				// Handle Option<T> types
 				if let syn::Type::Path(type_path) = ty {
