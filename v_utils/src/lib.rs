@@ -15,25 +15,13 @@ compile_error!("Feature `xdg` is not compatible with wasm.");
 // of course it's included unconditionally - the crate itself is called "v_utils"
 pub mod utils;
 
-#[cfg(test)]
-pub(crate) mod internal_utils;
-
-//Q: I like the idea of having a prelude, but atm it just leads to possibility of mismatching def paths, client imports v_utils and something else relying on a different version of v_utils
-#[cfg(feature = "lite")]
-pub mod prelude;
-
-pub mod other;
-pub use other::*;
-
 #[cfg(feature = "io")]
 pub mod io;
-
+pub mod other;
+#[cfg(feature = "lite")]
+pub mod prelude;
 #[cfg(feature = "trades")]
 pub mod trades;
-
-#[cfg(feature = "macros")]
-pub extern crate v_utils_macros as macros;
-
 #[doc(hidden)]
 pub mod __internal {
 	pub extern crate eyre;
@@ -70,6 +58,14 @@ pub mod __internal {
 		pub paths: Vec<std::path::PathBuf>,
 	}
 }
-
 #[cfg(feature = "distributions")]
 pub mod distributions;
+#[cfg(test)]
+pub(crate) mod internal_utils;
+
+//Q: I like the idea of having a prelude, but atm it just leads to possibility of mismatching def paths, client imports v_utils and something else relying on a different version of v_utils
+
+pub use other::*;
+
+#[cfg(feature = "macros")]
+pub extern crate v_utils_macros as macros;

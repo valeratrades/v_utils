@@ -16,60 +16,6 @@ impl Position {
 	}
 }
 
-/// Known editors with line:col support
-#[derive(Clone, Copy, Debug)]
-enum Editor {
-	Nvim,
-	Helix,
-	Vscode,
-	Unknown,
-}
-
-impl Editor {
-	/// Detect editor from $EDITOR environment variable
-	fn detect() -> Self {
-		let editor = env::var("EDITOR").unwrap_or_default();
-		let editor_name = Path::new(&editor).file_name().and_then(|s| s.to_str()).unwrap_or(&editor);
-
-		match editor_name {
-			"nvim" | "vim" | "vi" => Self::Nvim,
-			"hx" | "helix" => Self::Helix,
-			"code" | "code-insiders" => Self::Vscode,
-			_ => Self::Unknown,
-		}
-	}
-
-	/// Format command arguments for opening file at position
-	fn format_open_cmd(&self, path: &Path, position: Option<Position>) -> String {
-		let p = path.display();
-		match (self, position) {
-			(Self::Nvim, Some(pos)) => {
-				// nvim "+call cursor(line, col) | normal zz" file - positions cursor and centers view
-				match pos.col {
-					Some(col) => format!("$EDITOR \"+call cursor({}, {col}) | normal zz\" \"{p}\"", pos.line),
-					None => format!("$EDITOR \"+call cursor({}, 1) | normal zz\" \"{p}\"", pos.line),
-				}
-			}
-			(Self::Helix, Some(pos)) => {
-				// helix file:line:col (helix centers by default)
-				match pos.col {
-					Some(col) => format!("$EDITOR \"{p}:{}:{col}\"", pos.line),
-					None => format!("$EDITOR \"{p}:{}\"", pos.line),
-				}
-			}
-			(Self::Vscode, Some(pos)) => {
-				// code --goto file:line:col (vscode centers by default)
-				match pos.col {
-					Some(col) => format!("$EDITOR --goto \"{p}:{}:{col}\"", pos.line),
-					None => format!("$EDITOR --goto \"{p}:{}\"", pos.line),
-				}
-			}
-			// Unknown editor or no position - just open the file
-			(_, _) => format!("$EDITOR \"{p}\""),
-		}
-	}
-}
-
 /// Mode for opening a file
 #[derive(Debug, Default)]
 pub enum OpenMode {
@@ -83,7 +29,6 @@ pub enum OpenMode {
 	/// Opens file in less pager
 	Pager,
 }
-
 /// Builder for opening files with various options.
 ///
 /// # Examples
@@ -115,7 +60,6 @@ pub struct Client {
 	mode: OpenMode,
 	position: Option<Position>,
 }
-
 impl Client {
 	/// Enable git sync (pull before, commit+push after)
 	pub fn git(mut self, enable: bool) -> Self {
@@ -228,8 +172,60 @@ impl Client {
 pub async fn open<P: AsRef<Path>>(path: P) -> Result<()> {
 	Client::default().open(path).await
 }
-
 /// Convenience function: opens file with default settings (blocking)
 pub fn open_blocking<P: AsRef<Path>>(path: P) -> Result<()> {
 	tokio::runtime::Runtime::new().unwrap().block_on(open(path))
+}
+/// Known editors with line:col support
+#[derive(Clone, Copy, Debug)]
+enum Editor {
+	Nvim,
+	Helix,
+	Vscode,
+	Unknown,
+}
+
+impl Editor {
+	/// Detect editor from $EDITOR environment variable
+	fn detect() -> Self {
+		let editor = env::var("EDITOR").unwrap_or_default();
+		let editor_name = Path::new(&editor).file_name().and_then(|s| s.to_str()).unwrap_or(&editor);
+
+		match editor_name {
+			"nvim" | "vim" | "vi" => Self::Nvim,
+			"hx" | "helix" => Self::Helix,
+			"code" | "code-insiders" => Self::Vscode,
+			_ => Self::Unknown,
+		}
+	}
+
+	/// Format command arguments for opening file at position
+	fn format_open_cmd(&self, path: &Path, position: Option<Position>) -> String {
+		let p = path.display();
+		match (self, position) {
+			(Self::Nvim, Some(pos)) => {
+				// nvim "+call cursor(line, col) | normal zz" file - positions cursor and centers view
+				match pos.col {
+					Some(col) => format!("$EDITOR \"+call cursor({}, {col}) | normal zz\" \"{p}\"", pos.line),
+					None => format!("$EDITOR \"+call cursor({}, 1) | normal zz\" \"{p}\"", pos.line),
+				}
+			}
+			(Self::Helix, Some(pos)) => {
+				// helix file:line:col (helix centers by default)
+				match pos.col {
+					Some(col) => format!("$EDITOR \"{p}:{}:{col}\"", pos.line),
+					None => format!("$EDITOR \"{p}:{}\"", pos.line),
+				}
+			}
+			(Self::Vscode, Some(pos)) => {
+				// code --goto file:line:col (vscode centers by default)
+				match pos.col {
+					Some(col) => format!("$EDITOR --goto \"{p}:{}:{col}\"", pos.line),
+					None => format!("$EDITOR --goto \"{p}:{}\"", pos.line),
+				}
+			}
+			// Unknown editor or no position - just open the file
+			(_, _) => format!("$EDITOR \"{p}\""),
+		}
+	}
 }

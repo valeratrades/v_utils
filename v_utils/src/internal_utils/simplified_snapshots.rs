@@ -4,36 +4,6 @@
 //! rendering with proper font support, multiple output formats, and better customization.
 //! This module exists only for testing v_utils internals, since snapshot_fonts depends on v_utils.
 
-struct PlotData {
-	scale: f64,
-	offset: f64,
-	blocks: [char; 9],
-}
-impl PlotData {
-	fn new(min_val: f64, max_val: f64, height: usize) -> Self {
-		let data_range = max_val - min_val;
-		let plot_range = (height * 8) as f64;
-		let scale = plot_range / data_range;
-		let offset = min_val * scale;
-		let blocks = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-		//let braille = ['⠀', '⡀', '⡄', '⡆', '⢀', '⢠', '⣀', '⣆', '⣠', '⣤', '⣦', '⣴', '⣶', '⣷', '⣾', '⣿'];
-		PlotData { scale, offset, blocks }
-	}
-
-	fn get_block_index(&self, val: f64, i: usize) -> usize {
-		let scaled_val = val * self.scale - self.offset;
-		(scaled_val - i as f64 * 8.0).clamp(0.0, 8.0) as usize
-	}
-
-	/// Raise by the smallest step (▁)
-	fn raise_plot(&mut self) {
-		self.offset -= 1.0;
-	}
-}
-
-static SINGLE_PLOT_WIDTH: usize = 90;
-static SINGLE_PLOT_HEIGHT: usize = 12;
-
 #[derive(Clone, Debug, Default)]
 pub struct SnapshotP {
 	prices: Vec<f64>,
@@ -200,11 +170,6 @@ impl SnapshotP {
 	}
 }
 
-fn join_str_blocks_v(left: String, right: String) -> String {
-	assert_eq!(left.split('\n').count(), right.split('\n').count());
-	left.lines().zip(right.lines()).map(|(l, r)| format!("{l}{r}")).collect::<Vec<String>>().join("\n")
-}
-
 /// # Panics
 /// if ordinals on orders are outside of prices or not ascending.
 ///
@@ -228,6 +193,40 @@ pub fn snapshot_plot_orders<T: Into<f64> + Copy>(prices: &[T], orders: &[(usize,
 	order_points.extend((last_order.0..prices.len()).map(|_| last_order.1));
 
 	SnapshotP::build(&prices).secondary_pane_optional(order_points).draw()
+}
+struct PlotData {
+	scale: f64,
+	offset: f64,
+	blocks: [char; 9],
+}
+impl PlotData {
+	fn new(min_val: f64, max_val: f64, height: usize) -> Self {
+		let data_range = max_val - min_val;
+		let plot_range = (height * 8) as f64;
+		let scale = plot_range / data_range;
+		let offset = min_val * scale;
+		let blocks = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+		//let braille = ['⠀', '⡀', '⡄', '⡆', '⢀', '⢠', '⣀', '⣆', '⣠', '⣤', '⣦', '⣴', '⣶', '⣷', '⣾', '⣿'];
+		PlotData { scale, offset, blocks }
+	}
+
+	fn get_block_index(&self, val: f64, i: usize) -> usize {
+		let scaled_val = val * self.scale - self.offset;
+		(scaled_val - i as f64 * 8.0).clamp(0.0, 8.0) as usize
+	}
+
+	/// Raise by the smallest step (▁)
+	fn raise_plot(&mut self) {
+		self.offset -= 1.0;
+	}
+}
+
+static SINGLE_PLOT_WIDTH: usize = 90;
+static SINGLE_PLOT_HEIGHT: usize = 12;
+
+fn join_str_blocks_v(left: String, right: String) -> String {
+	assert_eq!(left.split('\n').count(), right.split('\n').count());
+	left.lines().zip(right.lines()).map(|(l, r)| format!("{l}{r}")).collect::<Vec<String>>().join("\n")
 }
 
 //TODO!!!!!: `plot_xy()`, that would have explicit axis markings in the expected locations (for now make strictly positive to avoid logic for dynamically positioning the axis).
