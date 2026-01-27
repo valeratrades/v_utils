@@ -736,6 +736,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				// For fields marked with #[private_value], wrap in PrivateValue and use FromStr
 				if is_option {
 					// Handle Option<T> with #[private_value] - extract inner type for explicit FromStr call
+					// Use into_string_optional so missing env vars become None instead of erroring
 					let inner_type = if let syn::Type::Path(type_path) = ty {
 						extract_option_inner_type(type_path)
 					} else {
@@ -748,7 +749,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 						},
 						quote! {
 							#ident: match helper.#ident {
-								Some(pv) => Some(<#inner_type as std::str::FromStr>::from_str(&pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?).map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))?),
+								Some(pv) => match pv.into_string_optional().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))? {
+									Some(s) => Some(<#inner_type as std::str::FromStr>::from_str(&s).map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to parse {} from string: {:?}", stringify!(#ident), e)))?),
+									None => None,
+								},
 								None => None,
 							}
 						},
@@ -863,6 +867,19 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 						match self {
 							PrivateValue::Direct(s) => Ok(s.clone()),
 							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
+						}
+					}
+
+					/// Like `into_string`, but returns `Ok(None)` if env var is not present.
+					/// Other errors (like invalid unicode) still propagate as `Err`.
+					pub fn into_string_optional(&self) -> v_utils::__internal::eyre::Result<Option<String>> {
+						match self {
+							PrivateValue::Direct(s) => Ok(Some(s.clone())),
+							PrivateValue::Env { env } => match std::env::var(env) {
+								Ok(s) => Ok(Some(s)),
+								Err(std::env::VarError::NotPresent) => Ok(None),
+								Err(e) => Err(v_utils::__internal::eyre::eyre!("Failed to read environment variable '{}': {}", env, e)),
+							},
 						}
 					}
 				}

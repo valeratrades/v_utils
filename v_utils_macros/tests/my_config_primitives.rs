@@ -78,4 +78,22 @@ optional_port = "9090"
 	// Test that SecretString fields show [REDACTED] in debug output (handled by secrecy crate)
 	let debug_output = format!("{:?}", t);
 	assert!(debug_output.contains("[REDACTED]"), "SecretString should show [REDACTED] in debug output, got: {}", debug_output);
+
+	// Test that Option<T> with #[private_value] becomes None when env var is missing
+	let toml_with_missing_env = r#"
+	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
+	alpaca_secret = { env = "HOME" }
+whoami = { env = "USER" }
+a_random_non_string = 1
+path = "~/.config/a_test_path"
+port = "8080"
+test_private_value_works_with_non_strings = 1234
+optional_string = { env = "USER" }
+optional_secret = { env = "USER" }
+skipped_string = "test"
+optional_port = { env = "THIS_ENV_VAR_DEFINITELY_DOES_NOT_EXIST_12345" }
+"#;
+
+	let t2: Test = toml::from_str(toml_with_missing_env).expect("Failed to deserialize with missing env var");
+	assert_eq!(t2.optional_port, None, "Option<T> with #[private_value] should be None when env var is missing");
 }
