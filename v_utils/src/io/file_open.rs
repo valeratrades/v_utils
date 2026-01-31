@@ -1,7 +1,7 @@
 use std::{env, path::Path};
 
 use eyre::{Result, WrapErr, bail, eyre};
-use tokio::{process::Command, sync::oneshot};
+use tokio::process::Command;
 
 /// Position in a file (line and optional column)
 #[derive(Clone, Copy, Debug, Default)]
@@ -29,14 +29,15 @@ pub enum OpenMode {
 	/// Opens file in less pager
 	Pager,
 }
+
 /// Builder for opening files with various options.
 ///
 /// # Examples
 /// ```ignore
 /// use v_utils::io::file_open::Client;
 ///
-/// // Simple open
-/// Client::default().open(&path).await?;
+/// // Simple open, returns whether file was modified
+/// let modified = Client::default().open(&path).await?;
 ///
 /// // Open with git sync
 /// Client::default().git(true).open(&path).await?;
@@ -53,12 +54,16 @@ pub enum OpenMode {
 /// // Open at specific line and column
 /// Client::default().at(Position::new(42, Some(10))).open(&path).await?;
 ///
+/// // Open with suggested buffer content (nvim only, user must :w to save)
+/// Client::default().with_buffer("suggested content".into()).open(&path).await?;
+///
 /// ```
 #[derive(Debug, Default)]
 pub struct Client {
 	git: bool,
 	mode: OpenMode,
 	position: Option<Position>,
+	buffer: Option<String>,
 }
 impl Client {
 	/// Enable git sync (pull before, commit+push after)
@@ -81,25 +86,45 @@ impl Client {
 		self
 	}
 
+	/// Pre-populate buffer with content that user must explicitly save.
+	///
+	/// Opens editor with the content already in buffer but marked as modified.
+	/// If user quits without saving, the file remains unchanged. If user saves, content is written.
+	///
+	/// **nvim only** - other editors will error.
+	pub fn with_buffer(mut self, contents: String) -> Self {
+		self.buffer = Some(contents);
+		self
+	}
+
 	/// Open the file at the given path
-	pub async fn open<P: AsRef<Path>>(self, path: P) -> Result<()> {
+	///
+	/// Returns `true` if file was modified, `false` otherwise.
+	pub async fn open<P: AsRef<Path>>(self, path: P) -> Result<bool> {
 		let path = path.as_ref();
 		if self.git { self.open_with_git(path).await } else { self.open_file(path).await }
 	}
 
-	async fn open_file(self, path: &Path) -> Result<()> {
+	async fn open_file(self, path: &Path) -> Result<bool> {
 		let p = path.display();
 		let editor = Editor::detect();
+		let opts = OpenOptions {
+			position: self.position,
+			buffer: self.buffer.as_deref(),
+		};
+
+		let mtime_before = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+
 		match self.mode {
 			OpenMode::Normal => {
 				if !path.exists() {
 					bail!("File does not exist");
 				}
-				let cmd = editor.format_open_cmd(path, self.position);
+				let cmd = editor.format_open_cmd(path, &opts)?;
 				Command::new("sh").arg("-c").arg(cmd).status().await.map_err(|_| eyre!("$EDITOR env variable is not defined"))?;
 			}
 			OpenMode::Force => {
-				let cmd = editor.format_open_cmd(path, self.position);
+				let cmd = editor.format_open_cmd(path, &opts)?;
 				Command::new("sh")
 					.arg("-c")
 					.arg(cmd)
@@ -127,10 +152,17 @@ impl Client {
 			}
 		}
 
-		Ok(())
+		let mtime_after = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+		let modified = match (mtime_before, mtime_after) {
+			(None, Some(_)) => true, // file was created
+			(Some(before), Some(after)) => after != before,
+			_ => false,
+		};
+
+		Ok(modified)
 	}
 
-	async fn open_with_git(self, path: &Path) -> Result<()> {
+	async fn open_with_git(self, path: &Path) -> Result<bool> {
 		let metadata = match std::fs::metadata(path) {
 			Ok(metadata) => metadata,
 			Err(e) => match self.mode {
@@ -153,7 +185,8 @@ impl Client {
 			format!("Failed to pull from Git repository at '{sp}'. Ensure a repository exists at this path or any of its parent directories and no merge conflicts are present.")
 		})?;
 
-		self.open_file(path)
+		let modified = self
+			.open_file(path)
 			.await
 			.with_context(|| format!("Failed to open file at '{}'. Use `OpenMode::Force` and ensure you have necessary permissions", path.display()))?;
 
@@ -164,18 +197,29 @@ impl Client {
 			.await
 			.with_context(|| format!("Failed to commit or push to Git repository at '{sp}'. Ensure you have the necessary permissions and the repository is correctly configured."))?;
 
-		Ok(())
+		Ok(modified)
 	}
 }
 
 /// Convenience function: opens file with default settings
-pub async fn open<P: AsRef<Path>>(path: P) -> Result<()> {
+///
+/// Returns `true` if file was modified, `false` otherwise.
+pub async fn open<P: AsRef<Path>>(path: P) -> Result<bool> {
 	Client::default().open(path).await
 }
 /// Convenience function: opens file with default settings (blocking)
-pub fn open_blocking<P: AsRef<Path>>(path: P) -> Result<()> {
+///
+/// Returns `true` if file was modified, `false` otherwise.
+pub fn open_blocking<P: AsRef<Path>>(path: P) -> Result<bool> {
 	tokio::runtime::Runtime::new().unwrap().block_on(open(path))
 }
+/// Options passed to editor for formatting the open command
+#[derive(Debug, Default)]
+struct OpenOptions<'a> {
+	position: Option<Position>,
+	buffer: Option<&'a str>,
+}
+
 /// Known editors with line:col support
 #[derive(Clone, Copy, Debug)]
 enum Editor {
@@ -199,10 +243,27 @@ impl Editor {
 		}
 	}
 
-	/// Format command arguments for opening file at position
-	fn format_open_cmd(&self, path: &Path, position: Option<Position>) -> String {
+	/// Format command for opening file with given options
+	fn format_open_cmd(&self, path: &Path, opts: &OpenOptions) -> Result<String> {
 		let p = path.display();
-		match (self, position) {
+
+		// Handle buffer pre-population
+		if let Some(contents) = opts.buffer {
+			return match self {
+				Self::Nvim => {
+					// Escape for lua string: backslashes and double quotes
+					let escaped = contents.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+					Ok(format!(
+						r#"nvim -c "lua vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(\"{escaped}\", '\\n')); vim.bo.modified = true" "{p}""#
+					))
+				}
+				// TODO: helix, vscode support
+				_ => bail!("with_buffer() only supported for nvim"),
+			};
+		}
+
+		// Handle position
+		Ok(match (self, opts.position) {
 			(Self::Nvim, Some(pos)) => {
 				// nvim "+call cursor(line, col) | normal zz" file - positions cursor and centers view
 				match pos.col {
@@ -226,6 +287,6 @@ impl Editor {
 			}
 			// Unknown editor or no position - just open the file
 			(_, _) => format!("$EDITOR \"{p}\""),
-		}
+		})
 	}
 }
