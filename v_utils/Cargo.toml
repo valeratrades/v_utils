@@ -36,6 +36,7 @@ tracing = [
     "dep:tracing-subscriber",
     "dep:tracing-log",
     "dep:tracing-error",
+    "dep:miette",
     "dep:xdg",
 ]
 distributions = ["dep:rand", "dep:rand_distr"]
@@ -85,6 +86,7 @@ toml = { workspace = true, optional = true }
 tracing = { version = "^0.1.44", features = ["log", "std", "async-await"] }
 
 # # optional
+miette = { version = "^7.6", optional = true }
 tokio = { version = "^1.49.0", features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
 tracing-error = { version = "^0.2.1", optional = true }
 tracing-log = { version = "^0.2.0", optional = true }

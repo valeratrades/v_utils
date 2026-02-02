@@ -35,29 +35,52 @@ pub mod tracing;
 #[cfg(feature = "tracing")]
 pub use tracing::*;
 
-/// # HACK
-/// Assumes that `color_eyre` is in scope
+/// Sets up error handling (color_eyre, miette) and tracing subscriber for client-side applications.
 ///
-/// Optionally pass `option_env!("LOG_DIRECTIVES")` as the first argument to embed compile-time log directives.
+/// HACK: Assumes that `color_eyre` and `miette` are in scope.
+///
+/// # Behavior
+/// - Installs color_eyre panic/error hooks (with span trace capture disabled)
+/// - Installs miette diagnostic hook (with terminal links and 3 context lines)
+/// - Initializes tracing subscriber with:
+///   - JSON formatted logs to `~/.local/state/{pkg_name}/{pkg_name}.log`
+///   - WARN and ERROR also printed to stderr
+///   - Log directives from `LOG_DIRECTIVES` env var (set by build.rs)
+///
+/// # Integration Test Mode
+/// When `__IS_INTEGRATION_TEST` env var is set, logs to stdout with debug level instead.
+/// This allows integration tests to capture and inspect log output.
+///
+/// # Usage
+/// ```ignore
+/// // Default log filename ({pkg_name}.log)
+/// v_utils::clientside!();
+///
+/// // Custom log filename from Option<String> (e.g., from CLI arg)
+/// v_utils::clientside!(extract_log_to());
+/// ```
 #[cfg(all(feature = "tracing", feature = "xdg"))]
 #[macro_export]
 macro_rules! clientside {
 	() => {
-		color_eyre::install().unwrap();
-		v_utils::utils::init_subscriber(
-			v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME"))
-				.stderr_errors(true)
-				.compiled_directives(option_env!("LOG_DIRECTIVES")),
-		);
+		v_utils::clientside!(None::<String>);
 	};
 	($fname:expr) => {
-		color_eyre::install().unwrap();
-		v_utils::utils::init_subscriber(
-			v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME"))
-				.fname($fname)
+		color_eyre::config::HookBuilder::default().capture_span_trace_by_default(false).install().unwrap();
+		miette::set_hook(Box::new(|_| Box::new(miette::MietteHandlerOpts::new().terminal_links(true).context_lines(3).build()))).expect("miette hook already set");
+		if std::env::var("__IS_INTEGRATION_TEST").is_ok() {
+			// SAFETY: Called at program start before any other threads are spawned
+			unsafe { std::env::set_var("LOG_DIRECTIVES", concat!("debug,", env!("CARGO_PKG_NAME"), "=debug")) };
+			v_utils::utils::init_subscriber(v_utils::utils::LogDestination::default());
+		} else {
+			let mut dest = v_utils::utils::LogDestination::xdg(env!("CARGO_PKG_NAME"))
 				.stderr_errors(true)
-				.compiled_directives(option_env!("LOG_DIRECTIVES")),
-		);
+				.compiled_directives(option_env!("LOG_DIRECTIVES"));
+			if let Some(fname) = $fname {
+				dest = dest.fname(fname);
+			}
+			v_utils::utils::init_subscriber(dest);
+		}
 	};
 }
 
@@ -66,13 +89,13 @@ macro_rules! clientside {
 #[macro_export]
 macro_rules! clientside {
 	() => {
-		eprintln!("[v_utils] Warning: `xdg` feature not enabled, logging to stdout instead of file. Add `xdg` feature to v_utils dependency to enable file logging.");
-		color_eyre::install().unwrap();
-		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::default().compiled_directives(option_env!("LOG_DIRECTIVES")));
+		v_utils::clientside!(None::<String>);
 	};
 	($fname:expr) => {
+		let _ = $fname; // silence unused warning
 		eprintln!("[v_utils] Warning: `xdg` feature not enabled, logging to stdout instead of file. Add `xdg` feature to v_utils dependency to enable file logging.");
-		color_eyre::install().unwrap();
+		color_eyre::config::HookBuilder::default().capture_span_trace_by_default(false).install().unwrap();
+		miette::set_hook(Box::new(|_| Box::new(miette::MietteHandlerOpts::new().terminal_links(true).context_lines(3).build()))).expect("miette hook already set");
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::default().compiled_directives(option_env!("LOG_DIRECTIVES")));
 	};
 }
