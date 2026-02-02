@@ -1247,7 +1247,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// When the config is missing a required field, the macro will:
 /// 1. Parse the error to identify the missing field
 /// 2. Get the default value from `Default::default()`
-/// 3. Ask the user via `confirm_blocking` if they want to extend the config
+/// 3. Ask the user via `confirmation().flush_blocking()` if they want to extend the config
 /// 4. If confirmed, add the missing field with its default value to the config file
 /// 5. Retry loading the config
 ///
@@ -1597,7 +1597,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 											missing_field,
 											default_value
 										);
-										if ::v_utils::io::confirm_blocking(&prompt) {
+										if matches!(::v_utils::io::confirmation(&prompt).flush_blocking(), ::v_utils::io::ConfirmResult::Yes) {
 											if let Err(extend_err) = Self::extend_config_file(config_path, &missing_field, &default_value) {
 												eprintln!("Warning: Failed to extend config: {}", extend_err);
 											} else {

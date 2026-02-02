@@ -12,7 +12,7 @@ repository = "https://github.com/valeratrades/v_utils"
 [features]
 default = ["lite"]
 
-io = ["dep:dirs"] 
+io = ["dep:dirs", "dep:libc"] 
 xdg = [
     "dep:xdg",
     "v_utils_macros/xdg",

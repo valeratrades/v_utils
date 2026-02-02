@@ -23,7 +23,7 @@ pub fn exit_on_error<T, E: Into<eyre::Report>>(r: Result<T, E>) -> T {
 	match r {
 		Ok(t) => t,
 		Err(e) => {
-			println!("{}", format_eyre_chain_for_user(e.into()));
+			eprintln!("{}", format_eyre_chain_for_user(e.into())); //Q: is it preferrable to print to `stdout` or `stderr` here? Former has higher priority, but semantically latter is more correct...
 			std::process::exit(7);
 		}
 	}
