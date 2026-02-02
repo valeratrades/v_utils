@@ -90,43 +90,6 @@ pub fn confirmation(message: &str) -> Confirmation<'_> {
 	Confirmation { message, all: false, change: None }
 }
 
-#[deprecated(since = "3.0.0", note = "Use `confirmation(msg).flush_blocking()` instead")]
-#[must_use]
-pub fn confirm_blocking<T: AsRef<str>>(message: T) -> bool {
-	matches!(confirmation(message.as_ref()).flush_blocking(), ConfirmResult::Yes)
-}
-#[cfg(feature = "async-io")]
-#[deprecated(since = "3.0.0", note = "Use `confirmation(msg).flush().await` instead")]
-pub async fn confirm<T: AsRef<str>>(message: T) -> bool {
-	matches!(confirmation(message.as_ref()).flush().await, ConfirmResult::Yes)
-}
-#[deprecated(since = "3.0.0", note = "Use `confirmation(msg).all().flush_blocking()` instead")]
-#[must_use]
-pub fn confirm_all_blocking<T: AsRef<str>>(message: T) -> ConfirmAllResult {
-	match confirmation(message.as_ref()).all().flush_blocking() {
-		ConfirmResult::Yes => ConfirmAllResult::Yes,
-		ConfirmResult::No => ConfirmAllResult::No,
-		ConfirmResult::All => ConfirmAllResult::All,
-		ConfirmResult::Change(_) => ConfirmAllResult::Yes,
-	}
-}
-#[cfg(feature = "async-io")]
-#[deprecated(since = "3.0.0", note = "Use `confirmation(msg).all().flush().await` instead")]
-pub async fn confirm_all<T: AsRef<str>>(message: T) -> ConfirmAllResult {
-	match confirmation(message.as_ref()).all().flush().await {
-		ConfirmResult::Yes => ConfirmAllResult::Yes,
-		ConfirmResult::No => ConfirmAllResult::No,
-		ConfirmResult::All => ConfirmAllResult::All,
-		ConfirmResult::Change(_) => ConfirmAllResult::Yes,
-	}
-}
-#[deprecated(since = "3.0.0", note = "Use `ConfirmResult` instead")]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ConfirmAllResult {
-	Yes,
-	No,
-	All,
-}
 fn run_confirmation_blocking(prompt: &str, all: bool, change: Option<&str>) -> ConfirmResult {
 	let stdin = io::stdin();
 	let mut stdout = io::stdout();
