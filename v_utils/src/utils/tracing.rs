@@ -347,6 +347,85 @@ fn trace_the_init() {
 	tracing::trace!("Environment: {vars:#?}\n", vars = vars);
 }
 
+/// Installs `color_eyre` with frame filters that strip async runtime noise
+/// (tokio, mio, futures_util) and test harness / panic machinery from backtraces.
+///
+/// Compiled symbols embed crate disambiguator hashes (e.g. `std[d04b43a2428f6e7c]::panicking`),
+/// so we strip `[...]` before matching.
+#[macro_export]
+macro_rules! install_color_eyre {
+	() => {
+		color_eyre::config::HookBuilder::default()
+			.add_frame_filter(Box::new(|frames| {
+				let strip_hashes = |name: &str| -> String {
+					let mut out = String::with_capacity(name.len());
+					let mut chars = name.chars();
+					while let Some(c) = chars.next() {
+						if c == '[' {
+							for c2 in chars.by_ref() {
+								if c2 == ']' {
+									break;
+								}
+							}
+						} else {
+							out.push(c);
+						}
+					}
+					out
+				};
+				frames.retain(|frame| {
+					let Some(name) = frame.name.as_ref() else { return true };
+					let name = strip_hashes(name);
+					let name = name.as_str();
+					// async runtime
+					if name.starts_with("tokio::") || name.starts_with("<tokio::") {
+						return false;
+					}
+					if name.starts_with("mio::") {
+						return false;
+					}
+					if name.starts_with("futures_util::") {
+						return false;
+					}
+					if name.contains("::future::") {
+						return false;
+					}
+					if name.contains("core::pin::Pin") {
+						return false;
+					}
+					// test harness & panic machinery below user code
+					if name.starts_with("test::") {
+						return false;
+					}
+					if name.contains("std::panicking") || name.contains("std::panic::") {
+						return false;
+					}
+					if name.contains("std::thread") || name.contains("std::sys::") {
+						return false;
+					}
+					if name.contains("core::ops::function") {
+						return false;
+					}
+					if name.contains("core::panic::unwind_safe") {
+						return false;
+					}
+					if name.starts_with("<alloc::boxed::Box<dyn core") {
+						return false;
+					}
+					if name.starts_with("__rustc") {
+						return false;
+					}
+					if name.contains("start_thread") || name.contains("clone3") {
+						return false;
+					}
+					true
+				});
+			}))
+			.install()
+			.unwrap()
+	};
+}
+
 #[cfg(test)]
 mod tests {
 	use tracing_subscriber::EnvFilter;
