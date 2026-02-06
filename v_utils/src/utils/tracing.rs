@@ -15,6 +15,12 @@ use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 
+/// Maximum log file size before trimming (20GB)
+const LOG_MAX_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
+/// How often to check log file size (1 minute)
+const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
+const DIRECTIVES_FILENAME: &str = "_log_directives";
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
@@ -188,10 +194,6 @@ pub enum LogDestinationKind {
 		fname: Option<String>,
 	},
 }
-/// Maximum log file size before trimming (20GB)
-const LOG_MAX_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
-/// How often to check log file size (1 minute)
-const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
 /// Wrapper to allow Arc<Mutex<File>> to implement Write safely
 #[derive(Clone)]
@@ -281,9 +283,6 @@ impl From<PathBuf> for LogDestination {
 		LogDestination::file(path)
 	}
 }
-
-const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
-const DIRECTIVES_FILENAME: &str = "_log_directives";
 
 fn normalize_directives(s: &str) -> String {
 	s.lines().map(|l| l.trim()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect::<Vec<_>>().join(",")
