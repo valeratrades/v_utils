@@ -66,7 +66,8 @@ macro_rules! clientside {
 		v_utils::clientside!(None::<String>);
 	};
 	($fname:expr) => {
-		color_eyre::config::HookBuilder::default().capture_span_trace_by_default(false).install().unwrap();
+		//color_eyre::config::HookBuilder::default().capture_span_trace_by_default(false).install().unwrap(); // thought would allow for nice interop with miette, but in reality I lose my colored traces
+		color_eyre::install().unwrap();
 		miette::set_hook(Box::new(|_| Box::new(miette::MietteHandlerOpts::new().terminal_links(true).build()))).expect("miette hook already set");
 		if std::env::var("__IS_INTEGRATION_TEST").is_ok() {
 			// SAFETY: Called at program start before any other threads are spawned
@@ -94,7 +95,7 @@ macro_rules! clientside {
 	($fname:expr) => {
 		let _ = $fname; // silence unused warning
 		eprintln!("[v_utils] Warning: `xdg` feature not enabled, logging to stdout instead of file. Add `xdg` feature to v_utils dependency to enable file logging.");
-		color_eyre::config::HookBuilder::default().capture_span_trace_by_default(false).install().unwrap();
+		color_eyre::install().unwrap();
 		miette::set_hook(Box::new(|_| Box::new(miette::MietteHandlerOpts::new().terminal_links(true).context_lines(3).build()))).expect("miette hook already set");
 		v_utils::utils::init_subscriber(v_utils::utils::LogDestination::default().compiled_directives(option_env!("LOG_DIRECTIVES")));
 	};
