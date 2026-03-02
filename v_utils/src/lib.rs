@@ -2,6 +2,8 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 #![feature(stmt_expr_attributes)]
+#![feature(specialization)]
+#![allow(incomplete_features)]
 
 #[cfg(all(feature = "assert-wasm-compat", feature = "async-io"))]
 compile_error!("Feature `async-io` is not compatible with wasm.");

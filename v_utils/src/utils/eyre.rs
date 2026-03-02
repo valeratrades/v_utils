@@ -1,5 +1,40 @@
 use std::fmt::Write;
 
+pub trait SysexitCode {
+	fn sysexit(&self) -> Sysexit;
+}
+/// Exit codes from sysexits.h, plus a generic fallback.
+///
+/// `None` (1) is for errors that don't have a specific sysexit mapping —
+/// use it as the catch-all in `SysexitCode` impls instead of guessing a code.
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(i32)]
+pub enum Sysexit {
+	/// Generic error, no specific sysexit code applies
+	#[default]
+	None = 1,
+	Usage = 64,
+	DataErr = 65,
+	NoInput = 66,
+	NoUser = 67,
+	NoHost = 68,
+	Unavailable = 69,
+	Software = 70,
+	OsErr = 71,
+	OsFile = 72,
+	CantCreat = 73,
+	IoErr = 74,
+	TempFail = 75,
+	Protocol = 76,
+	NoPerm = 77,
+	Config = 78,
+}
+impl From<Sysexit> for i32 {
+	fn from(s: Sysexit) -> i32 {
+		s as i32
+	}
+}
+
 pub fn format_eyre_chain_for_user(e: eyre::Report) -> String {
 	let mut s = String::new();
 
@@ -19,12 +54,32 @@ pub fn format_eyre_chain_for_user(e: eyre::Report) -> String {
 	s
 }
 
+mod sealed {
+	use super::SysexitCode;
+
+	pub trait ExitCode {
+		fn exit_code(&self) -> i32;
+	}
+	impl<E> ExitCode for E {
+		default fn exit_code(&self) -> i32 {
+			7
+		}
+	}
+	impl<E: SysexitCode> ExitCode for E {
+		fn exit_code(&self) -> i32 {
+			self.sysexit().into()
+		}
+	}
+}
+use sealed::ExitCode;
+
 pub fn exit_on_error<T, E: Into<eyre::Report>>(r: Result<T, E>) -> T {
 	match r {
 		Ok(t) => t,
 		Err(e) => {
-			eprintln!("{}", format_eyre_chain_for_user(e.into())); //Q: is it preferrable to print to `stdout` or `stderr` here? Former has higher priority, but semantically latter is more correct...
-			std::process::exit(7);
+			let code = e.exit_code();
+			eprintln!("{}", format_eyre_chain_for_user(e.into()));
+			std::process::exit(code);
 		}
 	}
 }
