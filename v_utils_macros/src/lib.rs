@@ -1533,11 +1533,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 		impl #name {
 			///NB: must have `Cli` struct in the same scope, with clap derived, and `insert_clap_settings!()` macro having had been expanded inside it.
-			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+			pub fn try_build(flags: SettingsFlags) -> Result<Self, ::v_utils::__internal::SettingsError> {
 				Self::try_build_internal(flags, true)
 			}
 
-			fn try_build_internal(flags: SettingsFlags, allow_extend: bool) -> Result<Self, ::v_utils::__internal::eyre::Report> {
+			fn try_build_internal(flags: SettingsFlags, allow_extend: bool) -> Result<Self, ::v_utils::__internal::SettingsError> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
 
@@ -1594,7 +1594,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 								}
 							},
 							_ => {
-								return Err(::v_utils::__internal::MultipleConfigsError {
+								return Err(::v_utils::__internal::SettingsError::MultipleConfigs {
 									paths: conf_files_found.into_iter().cloned().collect(),
 								}.into());
 							}
@@ -1639,7 +1639,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 								}
 							}
 						}
-						Err(::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e))
+						Err(::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e).into())
 					}
 				}
 			}
@@ -2696,7 +2696,7 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 				})
 			}
 
-			fn resolve_config_path(flags: &SettingsFlags) -> Result<Option<std::path::PathBuf>, ::v_utils::__internal::MultipleConfigsError> {
+			fn resolve_config_path(flags: &SettingsFlags) -> Result<Option<std::path::PathBuf>, ::v_utils::__internal::SettingsError> {
 				if let Some(ref path) = flags.config {
 					return Ok(Some(path.0.clone()));
 				}
@@ -2723,12 +2723,12 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 				match found.len() {
 					0 => Ok(None),
 					1 => Ok(Some(found.into_iter().next().unwrap())),
-					_ => Err(::v_utils::__internal::MultipleConfigsError { paths: found }),
+					_ => Err(::v_utils::__internal::SettingsError::MultipleConfigs { paths: found }),
 				}
 			}
 
 			/// Get the current settings, reloading from file if it has changed.
-			pub fn config(&self) -> Result<#name, ::v_utils::__internal::MultipleConfigsError> {
+			pub fn config(&self) -> Result<#name, ::v_utils::__internal::SettingsError> {
 				// Check for multiple configs (could have been added while running)
 				Self::resolve_config_path(&self.flags)?;
 

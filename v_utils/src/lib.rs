@@ -55,9 +55,35 @@ pub mod __internal {
 
 	#[cfg(feature = "cli")]
 	#[derive(Debug, thiserror::Error)]
-	#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
-	pub struct MultipleConfigsError {
-		pub paths: Vec<std::path::PathBuf>,
+	pub enum SettingsError {
+		#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
+		MultipleConfigs { paths: Vec<std::path::PathBuf> },
+		/// NB: no `#[from]`/`#[source]` — these are terminal error messages, not chain links.
+		/// With `#[from]`, thiserror sets `source()` to the inner type, which causes
+		/// `format_eyre_chain_for_user` to print the same message twice (once as root, once as wrapper).
+		#[error("{0}")]
+		Parse(crate::__internal::config::ConfigError),
+		#[error("{0}")]
+		Other(crate::__internal::eyre::Report),
+	}
+	#[cfg(feature = "cli")]
+	impl From<crate::__internal::config::ConfigError> for SettingsError {
+		fn from(e: crate::__internal::config::ConfigError) -> Self {
+			Self::Parse(e)
+		}
+	}
+	#[cfg(feature = "cli")]
+	impl From<crate::__internal::eyre::Report> for SettingsError {
+		fn from(e: crate::__internal::eyre::Report) -> Self {
+			Self::Other(e)
+		}
+	}
+
+	#[cfg(feature = "cli")]
+	impl crate::utils::SysexitCode for SettingsError {
+		fn sysexit(&self) -> crate::utils::Sysexit {
+			crate::utils::Sysexit::Config
+		}
 	}
 }
 #[cfg(feature = "distributions")]

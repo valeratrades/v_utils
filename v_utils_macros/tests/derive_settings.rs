@@ -121,7 +121,7 @@ fn main() {
 	// Test that try_build method exists and compiles
 	// Note: We can't actually call try_build in a simple test because it requires
 	// environment setup and config files
-	let _build_exists: fn(SettingsFlags) -> Result<AppConfig, v_utils::__internal::eyre::Report> = AppConfig::try_build;
+	let _build_exists: fn(SettingsFlags) -> Result<AppConfig, v_utils::__internal::SettingsError> = AppConfig::try_build;
 
 	// Test that SettingsFlags can be flattened into Cli struct
 	// This is verified at compile time - if Cli compiles, it works

@@ -31,7 +31,7 @@ fn main() {
 	};
 
 	// Verify try_build exists and has correct signature
-	let _build_exists: fn(SettingsFlags) -> Result<AppConfigNoDefault, v_utils::__internal::eyre::Report> = AppConfigNoDefault::try_build;
+	let _build_exists: fn(SettingsFlags) -> Result<AppConfigNoDefault, v_utils::__internal::SettingsError> = AppConfigNoDefault::try_build;
 
 	// Suppress unused warnings
 	let _ = flags;
