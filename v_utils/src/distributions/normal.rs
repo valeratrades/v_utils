@@ -10,7 +10,7 @@ use rand_distr::{Distribution, Normal};
 pub fn normal_random_walk(start: f64, num_steps: usize, std_dev: f64, drift: f64, seed: Option<u64>) -> Vec<f64> {
 	let mut rng = match seed {
 		Some(s) => StdRng::seed_from_u64(s),
-		None => StdRng::from_os_rng(),
+		None => StdRng::from_rng(&mut rand::rng()),
 	};
 
 	let normal = Normal::new(drift, std_dev).unwrap();

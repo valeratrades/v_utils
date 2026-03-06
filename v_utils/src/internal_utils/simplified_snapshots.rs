@@ -234,7 +234,7 @@ fn join_str_blocks_v(left: String, right: String) -> String {
 #[cfg(all(test, feature = "distributions"))]
 mod tests {
 	use insta::assert_snapshot;
-	use rand::{Rng, SeedableRng, rngs::StdRng};
+	use rand::{RngExt, SeedableRng, rngs::StdRng};
 
 	use super::*;
 	use crate::distributions::laplace_random_walk;

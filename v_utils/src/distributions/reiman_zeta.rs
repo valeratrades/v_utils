@@ -29,7 +29,7 @@ impl ReimanZeta {
 	pub fn sample(&self, seed: Option<u64>) -> usize {
 		let mut rng = match seed {
 			Some(s) => StdRng::seed_from_u64(s),
-			None => StdRng::from_os_rng(),
+			None => StdRng::from_rng(&mut rand::rng()),
 		};
 
 		let dist = WeightedIndex::new(&self.weights).unwrap();
