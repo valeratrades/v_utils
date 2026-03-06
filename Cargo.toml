@@ -5,12 +5,13 @@ members = ["v_utils", "v_utils_*"]
 resolver = "1"
 
 [workspace.dependencies]
+bon = { version = "^3.9.0" }
 eyre = { version = "^0.6.12" } # not color-eyre, that one is for client-side
-facet = { version = "^0.42" }
+facet = { version = "^0.44" }
 heck = { version = "^0.5.0" }
-insta = { version = "^1.46.0" }
-quote = { version = "^1.0.43" }
+insta = { version = "^1.46.3" }
+quote = { version = "^1.0.45" }
 serde = { version = "^1.0.228", features = ["derive"] }
 serde_json = { version = "^1.0.149" }
-toml = { version = "^0.9" }
-trybuild = { version = "^1.0.114", features = ["diff"] }
+toml = { version = "^1.0" }
+trybuild = { version = "^1.0.116", features = ["diff"] }
