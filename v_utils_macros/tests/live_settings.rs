@@ -6,19 +6,6 @@ use clap::Parser;
 use serde::Serialize;
 use v_utils_macros::{LiveSettings, Settings};
 
-/// Settings struct with Default and Serialize for config auto-extension support.
-/// When a config field is missing, the macro can offer to extend the config file
-/// with default values from Default::default().
-#[derive(Clone, Debug, Default, LiveSettings, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
-struct AppConfig {
-	#[serde(default)]
-	host: String,
-	#[serde(default)]
-	port: u16,
-	#[serde(default)]
-	debug: bool,
-}
-
 /// Example CLI struct using SettingsFlags
 #[allow(dead_code)]
 #[derive(Debug, Parser)]
@@ -26,7 +13,6 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-
 fn main() {
 	// Test that LiveSettings struct was generated
 	let flags = SettingsFlags {
@@ -56,4 +42,16 @@ fn main() {
 	// Suppress unused warnings
 	let _ = flags;
 	let _ = check_config_method;
+}
+/// Settings struct with Default and Serialize for config auto-extension support.
+/// When a config field is missing, the macro can offer to extend the config file
+/// with default values from Default::default().
+#[derive(Clone, Debug, Default, LiveSettings, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
+struct AppConfig {
+	#[serde(default)]
+	host: String,
+	#[serde(default)]
+	port: u16,
+	#[serde(default)]
+	debug: bool,
 }

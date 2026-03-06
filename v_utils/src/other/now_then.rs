@@ -1,6 +1,6 @@
 use crate::Percent;
 
-#[derive(Clone, Copy, Debug, Default, bon::Builder, serde::Deserialize, PartialEq, serde::Serialize)]
+#[derive(bon::Builder, Clone, Copy, Debug, Default, serde::Deserialize, PartialEq, serde::Serialize)]
 pub struct NowThen {
 	pub now: f64,
 	pub then: f64,

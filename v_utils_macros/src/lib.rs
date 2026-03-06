@@ -12,140 +12,6 @@ use syn::{
 };
 
 // helpers {{{
-/// A helper function to know location of errors in `quote!{}`s
-fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
-	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
-	std::fs::create_dir_all(std::path::PathBuf::from(&fpath).parent().unwrap()).unwrap();
-	std::fs::write(&fpath, expanded.to_string()).unwrap();
-	std::process::Command::new("rustfmt").arg("--edition=2024").arg(&fpath).output().unwrap();
-	quote! {include!(#fpath); }
-}
-macro_rules! _dbg_tree {
-	($target:expr) => {
-		let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_dbg.rs");
-		let dbg_str = format!("{:#?}", $target);
-		std::fs::write(fpath, dbg_str).unwrap();
-	};
-}
-fn is_option_type(type_path: &syn::TypePath) -> bool {
-	if let Some(segment) = type_path.path.segments.last() {
-		return segment.ident == "Option";
-	}
-	false
-}
-
-// Helper function to check if a type path is Vec<T>
-fn is_vec_type(type_path: &syn::TypePath) -> bool {
-	if let Some(segment) = type_path.path.segments.last() {
-		return segment.ident == "Vec";
-	}
-	false
-}
-
-// Helper function to check if a type is a specific primitive
-fn is_type(type_path: &syn::TypePath, type_name: &str) -> bool {
-	if let Some(segment) = type_path.path.segments.last() {
-		return segment.ident == type_name;
-	}
-	false
-}
-
-// Extract inner type from Option<T>
-fn extract_option_inner_type(type_path: &syn::TypePath) -> &syn::Type {
-	if let Some(segment) = type_path.path.segments.last() {
-		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-				return inner_type;
-			}
-		}
-	}
-	// Return a dummy type if extraction fails
-	panic!("Failed to extract inner type from Option")
-}
-
-// Extract inner type from Vec<T>
-fn extract_vec_inner_type(type_path: &syn::TypePath) -> &syn::Type {
-	if let Some(segment) = type_path.path.segments.last() {
-		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-				return inner_type;
-			}
-		}
-	}
-	// Return a dummy type if extraction fails
-	panic!("Failed to extract inner type from Vec")
-}
-fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
-	match ty {
-		syn::Type::Path(type_path) =>
-			if type_path.path.segments.last().unwrap().ident == "Option" {
-				quote! { #ty }
-			} else {
-				quote! { Option<#ty> }
-			},
-		_ => quote! { Option<#ty> },
-	}
-}
-
-//,}}}
-
-/// Parsed field-level settings attributes
-///
-/// Supports:
-/// - `#[settings(skip)]` - skip both flags and env
-/// - `#[settings(skip(flag))]` - skip only CLI flag generation
-/// - `#[settings(skip(env))]` - skip only env var binding
-/// - `#[settings(skip(flag, env))]` - skip both (same as `skip`)
-/// - `#[settings(flatten)]` - flatten nested struct
-#[derive(Default)]
-struct SettingsFieldAttrs {
-	flatten: bool,
-	skip_flag: bool,
-	skip_env: bool,
-}
-
-impl SettingsFieldAttrs {
-	fn parse(attrs: &[syn::Attribute]) -> Self {
-		let mut result = Self::default();
-		for attr in attrs {
-			if attr.path().is_ident("settings") {
-				let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
-					while !input.is_empty() {
-						let ident: syn::Ident = input.parse()?;
-						if ident == "flatten" {
-							result.flatten = true;
-						} else if ident == "skip" {
-							// Check if followed by parentheses with specific targets
-							if input.peek(token::Paren) {
-								let content;
-								syn::parenthesized!(content in input);
-								while !content.is_empty() {
-									let target: syn::Ident = content.parse()?;
-									if target == "flag" {
-										result.skip_flag = true;
-									} else if target == "env" {
-										result.skip_env = true;
-									}
-									// Skip comma if present
-									let _ = content.parse::<Option<Token![,]>>();
-								}
-							} else {
-								// Plain `skip` means skip both
-								result.skip_flag = true;
-								result.skip_env = true;
-							}
-						}
-						// Skip comma if present
-						let _ = input.parse::<Option<Token![,]>>();
-					}
-					Ok(())
-				});
-			}
-		}
-		result
-	}
-}
-
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
 /// For some reason not a `HashSet`, no clue why.
@@ -195,7 +61,6 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
-
 /// cli-like string serialization format, with focus on compactness
 ///
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
@@ -338,14 +203,12 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 
 	expanded.into()
 }
-
 /// Deprecated alias for [`CompactFormatNamed`]
 #[deprecated(since = "3.0.0", note = "Use CompactFormatNamed instead")]
 #[proc_macro_derive(CompactFormat)]
 pub fn derive_compact_format(input: TokenStream) -> TokenStream {
 	derive_compact_format_named(input)
 }
-
 /// Dictionary-style compact format, serializing to `{key=value;...}` syntax
 ///
 /// Unlike [`CompactFormatNamed`], this format doesn't include the struct name prefix.
@@ -497,7 +360,6 @@ pub fn derive_compact_format_map(input: TokenStream) -> TokenStream {
 
 	expanded.into()
 }
-
 /// Put on a struct with optional fields, each of which implements FromStr
 ///
 ///BUG: may write to the wrong field, if any of the child structs share the same acronym AND same fields. In reality, shouldn't happen.
@@ -575,7 +437,6 @@ pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
 
 	expanded.into()
 }
-
 #[proc_macro_derive(VecFieldsFromVecStr)]
 pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
@@ -648,7 +509,6 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 
 	expanded.into()
 }
-
 /// Generates a custom serde Deserialize implementation for config deserialization with PrivateValue support.
 ///
 /// This macro handles:
@@ -980,52 +840,6 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	};
 	q.into()
 }
-
-// make_df! {{{
-/// Structure to hold the entire macro input
-struct Field {
-	_parens: token::Paren,
-	index: LitInt,
-	_comma1: Token![,],
-	dtype: Ident,
-	_comma2: Token![,],
-	name: Ident,
-}
-impl Parse for Field {
-	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-		let content;
-		Ok(Field {
-			_parens: syn::parenthesized!(content in input),
-			index: content.parse()?,
-			_comma1: content.parse()?,
-			dtype: content.parse()?,
-			_comma2: content.parse()?,
-			name: content.parse()?,
-		})
-	}
-}
-
-/// Structure to hold the entire macro input
-struct DataFrameDef {
-	values_vec: Ident,
-	_arrow: Token![=>],
-	fields: Vec<Field>,
-}
-impl Parse for DataFrameDef {
-	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-		let values_vec: Ident = input.parse()?;
-		let _arrow: Token![=>] = input.parse()?;
-
-		let mut fields = Vec::new();
-		//TODO!: add optional comma at the end
-		while !input.is_empty() {
-			fields.push(input.parse()?);
-		}
-
-		Ok(DataFrameDef { values_vec, _arrow, fields })
-	}
-}
-
 #[proc_macro]
 pub fn make_df(input: TokenStream) -> TokenStream {
 	let DataFrameDef { values_vec, fields, .. } = parse_macro_input!(input as DataFrameDef);
@@ -1102,8 +916,6 @@ pub fn make_df(input: TokenStream) -> TokenStream {
 	}
 	.into()
 }
-//,}}}
-
 #[proc_macro_derive(WrapNew)]
 pub fn wrap_new(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
@@ -1127,8 +939,6 @@ pub fn wrap_new(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
-
-//BUG: doesn't convert to SCREAMING_SNAKE_CASE, but simply uppercases everything
 /// Implements Display and FromStr for variants of an enum, using SCREAMING_SNAKE_CASE
 #[proc_macro_derive(ScreamIt)]
 pub fn scream_it(input: TokenStream) -> TokenStream {
@@ -1219,11 +1029,6 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
-
-// Settings {{{
-
-//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
-//NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
 /// Derive macro for application settings that integrates config files, environment variables, and CLI flags.
 ///
 /// # Features
@@ -2385,7 +2190,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	//_dbg_token_stream(expanded.clone(), "settings").into()
 	TokenStream::from(expanded)
 }
-
 /// Marks a struct as a nested settings section. Use with `#[settings(flatten)]` in parent.
 ///
 /// For first-level nesting, no prefix is needed - it defaults to the struct's snake_case name.
@@ -2517,8 +2321,8 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		} else {
 			let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
 			let prefixed_field_name = format_ident!("{}_{}", prefix, ident.as_ref().unwrap());
-			let config_value_path = format!("{}.{}", config_prefix, ident.as_ref().unwrap());
-			let source_tag = format!("flags:{}", prefix);
+			let config_value_path = format!("{config_prefix}.{}", ident.as_ref().unwrap());
+			let source_tag = format!("flags:{prefix}");
 			Some(quote! {
 				if let Some(#ident) = &self.#prefixed_field_name {
 					map.insert(
@@ -2547,77 +2351,6 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 	//_dbg_token_stream(expanded.clone(), &produced_struct_name.to_string()).into()
 	TokenStream::from(expanded)
 }
-
-/// Takes in field identifier and type, returns the appropriate config::ValueKind conversion
-fn clap_to_config(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
-	// Extract the inner type from Option<T>
-	let inner_type = match ty {
-		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
-		_ => ty,
-	};
-
-	match inner_type {
-		// bool
-		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
-			quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) }
-		}
-		// Vec/Array
-		syn::Type::Path(type_path) if is_vec_type(type_path) => {
-			// Create a new Vec<Value> for the array
-			quote! {
-				{
-					let mut array = Vec::new();
-					for item in #ident.iter() {
-						array.push(v_utils::__internal::config::Value::new(
-							None,
-							v_utils::__internal::config::ValueKind::String(item.to_string())
-						));
-					}
-					v_utils::__internal::config::ValueKind::Array(array)
-				}
-			}
-		}
-		// default to String
-		_ => {
-			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
-		}
-	}
-}
-
-// we can't do type-conversion checks at clap-parsing level, as we need to push them through config's system later.
-fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
-	// Extract the inner type from Option<T>
-	let inner_type = match ty {
-		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
-		_ => ty,
-	};
-
-	//TODO!!!!!: add numeric types (all that are in config::ValueKind)
-	// Now map the inner type to clap-compatible types
-	match inner_type {
-		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
-			quote! { Option<bool> }
-		}
-		// If it's a Vec, check its element type
-		syn::Type::Path(type_path) if is_vec_type(type_path) => {
-			let vec_inner = extract_vec_inner_type(type_path);
-			if let syn::Type::Path(inner_path) = vec_inner {
-				if is_type(inner_path, "bool") {
-					quote! { Option<Vec<bool>> }
-				} else {
-					// Default to Vec<String> for other element types
-					quote! { Option<Vec<String>> }
-				}
-			} else {
-				// Default to Vec<String> if we can't determine the element type
-				quote! { Option<Vec<String>> }
-			}
-		}
-		_ => quote! { Option<String> },
-	}
-}
-//,}}}
-
 /// Derive macro that generates a `LiveSettings` struct for hot-reloading configuration.
 /// Requires `Settings` to be derived on the same struct first.
 ///
@@ -2774,3 +2507,260 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+/// A helper function to know location of errors in `quote!{}`s
+fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
+	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
+	std::fs::create_dir_all(std::path::PathBuf::from(&fpath).parent().unwrap()).unwrap();
+	std::fs::write(&fpath, expanded.to_string()).unwrap();
+	std::process::Command::new("rustfmt").arg("--edition=2024").arg(&fpath).output().unwrap();
+	quote! {include!(#fpath); }
+}
+macro_rules! _dbg_tree {
+	($target:expr) => {
+		let fpath = concat!("/tmp/", env!("CARGO_PKG_NAME"), "_dbg.rs");
+		let dbg_str = format!("{:#?}", $target);
+		std::fs::write(fpath, dbg_str).unwrap();
+	};
+}
+fn is_option_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Option";
+	}
+	false
+}
+
+// Helper function to check if a type path is Vec<T>
+fn is_vec_type(type_path: &syn::TypePath) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == "Vec";
+	}
+	false
+}
+
+// Helper function to check if a type is a specific primitive
+fn is_type(type_path: &syn::TypePath, type_name: &str) -> bool {
+	if let Some(segment) = type_path.path.segments.last() {
+		return segment.ident == type_name;
+	}
+	false
+}
+
+// Extract inner type from Option<T>
+fn extract_option_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Option")
+}
+
+// Extract inner type from Vec<T>
+fn extract_vec_inner_type(type_path: &syn::TypePath) -> &syn::Type {
+	if let Some(segment) = type_path.path.segments.last() {
+		if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+			if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
+				return inner_type;
+			}
+		}
+	}
+	// Return a dummy type if extraction fails
+	panic!("Failed to extract inner type from Vec")
+}
+fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	match ty {
+		syn::Type::Path(type_path) =>
+			if type_path.path.segments.last().unwrap().ident == "Option" {
+				quote! { #ty }
+			} else {
+				quote! { Option<#ty> }
+			},
+		_ => quote! { Option<#ty> },
+	}
+}
+
+//,}}}
+
+/// Parsed field-level settings attributes
+///
+/// Supports:
+/// - `#[settings(skip)]` - skip both flags and env
+/// - `#[settings(skip(flag))]` - skip only CLI flag generation
+/// - `#[settings(skip(env))]` - skip only env var binding
+/// - `#[settings(skip(flag, env))]` - skip both (same as `skip`)
+/// - `#[settings(flatten)]` - flatten nested struct
+#[derive(Default)]
+struct SettingsFieldAttrs {
+	flatten: bool,
+	skip_flag: bool,
+	skip_env: bool,
+}
+
+impl SettingsFieldAttrs {
+	fn parse(attrs: &[syn::Attribute]) -> Self {
+		let mut result = Self::default();
+		for attr in attrs {
+			if attr.path().is_ident("settings") {
+				let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
+					while !input.is_empty() {
+						let ident: syn::Ident = input.parse()?;
+						if ident == "flatten" {
+							result.flatten = true;
+						} else if ident == "skip" {
+							// Check if followed by parentheses with specific targets
+							if input.peek(token::Paren) {
+								let content;
+								syn::parenthesized!(content in input);
+								while !content.is_empty() {
+									let target: syn::Ident = content.parse()?;
+									if target == "flag" {
+										result.skip_flag = true;
+									} else if target == "env" {
+										result.skip_env = true;
+									}
+									// Skip comma if present
+									let _ = content.parse::<Option<Token![,]>>();
+								}
+							} else {
+								// Plain `skip` means skip both
+								result.skip_flag = true;
+								result.skip_env = true;
+							}
+						}
+						// Skip comma if present
+						let _ = input.parse::<Option<Token![,]>>();
+					}
+					Ok(())
+				});
+			}
+		}
+		result
+	}
+}
+
+// make_df! {{{
+/// Structure to hold the entire macro input
+struct Field {
+	_parens: token::Paren,
+	index: LitInt,
+	_comma1: Token![,],
+	dtype: Ident,
+	_comma2: Token![,],
+	name: Ident,
+}
+impl Parse for Field {
+	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+		let content;
+		Ok(Field {
+			_parens: syn::parenthesized!(content in input),
+			index: content.parse()?,
+			_comma1: content.parse()?,
+			dtype: content.parse()?,
+			_comma2: content.parse()?,
+			name: content.parse()?,
+		})
+	}
+}
+
+/// Structure to hold the entire macro input
+struct DataFrameDef {
+	values_vec: Ident,
+	_arrow: Token![=>],
+	fields: Vec<Field>,
+}
+impl Parse for DataFrameDef {
+	fn parse(input: ParseStream) -> Result<Self, syn::Error> {
+		let values_vec: Ident = input.parse()?;
+		let _arrow: Token![=>] = input.parse()?;
+
+		let mut fields = Vec::new();
+		//TODO!: add optional comma at the end
+		while !input.is_empty() {
+			fields.push(input.parse()?);
+		}
+
+		Ok(DataFrameDef { values_vec, _arrow, fields })
+	}
+}
+
+//,}}}
+
+//BUG: doesn't convert to SCREAMING_SNAKE_CASE, but simply uppercases everything
+
+// Settings {{{
+
+//TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
+//NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
+
+/// Takes in field identifier and type, returns the appropriate config::ValueKind conversion
+fn clap_to_config(ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	match inner_type {
+		// bool
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { v_utils::__internal::config::ValueKind::Boolean(*#ident) }
+		}
+		// Vec/Array
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			// Create a new Vec<Value> for the array
+			quote! {
+				{
+					let mut array = Vec::new();
+					for item in #ident.iter() {
+						array.push(v_utils::__internal::config::Value::new(
+							None,
+							v_utils::__internal::config::ValueKind::String(item.to_string())
+						));
+					}
+					v_utils::__internal::config::ValueKind::Array(array)
+				}
+			}
+		}
+		// default to String
+		_ => {
+			quote! { v_utils::__internal::config::ValueKind::String(#ident.to_string()) }
+		}
+	}
+}
+
+// we can't do type-conversion checks at clap-parsing level, as we need to push them through config's system later.
+fn clap_compatible_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
+	// Extract the inner type from Option<T>
+	let inner_type = match ty {
+		syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+		_ => ty,
+	};
+
+	//TODO!!!!!: add numeric types (all that are in config::ValueKind)
+	// Now map the inner type to clap-compatible types
+	match inner_type {
+		syn::Type::Path(type_path) if is_type(type_path, "bool") => {
+			quote! { Option<bool> }
+		}
+		// If it's a Vec, check its element type
+		syn::Type::Path(type_path) if is_vec_type(type_path) => {
+			let vec_inner = extract_vec_inner_type(type_path);
+			if let syn::Type::Path(inner_path) = vec_inner {
+				if is_type(inner_path, "bool") {
+					quote! { Option<Vec<bool>> }
+				} else {
+					// Default to Vec<String> for other element types
+					quote! { Option<Vec<String>> }
+				}
+			} else {
+				// Default to Vec<String> if we can't determine the element type
+				quote! { Option<Vec<String>> }
+			}
+		}
+		_ => quote! { Option<String> },
+	}
+}
+//,}}}

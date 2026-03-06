@@ -5,22 +5,11 @@
 use clap::Parser;
 use v_utils_macros::Settings;
 
-/// Settings struct WITHOUT Default and Serialize.
-/// Config auto-extension will not be available, but it should still compile
-/// and work normally for loading config.
-#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
-struct AppConfigNoDefault {
-	host: String,
-	port: u16,
-	debug: bool,
-}
-
 #[derive(Debug, Parser)]
 struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-
 fn main() {
 	// Verify the SettingsFlags struct was created
 	let flags = SettingsFlags {
@@ -35,4 +24,13 @@ fn main() {
 
 	// Suppress unused warnings
 	let _ = flags;
+}
+/// Settings struct WITHOUT Default and Serialize.
+/// Config auto-extension will not be available, but it should still compile
+/// and work normally for loading config.
+#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
+struct AppConfigNoDefault {
+	host: String,
+	port: u16,
+	debug: bool,
 }

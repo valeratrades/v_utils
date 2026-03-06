@@ -5,38 +5,6 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
 
-#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
-struct Config {
-	#[serde(default)]
-	host: String,
-	#[serde(default)]
-	port: u16,
-	#[serde(default)]
-	debug: bool,
-	#[settings(flatten)]
-	#[serde(default)]
-	database: Database,
-}
-
-impl Default for Config {
-	fn default() -> Self {
-		Self {
-			host: "localhost".to_string(),
-			port: 8080,
-			debug: false,
-			database: Database::default(),
-		}
-	}
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
-struct Database {
-	#[serde(default)]
-	url: String,
-	#[serde(default)]
-	max_connections: u32,
-}
-
 fn main() {
 	// Verify write_defaults method exists and has correct signature
 	let _write_defaults_exists: fn() -> Result<std::path::PathBuf, v_utils::__internal::eyre::Report> = Config::write_defaults;
@@ -104,4 +72,35 @@ fn main() {
 		let diff = config.diff_from_defaults().unwrap();
 		insta::assert_snapshot!(diff, @r###"database.url: "" -> "postgres://localhost/db""###);
 	}
+}
+#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
+struct Config {
+	#[serde(default)]
+	host: String,
+	#[serde(default)]
+	port: u16,
+	#[serde(default)]
+	debug: bool,
+	#[settings(flatten)]
+	#[serde(default)]
+	database: Database,
+}
+
+impl Default for Config {
+	fn default() -> Self {
+		Self {
+			host: "localhost".to_string(),
+			port: 8080,
+			debug: false,
+			database: Database::default(),
+		}
+	}
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
+struct Database {
+	#[serde(default)]
+	url: String,
+	#[serde(default)]
+	max_connections: u32,
 }

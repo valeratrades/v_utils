@@ -1,24 +1,5 @@
 use v_utils_macros::{CompactFormatNamed, OptionalFieldsFromVecStr, VecFieldsFromVecStr};
 
-#[derive(Clone, CompactFormatNamed, Debug, PartialEq)]
-struct TrailingStop {
-	percent: f64,
-}
-
-#[derive(Clone, Debug, OptionalFieldsFromVecStr, PartialEq)]
-struct OptionalProtocols {
-	trailing_stop: Option<TrailingStop>,
-	take_profit_stop_loss: Option<f64>,
-	leading_crosses: Option<f64>,
-}
-
-#[derive(Clone, Debug, PartialEq, VecFieldsFromVecStr)]
-struct VecProtocols {
-	trailing_stop: Vec<TrailingStop>,
-	take_profit_stop_loss: Vec<f64>,
-	leading_crosses: Vec<f64>,
-}
-
 fn main() {
 	let o1 = OptionalProtocols::try_from(vec!["0.1", "ts:p-0.2", "0.3"]).unwrap();
 	assert_eq!(
@@ -49,4 +30,22 @@ fn main() {
 			leading_crosses: Vec::new()
 		}
 	);
+}
+#[derive(Clone, CompactFormatNamed, Debug, PartialEq)]
+struct TrailingStop {
+	percent: f64,
+}
+
+#[derive(Clone, Debug, OptionalFieldsFromVecStr, PartialEq)]
+struct OptionalProtocols {
+	trailing_stop: Option<TrailingStop>,
+	take_profit_stop_loss: Option<f64>,
+	leading_crosses: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq, VecFieldsFromVecStr)]
+struct VecProtocols {
+	trailing_stop: Vec<TrailingStop>,
+	take_profit_stop_loss: Vec<f64>,
+	leading_crosses: Vec<f64>,
 }

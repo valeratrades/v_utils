@@ -98,6 +98,7 @@ tracing-subscriber = { version = "^0.3.22", features = ["fmt", "json", "registry
 v_utils_macros = { path = "../v_utils_macros", version = "^2.11.30", optional = true }
 
 [dev-dependencies]
+v_utils_macros = { path = "../v_utils_macros" }
+
 insta.workspace = true
 trybuild.workspace = true
-v_utils_macros = { path = "../v_utils_macros" }

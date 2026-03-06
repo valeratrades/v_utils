@@ -37,10 +37,6 @@ pub struct Test {
 	#[private_value]
 	optional_port: Option<Port>,
 }
-fn __default_num_of_retries() -> u8 {
-	3
-}
-
 fn main() {
 	let toml_str = r#"
 	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
@@ -76,8 +72,8 @@ optional_port = "9090"
 	assert_eq!(t.optional_port, Some(Port(9090))); // Test that Option<T> with #[private_value] works
 
 	// Test that SecretString fields show [REDACTED] in debug output (handled by secrecy crate)
-	let debug_output = format!("{:?}", t);
-	assert!(debug_output.contains("[REDACTED]"), "SecretString should show [REDACTED] in debug output, got: {}", debug_output);
+	let debug_output = format!("{t:?}");
+	assert!(debug_output.contains("[REDACTED]"), "SecretString should show [REDACTED] in debug output, got: {debug_output}");
 
 	// Test that Option<T> with #[private_value] becomes None when env var is missing
 	let toml_with_missing_env = r#"
@@ -96,4 +92,7 @@ optional_port = { env = "THIS_ENV_VAR_DEFINITELY_DOES_NOT_EXIST_12345" }
 
 	let t2: Test = toml::from_str(toml_with_missing_env).expect("Failed to deserialize with missing env var");
 	assert_eq!(t2.optional_port, None, "Option<T> with #[private_value] should be None when env var is missing");
+}
+fn __default_num_of_retries() -> u8 {
+	3
 }

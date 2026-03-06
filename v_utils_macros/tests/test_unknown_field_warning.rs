@@ -5,6 +5,11 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
 
+#[derive(Debug, Parser)]
+struct Cli {
+	#[clap(flatten)]
+	settings_flags: SettingsFlags,
+}
 #[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
 struct TestConfig {
 	#[serde(default)]
@@ -24,12 +29,6 @@ struct Database {
 	url: String,
 	#[serde(default)]
 	max_connections: u32,
-}
-
-#[derive(Debug, Parser)]
-struct Cli {
-	#[clap(flatten)]
-	settings_flags: SettingsFlags,
 }
 
 #[test]
@@ -57,11 +56,11 @@ fn test_unknown_field_warning() {
 	// This should load the config and print warnings for unknown fields
 	match TestConfig::try_build(flags) {
 		Ok(config) => {
-			eprintln!("Config loaded: {:?}", config);
+			eprintln!("Config loaded: {config:?}");
 			eprintln!("(Unknown field warnings should have been printed above)");
 		}
 		Err(e) => {
-			eprintln!("Error loading config: {}", e);
+			eprintln!("Error loading config: {e}");
 		}
 	}
 	eprintln!("=== End of unknown field warning test ===\n");

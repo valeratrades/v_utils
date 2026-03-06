@@ -2,34 +2,6 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
 
-/// Settings struct with Default and Serialize for config auto-extension support.
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
-#[allow(unused)]
-struct AppConfig {
-	#[serde(default)]
-	host: String,
-	#[serde(default)]
-	port: u16,
-	#[serde(default)]
-	debug: bool,
-	#[serde(default)]
-	workers: Option<usize>,
-	#[settings(flatten)]
-	#[serde(default)]
-	database: Database,
-	#[settings(flatten)]
-	#[serde(default)]
-	risk_tiers: RiskTiers,
-	/// Optional nested config - should work with flatten
-	#[settings(flatten)]
-	#[serde(default)]
-	logging: Option<Logging>,
-	/// This field should be skipped from CLI flags (but still in config)
-	#[settings(skip(flag))]
-	#[serde(default)]
-	internal_state: String,
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct Database {
@@ -41,7 +13,6 @@ pub struct Database {
 	#[serde(default)]
 	pool: Pool,
 }
-
 /// Second level of nesting - Pool config (doubly nested)
 #[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[settings(prefix = "database_pool")]
@@ -52,7 +23,6 @@ pub struct Pool {
 	#[serde(default)]
 	max_size: u32,
 }
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct RiskTiers {
@@ -61,7 +31,6 @@ pub struct RiskTiers {
 	#[serde(default)]
 	b: String,
 }
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 #[allow(unused)]
 pub struct Logging {
@@ -70,7 +39,6 @@ pub struct Logging {
 	#[serde(default)]
 	file: Option<String>,
 }
-
 /// Example of how to use Settings with Clap
 /// The Settings derive macro generates a `SettingsFlags` struct
 /// which can be flattened into your CLI struct
@@ -80,7 +48,6 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-
 fn main() {
 	// Test that the Settings macro generates the expected SettingsFlags struct //HACK: relies on exact name
 	let flags = SettingsFlags {
@@ -188,8 +155,35 @@ fn main() {
 		}
 		Err(e) => {
 			// Config file might not exist in test environment, which is fine
-			eprintln!("Note: Config loading skipped ({})", e);
+			eprintln!("Note: Config loading skipped ({e})");
 		}
 	}
 	eprintln!("=== End of unknown field warning test ===\n");
+}
+/// Settings struct with Default and Serialize for config auto-extension support.
+#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
+#[allow(unused)]
+struct AppConfig {
+	#[serde(default)]
+	host: String,
+	#[serde(default)]
+	port: u16,
+	#[serde(default)]
+	debug: bool,
+	#[serde(default)]
+	workers: Option<usize>,
+	#[settings(flatten)]
+	#[serde(default)]
+	database: Database,
+	#[settings(flatten)]
+	#[serde(default)]
+	risk_tiers: RiskTiers,
+	/// Optional nested config - should work with flatten
+	#[settings(flatten)]
+	#[serde(default)]
+	logging: Option<Logging>,
+	/// This field should be skipped from CLI flags (but still in config)
+	#[settings(skip(flag))]
+	#[serde(default)]
+	internal_state: String,
 }
