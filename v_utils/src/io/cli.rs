@@ -97,12 +97,12 @@ fn run_confirmation_blocking(prompt: &str, all: bool, change: Option<&str>) -> C
 	print!("{prompt}");
 	stdout.flush().unwrap();
 
-	loop {
-		let mut input = String::new();
-		stdin.read_line(&mut input).expect("Failed to read line");
-
-		let input = input.trim().to_lowercase();
-		match input.as_str() {
+	let mut input = String::new();
+	while {
+		input.clear();
+		stdin.read_line(&mut input).expect("Failed to read line") > 0
+	} {
+		match input.trim().to_ascii_lowercase().as_str() {
 			"y" | "yes" | "" => return ConfirmResult::Yes,
 			"n" | "no" => {
 				eprintln!("Aborted by user.");
@@ -123,6 +123,9 @@ fn run_confirmation_blocking(prompt: &str, all: bool, change: Option<&str>) -> C
 			}
 		}
 	}
+	// EOF on stdin
+	eprintln!("Aborted by user.");
+	ConfirmResult::No
 }
 
 /// Read user edit inline, cargo-style (same line updates).
@@ -157,21 +160,19 @@ fn read_inline_edit(initial: &str) -> Option<String> {
 	#[cfg(not(unix))]
 	let original_termios: Option<(i32, ())> = None;
 
-	let result = loop {
-		let mut byte = [0u8; 1];
-		if stdin_handle.read_exact(&mut byte).is_err() {
-			break None;
-		}
-
+	let mut byte = [0u8; 1];
+	let mut result = None;
+	while stdin_handle.read_exact(&mut byte).is_ok() {
 		match byte[0] {
 			b'\n' | b'\r' => {
 				println!();
-				break Some(value);
+				result = Some(value);
+				break;
 			}
 			0x1b | 0x03 => {
 				print!("\r\x1b[K");
 				stdout.flush().unwrap();
-				break None;
+				break;
 			}
 			0x7f | 0x08 =>
 				if !value.is_empty() {
@@ -186,7 +187,7 @@ fn read_inline_edit(initial: &str) -> Option<String> {
 			}
 			_ => {}
 		}
-	};
+	}
 
 	#[cfg(unix)]
 	if let Some((fd, original)) = original_termios {
