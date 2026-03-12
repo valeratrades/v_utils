@@ -1,3 +1,6 @@
+pub mod fraction;
+pub use fraction::Fraction;
+
 pub mod percent;
 pub use percent::Percent;
 
