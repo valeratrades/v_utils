@@ -14,6 +14,7 @@ compile_error!("Feature `full` is not compatible with wasm (pulls in console-sub
 #[cfg(all(feature = "assert-wasm-compat", feature = "xdg"))]
 compile_error!("Feature `xdg` is not compatible with wasm.");
 
+pub mod arch;
 // of course it's included unconditionally - the crate itself is called "v_utils"
 pub mod utils;
 

@@ -26,8 +26,7 @@ macro_rules! log {
 #[macro_export]
 macro_rules! print_rolling {
 	($($arg:tt)*) => {{
-		eprint!("\r\x1B[2K");
-		eprint!($($arg)*);
+		eprint!("\r\x1B[2K{}", format_args!($($arg)*));
 	}};
 }
 
