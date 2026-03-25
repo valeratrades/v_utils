@@ -1,5 +1,7 @@
 use std::fmt::Write;
 
+use sealed::ExitCode;
+
 pub trait SysexitCode {
 	fn sysexit(&self) -> Sysexit;
 }
@@ -71,7 +73,6 @@ mod sealed {
 		}
 	}
 }
-use sealed::ExitCode;
 
 pub fn exit_on_error<T, E: Into<eyre::Report>>(r: Result<T, E>) -> T {
 	match r {

@@ -21,6 +21,76 @@ const LOG_MAX_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
 const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
 const DIRECTIVES_FILENAME: &str = "_log_directives";
+impl LogDestination {
+	/// Helper for creating File variant
+	pub fn file<P: Into<PathBuf>>(path: P) -> Self {
+		LogDestination {
+			kind: LogDestinationKind::File { path: path.into() },
+			stderr_errors: false,
+			compiled_directives: None,
+		}
+	}
+
+	/// Helper for creating Xdg variant
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
+	pub fn xdg<S: Into<String>>(name: S) -> Self {
+		LogDestination {
+			kind: LogDestinationKind::Xdg { dname: name.into(), fname: None },
+			stderr_errors: false,
+			compiled_directives: None,
+		}
+	}
+
+	/// Set custom filename for Xdg variant (creates `{fname}.log`)
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
+	pub fn fname<S: Into<String>>(mut self, fname: S) -> Self {
+		if let LogDestinationKind::Xdg { dname, .. } = self.kind {
+			self.kind = LogDestinationKind::Xdg { dname, fname: Some(fname.into()) };
+		}
+		self
+	}
+
+	/// Enable/disable ERROR level logging to stderr
+	pub fn stderr_errors(mut self, enabled: bool) -> Self {
+		self.stderr_errors = enabled;
+		self
+	}
+
+	/// Set compile-time embedded directives (takes priority over file-based directives).
+	/// Typically used with `option_env!("LOG_DIRECTIVES")` in the downstream crate.
+	pub fn compiled_directives(mut self, directives: Option<&'static str>) -> Self {
+		self.compiled_directives = directives;
+		self
+	}
+}
+
+use std::{
+	collections::BTreeMap,
+	env::{args_os, current_dir, current_exe, vars_os},
+};
+
+#[derive(Clone, Debug, Default)]
+pub enum LogDestinationKind {
+	#[default]
+	Stdout,
+	File {
+		path: PathBuf,
+	},
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
+	Xdg {
+		dname: String,
+		fname: Option<String>,
+	},
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct LogDestination {
+	pub kind: LogDestinationKind,
+	pub stderr_errors: bool,
+	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
+	pub compiled_directives: Option<&'static str>,
+}
+
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
@@ -131,70 +201,6 @@ pub fn init_subscriber(log_destination: LogDestination) {
 
 	trace_the_init(); //? Should I make this a trace?
 }
-#[derive(Clone, Debug, Default)]
-pub struct LogDestination {
-	pub kind: LogDestinationKind,
-	pub stderr_errors: bool,
-	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
-	pub compiled_directives: Option<&'static str>,
-}
-impl LogDestination {
-	/// Helper for creating File variant
-	pub fn file<P: Into<PathBuf>>(path: P) -> Self {
-		LogDestination {
-			kind: LogDestinationKind::File { path: path.into() },
-			stderr_errors: false,
-			compiled_directives: None,
-		}
-	}
-
-	/// Helper for creating Xdg variant
-	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	pub fn xdg<S: Into<String>>(name: S) -> Self {
-		LogDestination {
-			kind: LogDestinationKind::Xdg { dname: name.into(), fname: None },
-			stderr_errors: false,
-			compiled_directives: None,
-		}
-	}
-
-	/// Set custom filename for Xdg variant (creates `{fname}.log`)
-	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	pub fn fname<S: Into<String>>(mut self, fname: S) -> Self {
-		if let LogDestinationKind::Xdg { dname, .. } = self.kind {
-			self.kind = LogDestinationKind::Xdg { dname, fname: Some(fname.into()) };
-		}
-		self
-	}
-
-	/// Enable/disable ERROR level logging to stderr
-	pub fn stderr_errors(mut self, enabled: bool) -> Self {
-		self.stderr_errors = enabled;
-		self
-	}
-
-	/// Set compile-time embedded directives (takes priority over file-based directives).
-	/// Typically used with `option_env!("LOG_DIRECTIVES")` in the downstream crate.
-	pub fn compiled_directives(mut self, directives: Option<&'static str>) -> Self {
-		self.compiled_directives = directives;
-		self
-	}
-}
-
-#[derive(Clone, Debug, Default)]
-pub enum LogDestinationKind {
-	#[default]
-	Stdout,
-	File {
-		path: PathBuf,
-	},
-	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	Xdg {
-		dname: String,
-		fname: Option<String>,
-	},
-}
-
 /// Wrapper to allow Arc<Mutex<File>> to implement Write safely
 #[derive(Clone)]
 struct SharedFileWriter {
@@ -334,11 +340,6 @@ fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir
 		.parse(&directives)
 		.unwrap_or_else(|_| panic!("Error parsing tracing directives:\n```\n{directives}\n```\n"))
 }
-
-use std::{
-	collections::BTreeMap,
-	env::{args_os, current_dir, current_exe, vars_os},
-};
 fn trace_the_init() {
 	let args: Vec<_> = args_os().collect();
 	let vars: BTreeMap<_, _> = vars_os().collect();
