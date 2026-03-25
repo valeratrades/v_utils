@@ -12,11 +12,8 @@ repository = "https://github.com/valeratrades/v_utils"
 [features]
 default = ["lite"]
 
-io = ["dep:dirs", "dep:libc"] 
-xdg = [
-    "dep:xdg",
-    "v_utils_macros/xdg",
-] # have to separate it, because `xdg` lib behaves weirdly under wasm
+io = ["dep:dirs", "dep:libc"]
+xdg = ["dep:xdg", "v_utils_macros/xdg"]
 cli = [
     "io",
     # Required for confirm_blocking in Settings macro
@@ -51,7 +48,7 @@ full = [
     "dep:tokio",
     "tokio/full",
     "dep:console-subscriber",
-] #console-subscriber also is pulling tokio with `mio`, breaking wasm builds
+]
 
 [dependencies]
 v_utils_macros = { path = "../v_utils_macros", version = "^2.11.31", optional = true }

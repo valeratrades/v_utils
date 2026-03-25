@@ -20,6 +20,17 @@ macro_rules! log {
 	}};
 }
 
+/// Prints to stderr, overwriting the current line in-place (like cargo's progress bar).
+/// Uses `\r` + ANSI clear-line so the output stays on a single terminal line.
+/// Usage: print_rolling!("status: {}", value)
+#[macro_export]
+macro_rules! print_rolling {
+	($($arg:tt)*) => {{
+		eprint!("\r\x1B[2K");
+		eprint!($($arg)*);
+	}};
+}
+
 /// Macro for logging to both stderr and tracing debug
 /// Usage: elog!("message") or elog!("format {}", arg)
 #[macro_export]

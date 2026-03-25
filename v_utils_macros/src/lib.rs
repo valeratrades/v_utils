@@ -551,6 +551,8 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
+	let mut default_fns: Vec<proc_macro2::TokenStream> = Vec::new();
+
 	let (helper_fields, init_fields): (Vec<_>, Vec<_>) = fields
 		.iter()
 		.map(|f| {
@@ -573,11 +575,41 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				false
 			});
 
+			// Extract #[default(expr)] value from SmartDefault if present
+			let smart_default_expr: Option<syn::Expr> = f.attrs.iter().find_map(|attr| {
+				if attr.path().is_ident("default") {
+					attr.parse_args::<syn::Expr>().ok()
+				} else {
+					None
+				}
+			});
+
+			// Check if field already has an explicit #[serde(default...)] attribute
+			let has_serde_default = f.attrs.iter().any(|attr| {
+				if !attr.path().is_ident("serde") {
+					return false;
+				}
+				let Ok(nested) = attr.parse_args::<syn::Meta>() else { return false };
+				matches!(&nested, syn::Meta::Path(p) if p.is_ident("default"))
+					|| matches!(&nested, syn::Meta::NameValue(nv) if nv.path.is_ident("default"))
+			});
+
 			// Collect all attributes except private_value, primitives, settings, and default to forward to Helper
 			// (default is for SmartDefault, not for serde)
-			let forwarded_attrs = f.attrs.iter().filter(|attr| {
+			let mut forwarded_attrs: Vec<proc_macro2::TokenStream> = f.attrs.iter().filter(|attr| {
 				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives") && !attr.path().is_ident("default")
-			}).collect::<Vec<_>>();
+			}).map(|attr| quote! { #attr }).collect();
+
+			// If field has #[default(expr)] from SmartDefault but no explicit #[serde(default)],
+			// generate a default function and inject #[serde(default = "fn_name")] for the Helper struct
+			if let (Some(expr), false) = (&smart_default_expr, has_serde_default) {
+				let fn_name = syn::Ident::new(&format!("__default_{}", ident.as_ref().unwrap()), proc_macro2::Span::call_site());
+				default_fns.push(quote! {
+					fn #fn_name() -> #ty { #expr }
+				});
+				let fn_name_str = fn_name.to_string();
+				forwarded_attrs.push(quote! { #[serde(default = #fn_name_str)] });
+			}
 
 			// Check if type is Option<T>
 			let is_option = if let syn::Type::Path(type_path) = ty {
@@ -824,6 +856,8 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 					}
 				}
 
+
+				#(#default_fns)*
 
 				#[derive(v_utils::__internal::serde::Deserialize)]
 				#[serde(crate = "v_utils::__internal::serde")]

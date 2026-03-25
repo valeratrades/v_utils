@@ -1,8 +1,11 @@
-use derive_more::{Deref, DerefMut};
+use derive_more::{Deref, DerefMut, Display};
 use eyre::Report;
 use serde::{Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Copy, Default, Deref, DerefMut, Eq, Hash, Ord, PartialEq, PartialOrd)]
+//HACK: should implement `pad`, but rust is broken (or skill issue (upd: definitely broken)). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
+#[derive(Clone, Copy, Default, derive_more::Debug, Deref, DerefMut, Display, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[debug("{}", self.as_str())]
+#[display("{}", self.as_str())]
 pub struct Asset(pub [u8; 16]);
 impl Asset {
 	pub fn new<S: AsRef<str>>(s: S) -> Self {
@@ -12,23 +15,17 @@ impl Asset {
 		Self(bytes)
 	}
 
-	fn fmt(&self) -> &str {
+	pub fn as_str(&self) -> &str {
 		std::str::from_utf8(&self.0).unwrap().trim_end_matches('\0')
 	}
 
-	pub fn as_str(&self) -> &str {
-		self.fmt()
-	}
-}
-//HACK: should implement `pad`, but rust is broken (or skill issue (upd: definitely broken)). Whatever the case, doing `f.pad(s)` on the same output breaks things downstream (no clue why).
-impl std::fmt::Display for Asset {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "{}", self.fmt())
-	}
-}
-impl std::fmt::Debug for Asset {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		write!(f, "{}", self.fmt())
+	/// Construct the standard USD-quoted [Pair] for this asset.
+	/// Linear contracts quote against USDT; inverse contracts quote against USD.
+	pub fn usd_pair(self, is_inverse: bool) -> Pair {
+		match is_inverse {
+			false => Pair::new(self, "USDT".into()),
+			true => Pair::new(self, "USD".into()),
+		}
 	}
 }
 impl From<&str> for Asset {
@@ -43,17 +40,17 @@ impl From<String> for Asset {
 }
 impl AsRef<str> for Asset {
 	fn as_ref(&self) -> &str {
-		self.fmt()
+		self.as_str()
 	}
 }
 impl PartialEq<str> for Asset {
 	fn eq(&self, other: &str) -> bool {
-		self.fmt() == other
+		self.as_str() == other
 	}
 }
 impl PartialEq<&str> for Asset {
 	fn eq(&self, other: &&str) -> bool {
-		&self.fmt() == other
+		&self.as_str() == other
 	}
 }
 
