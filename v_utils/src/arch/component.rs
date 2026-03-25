@@ -5,15 +5,57 @@
 
 use std::{
 	cell::{RefCell, UnsafeCell},
-	collections::{HashMap, HashSet},
-	fmt::{self, Debug},
+	collections::HashSet,
+	fmt::{self, Debug, Display, Formatter},
+	hash::Hash,
 	rc::Rc,
 };
+
+pub use ustr::Ustr;
+
+/// Represents a valid component ID.
+///
+/// Backed by [`Ustr`] for O(1) cloning and comparison.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ComponentId(Ustr);
+
+impl ComponentId {
+	pub fn new(value: &str) -> Self {
+		assert!(!value.is_empty() && value.is_ascii(), "ComponentId must be non-empty ASCII, got: {value:?}");
+		Self(Ustr::from(value))
+	}
+
+	pub fn inner(&self) -> Ustr {
+		self.0
+	}
+
+	pub fn as_str(&self) -> &str {
+		self.0.as_str()
+	}
+}
+
+impl Debug for ComponentId {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
+
+impl Display for ComponentId {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+impl From<&str> for ComponentId {
+	fn from(value: &str) -> Self {
+		Self::new(value)
+	}
+}
 
 /// Components have state and lifecycle management capabilities.
 pub trait Component: Debug {
 	/// Returns the unique identifier for this component.
-	fn component_id(&self) -> &str;
+	fn component_id(&self) -> ComponentId;
 
 	fn state(&self) -> ComponentState;
 
@@ -266,14 +308,51 @@ thread_local! {
 /// The registry tracks which components are currently mutably borrowed to prevent
 /// multiple simultaneous mutable borrows (which would be undefined behavior).
 pub struct ComponentRegistry {
-	components: RefCell<HashMap<String, Rc<UnsafeCell<dyn Component>>>>,
-	borrows: RefCell<HashSet<String>>,
+	components: RefCell<ustr::UstrMap<Rc<UnsafeCell<dyn Component>>>>,
+	borrows: RefCell<HashSet<Ustr>>,
+}
+impl ComponentRegistry {
+	pub fn new() -> Self {
+		Self {
+			components: RefCell::new(ustr::UstrMap::default()),
+			borrows: RefCell::new(HashSet::new()),
+		}
+	}
+
+	pub fn insert(&self, id: Ustr, component: Rc<UnsafeCell<dyn Component>>) {
+		self.components.borrow_mut().insert(id, component);
+	}
+
+	pub fn get(&self, id: &Ustr) -> Option<Rc<UnsafeCell<dyn Component>>> {
+		self.components.borrow().get(id).cloned()
+	}
+
+	/// Checks if a component is currently borrowed.
+	pub fn is_borrowed(&self, id: &Ustr) -> bool {
+		self.borrows.borrow().contains(id)
+	}
+
+	/// Marks a component as borrowed. Returns false if already borrowed.
+	fn try_borrow(&self, id: Ustr) -> bool {
+		let mut borrows = self.borrows.borrow_mut();
+		if borrows.contains(&id) {
+			false
+		} else {
+			borrows.insert(id);
+			true
+		}
+	}
+
+	/// Releases a borrow on a component.
+	fn release_borrow(&self, id: &Ustr) {
+		self.borrows.borrow_mut().remove(id);
+	}
 }
 
 impl Debug for ComponentRegistry {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let components_ref = self.components.borrow();
-		let keys: Vec<&String> = components_ref.keys().collect();
+		let keys: Vec<&Ustr> = components_ref.keys().collect();
 		f.debug_struct("ComponentRegistry")
 			.field("components", &keys)
 			.field("active_borrows", &self.borrows.borrow().len())
@@ -287,54 +366,46 @@ impl Default for ComponentRegistry {
 	}
 }
 
-impl ComponentRegistry {
-	pub fn new() -> Self {
-		Self {
-			components: RefCell::new(HashMap::new()),
-			borrows: RefCell::new(HashSet::new()),
-		}
-	}
-
-	pub fn insert(&self, id: String, component: Rc<UnsafeCell<dyn Component>>) {
-		self.components.borrow_mut().insert(id, component);
-	}
-
-	pub fn get(&self, id: &str) -> Option<Rc<UnsafeCell<dyn Component>>> {
-		self.components.borrow().get(id).cloned()
-	}
-
-	/// Checks if a component is currently borrowed.
-	pub fn is_borrowed(&self, id: &str) -> bool {
-		self.borrows.borrow().contains(id)
-	}
-
-	/// Marks a component as borrowed. Returns false if already borrowed.
-	fn try_borrow(&self, id: &str) -> bool {
-		let mut borrows = self.borrows.borrow_mut();
-		if borrows.contains(id) {
-			false
-		} else {
-			borrows.insert(id.to_owned());
-			true
-		}
-	}
-
-	/// Releases a borrow on a component.
-	fn release_borrow(&self, id: &str) {
-		self.borrows.borrow_mut().remove(id);
-	}
+/// Returns a reference to the global component registry.
+pub fn get_component_registry() -> &'static ComponentRegistry {
+	COMPONENT_REGISTRY.with(|registry|
+		// SAFETY: We return a static reference that lives for the lifetime of the thread.
+		// Since this is thread_local storage, each thread has its own instance.
+		unsafe { std::mem::transmute::<&ComponentRegistry, &'static ComponentRegistry>(registry) })
 }
+/// Registers a component in the global registry.
+pub fn register_component<T>(component: T) -> Rc<UnsafeCell<T>>
+where
+	T: Component + 'static, {
+	let component_id = component.component_id().inner();
+	let component_ref = Rc::new(UnsafeCell::new(component));
 
+	let component_trait_ref: Rc<UnsafeCell<dyn Component>> = component_ref.clone();
+	get_component_registry().insert(component_id, component_trait_ref);
+
+	component_ref
+}
+/// Returns a component from the global registry by ID.
+pub fn get_component(id: &ComponentId) -> Option<Rc<UnsafeCell<dyn Component>>> {
+	get_component_registry().get(&id.inner())
+}
+#[cfg(test)]
+/// Clears the component registry (for test isolation).
+pub fn clear_component_registry() {
+	let registry = get_component_registry();
+	registry.components.borrow_mut().clear();
+	registry.borrows.borrow_mut().clear();
+}
 /// Guard that releases a component borrow when dropped.
 ///
 /// This ensures borrows are released even if the code panics during
 /// a lifecycle method call.
 struct BorrowGuard {
-	id: String,
+	id: Ustr,
 }
 
 impl BorrowGuard {
-	fn new(id: String) -> Self {
+	fn new(id: Ustr) -> Self {
 		Self { id }
 	}
 }
@@ -343,32 +414,6 @@ impl Drop for BorrowGuard {
 	fn drop(&mut self) {
 		get_component_registry().release_borrow(&self.id);
 	}
-}
-
-/// Returns a reference to the global component registry.
-pub fn get_component_registry() -> &'static ComponentRegistry {
-	COMPONENT_REGISTRY.with(|registry|
-		// SAFETY: We return a static reference that lives for the lifetime of the thread.
-		// Since this is thread_local storage, each thread has its own instance.
-		unsafe { std::mem::transmute::<&ComponentRegistry, &'static ComponentRegistry>(registry) })
-}
-
-/// Registers a component in the global registry.
-pub fn register_component<T>(component: T) -> Rc<UnsafeCell<T>>
-where
-	T: Component + 'static, {
-	let component_id = component.component_id().to_owned();
-	let component_ref = Rc::new(UnsafeCell::new(component));
-
-	let component_trait_ref: Rc<UnsafeCell<dyn Component>> = component_ref.clone();
-	get_component_registry().insert(component_id, component_trait_ref);
-
-	component_ref
-}
-
-/// Returns a component from the global registry by ID.
-pub fn get_component(id: &str) -> Option<Rc<UnsafeCell<dyn Component>>> {
-	get_component_registry().get(id)
 }
 
 macro_rules! registry_lifecycle_fn {
@@ -380,13 +425,13 @@ macro_rules! registry_lifecycle_fn {
 		/// # Panics
 		///
 		/// Panics if the component is not found or is already borrowed.
-		pub fn $fn_name(id: &str) -> eyre::Result<()> {
+		pub fn $fn_name(id: &Ustr) -> eyre::Result<()> {
 			let registry = get_component_registry();
 			let component_ref = registry.get(id).unwrap_or_else(|| panic!("Component '{id}' not found in global registry"));
 
-			assert!(registry.try_borrow(id), "Component '{id}' is already mutably borrowed — aliasing mutable references is UB",);
+			assert!(registry.try_borrow(*id), "Component '{id}' is already mutably borrowed — aliasing mutable references is UB",);
 
-			let _guard = BorrowGuard::new(id.to_owned());
+			let _guard = BorrowGuard::new(*id);
 
 			// SAFETY: Borrow tracking ensures exclusive access
 			unsafe {
@@ -403,14 +448,6 @@ registry_lifecycle_fn!(reset_component, reset, "reset()");
 registry_lifecycle_fn!(dispose_component, dispose, "dispose()");
 
 #[cfg(test)]
-/// Clears the component registry (for test isolation).
-pub fn clear_component_registry() {
-	let registry = get_component_registry();
-	registry.components.borrow_mut().clear();
-	registry.borrows.borrow_mut().clear();
-}
-
-#[cfg(test)]
 mod tests {
 	use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -418,7 +455,7 @@ mod tests {
 
 	#[derive(Debug)]
 	struct TestComponent {
-		id: String,
+		id: ComponentId,
 		state: ComponentState,
 		should_panic: &'static AtomicBool,
 	}
@@ -426,7 +463,7 @@ mod tests {
 	impl TestComponent {
 		fn new(name: &str, should_panic: &'static AtomicBool) -> Self {
 			Self {
-				id: name.to_owned(),
+				id: ComponentId::new(name),
 				state: ComponentState::Ready,
 				should_panic,
 			}
@@ -434,8 +471,8 @@ mod tests {
 	}
 
 	impl Component for TestComponent {
-		fn component_id(&self) -> &str {
-			&self.id
+		fn component_id(&self) -> ComponentId {
+			self.id
 		}
 
 		fn state(&self) -> ComponentState {
@@ -463,10 +500,10 @@ mod tests {
 		clear_component_registry();
 
 		let component = TestComponent::new("test-1", &NO_PANIC);
-		let id = component.id.clone();
+		let id = component.id.inner();
 
 		let component_ref = Rc::new(UnsafeCell::new(component));
-		get_component_registry().insert(id.clone(), component_ref);
+		get_component_registry().insert(id, component_ref);
 
 		let result1 = start_component(&id);
 		assert!(result1.is_ok());
@@ -481,10 +518,10 @@ mod tests {
 		clear_component_registry();
 
 		let component = TestComponent::new("test-2", &NO_PANIC);
-		let id = component.id.clone();
+		let id = component.id.inner();
 
 		let component_ref = Rc::new(UnsafeCell::new(component));
-		get_component_registry().insert(id.clone(), component_ref);
+		get_component_registry().insert(id, component_ref);
 
 		let _ = start_component(&id);
 		assert!(!get_component_registry().is_borrowed(&id));
@@ -495,10 +532,10 @@ mod tests {
 		clear_component_registry();
 
 		let component = TestComponent::new("test-panic", &DO_PANIC);
-		let id = component.id.clone();
+		let id = component.id.inner();
 
 		let component_ref = Rc::new(UnsafeCell::new(component));
-		get_component_registry().insert(id.clone(), component_ref);
+		get_component_registry().insert(id, component_ref);
 
 		let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
 			let _ = start_component(&id);
