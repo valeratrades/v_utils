@@ -39,6 +39,7 @@ fn test_unknown_field_warning() {
 			env!("CARGO_MANIFEST_DIR"),
 			"/tests/test_unknown_field.toml"
 		)))),
+		yes: false,
 		host: None,
 		port: None,
 		debug: None,

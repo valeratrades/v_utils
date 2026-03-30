@@ -14,6 +14,7 @@ fn main() {
 	// Verify the SettingsFlags struct was created
 	let flags = SettingsFlags {
 		config: None,
+		yes: false,
 		host: Some("localhost".to_string()),
 		port: Some("8080".to_string()),
 		debug: Some(true),

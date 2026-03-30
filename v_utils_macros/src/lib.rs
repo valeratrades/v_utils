@@ -1465,7 +1465,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 											missing_field,
 											default_value
 										);
-										if matches!(::v_utils::io::confirmation(&prompt).flush_blocking(), ::v_utils::io::ConfirmResult::Yes) {
+										if flags.yes || matches!(::v_utils::io::confirmation(&prompt).flush_blocking(), ::v_utils::io::ConfirmResult::Yes) {
 											if let Err(extend_err) = Self::extend_config_file(config_path, &missing_field, &default_value) {
 												eprintln!("Warning: Failed to extend config: {}", extend_err);
 											} else {
@@ -2151,6 +2151,9 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		pub struct SettingsFlags {
 			#[arg(short, long)]
 			config: Option<v_utils::io::ExpandedPath>,
+			/// Automatically accept all confirmation prompts
+			#[arg(short, long)]
+			pub yes: bool,
 			#(#flag_quotes)*
 		}
 		impl v_utils::__internal::config::Source for SettingsFlags {

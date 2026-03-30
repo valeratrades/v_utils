@@ -52,6 +52,7 @@ fn main() {
 	// Test that the Settings macro generates the expected SettingsFlags struct //HACK: relies on exact name
 	let flags = SettingsFlags {
 		config: None,
+		yes: false,
 		host: Some("localhost".to_string()),
 		port: Some("8080".to_string()),
 		debug: Some(true),
@@ -99,6 +100,7 @@ fn main() {
 	let _test_skip: fn() = || {
 		let _flags_without_internal_state = SettingsFlags {
 			config: None,
+			yes: false,
 			host: None,
 			port: None,
 			debug: None,
@@ -127,6 +129,7 @@ fn main() {
 	eprintln!("\n=== Testing unknown field warning ===");
 	let flags_with_config = SettingsFlags {
 		config: Some(v_utils::io::ExpandedPath(std::path::PathBuf::from("tests/test_unknown_field.toml"))),
+		yes: false,
 		host: None,
 		port: None,
 		debug: None,
