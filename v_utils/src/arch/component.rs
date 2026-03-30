@@ -13,45 +13,6 @@ use std::{
 
 pub use ustr::Ustr;
 
-/// Represents a valid component ID.
-///
-/// Backed by [`Ustr`] for O(1) cloning and comparison.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ComponentId(Ustr);
-
-impl ComponentId {
-	pub fn new(value: &str) -> Self {
-		assert!(!value.is_empty() && value.is_ascii(), "ComponentId must be non-empty ASCII, got: {value:?}");
-		Self(Ustr::from(value))
-	}
-
-	pub fn inner(&self) -> Ustr {
-		self.0
-	}
-
-	pub fn as_str(&self) -> &str {
-		self.0.as_str()
-	}
-}
-
-impl Debug for ComponentId {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "{:?}", self.0)
-	}
-}
-
-impl Display for ComponentId {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-impl From<&str> for ComponentId {
-	fn from(value: &str) -> Self {
-		Self::new(value)
-	}
-}
-
 /// Components have state and lifecycle management capabilities.
 pub trait Component: Debug {
 	/// Returns the unique identifier for this component.
@@ -198,6 +159,44 @@ pub trait Component: Debug {
 	}
 	fn on_dispose(&mut self) -> eyre::Result<()> {
 		Ok(())
+	}
+}
+/// Represents a valid component ID.
+///
+/// Backed by [`Ustr`] for O(1) cloning and comparison.
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ComponentId(Ustr);
+
+impl ComponentId {
+	pub fn new(value: &str) -> Self {
+		assert!(!value.is_empty() && value.is_ascii(), "ComponentId must be non-empty ASCII, got: {value:?}");
+		Self(Ustr::from(value))
+	}
+
+	pub fn inner(&self) -> Ustr {
+		self.0
+	}
+
+	pub fn as_str(&self) -> &str {
+		self.0.as_str()
+	}
+}
+
+impl Debug for ComponentId {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
+
+impl Display for ComponentId {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
+impl From<&str> for ComponentId {
+	fn from(value: &str) -> Self {
+		Self::new(value)
 	}
 }
 
