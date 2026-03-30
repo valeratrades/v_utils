@@ -69,20 +69,6 @@ pub struct ModalState<A> {
 	/// Showing full help.
 	pub show_help: bool,
 }
-
-impl<A: Clone> Default for ModalState<A> {
-	fn default() -> Self {
-		Self {
-			root: ModalNode::new(),
-			sequence: Vec::new(),
-			time_since_last_key: 0.0,
-			hints_visible: false,
-			active: false,
-			show_help: false,
-		}
-	}
-}
-
 impl<A: Clone> ModalState<A> {
 	pub fn new(root: ModalNode<A>) -> Self {
 		Self { root, ..Default::default() }
@@ -160,6 +146,19 @@ impl<A: Clone> ModalState<A> {
 			current.children.contains_key(&key)
 		} else {
 			self.root.children.contains_key(&key)
+		}
+	}
+}
+
+impl<A: Clone> Default for ModalState<A> {
+	fn default() -> Self {
+		Self {
+			root: ModalNode::new(),
+			sequence: Vec::new(),
+			time_since_last_key: 0.0,
+			hints_visible: false,
+			active: false,
+			show_help: false,
 		}
 	}
 }
