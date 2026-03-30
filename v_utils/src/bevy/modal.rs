@@ -8,7 +8,7 @@ use super::PressedChars;
 pub const MODAL_HINT_TIMEOUT: f32 = 0.150;
 
 /// A node in a modal keybind tree, generic over action type.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ModalNode<A> {
 	/// Child nodes keyed by character.
 	pub children: HashMap<char, ModalNode<A>>,
@@ -18,13 +18,19 @@ pub struct ModalNode<A> {
 	pub label: Option<&'static str>,
 }
 
-impl<A: Clone> ModalNode<A> {
-	pub fn new() -> Self {
+impl<A> Default for ModalNode<A> {
+	fn default() -> Self {
 		Self {
 			children: HashMap::new(),
 			action: None,
 			label: None,
 		}
+	}
+}
+
+impl<A: Clone> ModalNode<A> {
+	pub fn new() -> Self {
+		Self::default()
 	}
 
 	/// Add a child node for a key.

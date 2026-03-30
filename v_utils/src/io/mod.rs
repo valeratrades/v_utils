@@ -4,10 +4,6 @@ pub use cli::*;
 pub mod expanded_path;
 pub use expanded_path::*;
 
-pub mod files;
-#[allow(deprecated)]
-pub use files::*;
-
 #[cfg(feature = "async-io")]
 pub mod file_open;
 #[cfg(feature = "async-io")]
