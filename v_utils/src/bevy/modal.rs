@@ -17,17 +17,6 @@ pub struct ModalNode<A> {
 	/// Human-readable label for this key (shown in hints).
 	pub label: Option<&'static str>,
 }
-
-impl<A> Default for ModalNode<A> {
-	fn default() -> Self {
-		Self {
-			children: HashMap::new(),
-			action: None,
-			label: None,
-		}
-	}
-}
-
 impl<A: Clone> ModalNode<A> {
 	pub fn new() -> Self {
 		Self::default()
@@ -56,6 +45,16 @@ impl<A: Clone> ModalNode<A> {
 
 	pub fn is_terminal(&self) -> bool {
 		self.action.is_some()
+	}
+}
+
+impl<A> Default for ModalNode<A> {
+	fn default() -> Self {
+		Self {
+			children: HashMap::new(),
+			action: None,
+			label: None,
+		}
 	}
 }
 
