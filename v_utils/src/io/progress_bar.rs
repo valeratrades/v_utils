@@ -1,39 +1,68 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
+use bon::Builder;
+
+use crate::{other::Timelike, print_rolling};
+
+/// Single-line terminal progress bar using `print_rolling!`.
+///
 ///```rust
 ///use v_utils::io::ProgressBar;
 ///
-///let mut pb = ProgressBar::new(100);
-///for i in 0..100 {
+///let mut pb = ProgressBar::builder().total(100).build();
+///for i in 0..=100 {
 ///    pb.progress(i);
 ///}
-///
-#[derive(Clone, Debug)]
+///```
+#[derive(Clone, Debug, Builder)]
 pub struct ProgressBar {
-	bar_width: f64,
-	timestamp_ms: u128,
-	total: f64,
+	total: usize,
+	/// Bar width in characters (default: 40)
+	#[builder(default = 40)]
+	width: usize,
+	/// Fill character (default: '█')
+	#[builder(default = '█')]
+	fill: char,
+	/// Empty character (default: '░')
+	#[builder(default = '░')]
+	empty: char,
+	/// Optional prefix shown before the bar
+	#[builder(default)]
+	prefix: String,
+	#[builder(skip)]
+	started: Option<Instant>,
 }
+
 impl ProgressBar {
 	pub fn new(total: usize) -> Self {
-		let bar_width: f64 = 133.0;
-		let timestamp_ms = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
-		let total = total as f64;
-		ProgressBar { bar_width, timestamp_ms, total }
+		Self::builder().total(total).build()
 	}
 
 	pub fn progress(&mut self, i: usize) {
-		const CLEAR: &str = "\x1B[2J\x1B[1;1H";
-		let scalar: f64 = self.bar_width / self.total;
-		let display_i = (i as f64 * scalar) as usize;
-		let display_total = (self.total * scalar) as usize;
+		let started = *self.started.get_or_insert_with(Instant::now);
+		let ratio = if self.total == 0 { 1.0 } else { (i as f64 / self.total as f64).min(1.0) };
+		let filled = (ratio * self.width as f64) as usize;
+		let empty = self.width - filled;
+		let pct = (ratio * 100.0) as u32;
 
-		println!("{CLEAR}");
-		println!("[{}{}]", "*".repeat(display_i), " ".repeat(display_total - display_i));
+		let eta = if i > 0 {
+			let elapsed = started.elapsed().as_secs_f64();
+			let remaining = elapsed * (self.total.saturating_sub(i)) as f64 / i as f64;
+			format!(" ETA {}", Timelike(remaining.ceil() as u32))
+		} else {
+			String::new()
+		};
 
-		let since_timestamp_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() - self.timestamp_ms;
-		let progress_left_scalar = (self.total - i as f64) / i as f64;
-		let left_s = (since_timestamp_ms as f64 * progress_left_scalar / 1000.0) as usize;
-		println!("Time left: ≈ {left_s}s");
+		let prefix = if self.prefix.is_empty() { String::new() } else { format!("{} ", self.prefix) };
+
+		print_rolling!(
+			"{prefix}▕{}{}▏ {pct}%{eta}",
+			str::repeat(&self.fill.to_string(), filled),
+			str::repeat(&self.empty.to_string(), empty)
+		);
+
+		if i >= self.total {
+			eprintln!();
+		}
 	}
 }
