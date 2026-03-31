@@ -61,133 +61,6 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
-/// cli-like string serialization format, with focus on compactness
-///
-/// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
-///
-/// Macro generates FromStr and Display; assuming this format.
-///```rust
-///#[cfg(feature = "macros")] {
-///#[cfg(feature = "trades")] {
-///use v_utils::macros::CompactFormatNamed;
-///use v_utils::trades::{Timeframe, TimeframeDesignator};
-///
-///#[derive(CompactFormatNamed, Debug, PartialEq)]
-///pub struct SAR {
-///	 pub start: f64,
-///	 pub increment: f64,
-///	 pub max: f64,
-///	 pub timeframe: Timeframe,
-///}
-///
-///let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
-///let params_str = "sar:s0.07:i0.02:m0.15:t5m";
-///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
-///let sar_write = sar.to_string();
-///assert_eq!(params_str, sar_write);
-///}
-///}
-///```
-//HACK: syn (as of 2.0.117) doesn't parse `default_field_values` (`field: Type = expr`).
-// Pre-process the token stream to strip `= expr` and collect defaults manually.
-// Replace with native syn support when it lands.
-fn strip_field_defaults(input: TokenStream) -> (TokenStream, std::collections::HashMap<String, String>) {
-	use proc_macro::{Delimiter, TokenTree};
-
-	let mut defaults = std::collections::HashMap::new();
-	let tokens: Vec<TokenTree> = input.into_iter().collect();
-	let mut output = Vec::new();
-
-	for tt in &tokens {
-		match tt {
-			TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
-				let inner = strip_fields_in_brace(g.stream(), &mut defaults);
-				let mut new_group = proc_macro::Group::new(Delimiter::Brace, inner);
-				new_group.set_span(g.span());
-				output.push(TokenTree::Group(new_group));
-			}
-			other => output.push(other.clone()),
-		}
-	}
-
-	(output.into_iter().collect(), defaults)
-}
-
-/// Process the inside of the struct brace, stripping `= expr` from fields.
-/// We track the last seen identifier before `:` as the field name, and when we see
-/// `=` after a type (before `,` or `}`), we collect everything between `=` and the delimiter.
-fn strip_fields_in_brace(stream: TokenStream, defaults: &mut std::collections::HashMap<String, String>) -> TokenStream {
-	use proc_macro::{Spacing, TokenTree};
-
-	let tokens: Vec<TokenTree> = stream.into_iter().collect();
-	let mut output: Vec<TokenTree> = Vec::new();
-	let mut i = 0;
-	let mut current_field_name: Option<String> = None;
-	// Track depth: we only strip defaults at the top level of the struct body,
-	// not inside nested attribute groups like #[compact(...)]
-	let mut saw_colon = false; // saw the `:` after field name (type separator)
-
-	while i < tokens.len() {
-		match &tokens[i] {
-			// Track field name: identifier followed by `:`
-			TokenTree::Ident(id) => {
-				// Peek ahead for `:`
-				if i + 1 < tokens.len() {
-					if let TokenTree::Punct(p) = &tokens[i + 1] {
-						if p.as_char() == ':' && p.spacing() == Spacing::Alone {
-							current_field_name = Some(id.to_string());
-							saw_colon = false;
-						}
-					}
-				}
-				output.push(tokens[i].clone());
-				i += 1;
-			}
-			TokenTree::Punct(p) if p.as_char() == ':' && p.spacing() == Spacing::Alone => {
-				saw_colon = true;
-				output.push(tokens[i].clone());
-				i += 1;
-			}
-			TokenTree::Punct(p) if p.as_char() == '=' && saw_colon => {
-				// This is `= expr` after the type. Collect tokens until `,` or end.
-				i += 1; // skip `=`
-				let mut expr_tokens = Vec::new();
-				while i < tokens.len() {
-					if let TokenTree::Punct(p) = &tokens[i] {
-						if p.as_char() == ',' {
-							break;
-						}
-					}
-					expr_tokens.push(tokens[i].clone());
-					i += 1;
-				}
-				if let Some(ref name) = current_field_name {
-					let expr_str: TokenStream = expr_tokens.into_iter().collect();
-					defaults.insert(name.clone(), expr_str.to_string());
-				}
-				saw_colon = false;
-			}
-			TokenTree::Punct(p) if p.as_char() == ',' => {
-				saw_colon = false;
-				current_field_name = None;
-				output.push(tokens[i].clone());
-				i += 1;
-			}
-			// Recurse into groups (but don't strip defaults inside them — they're attrs/types)
-			TokenTree::Group(g) => {
-				output.push(TokenTree::Group(g.clone()));
-				i += 1;
-			}
-			_ => {
-				output.push(tokens[i].clone());
-				i += 1;
-			}
-		}
-	}
-
-	output.into_iter().collect()
-}
-
 #[proc_macro_derive(CompactFormatNamed, attributes(compact))]
 pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 	// Pre-process: strip `= expr` default field values (rust nightly `default_field_values`),
@@ -381,7 +254,7 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 /// #[derive(CompactFormatNamed, Debug, PartialEq)]
 /// pub struct Bar { pub y: f64 }
 ///
-/// #[derive(TryParseVariants, Debug, PartialEq)]
+/// #[derive(Debug, PartialEq, TryParseVariants)]
 /// pub enum MyEnum {
 ///     Foo(Foo),
 ///     Bar(Bar),
@@ -409,7 +282,7 @@ pub fn derive_try_parse_variants(input: TokenStream) -> TokenStream {
 		let variant_ident = &v.ident;
 		let inner_ty = match &v.fields {
 			Fields::Unnamed(fields) if fields.unnamed.len() == 1 => &fields.unnamed.first().unwrap().ty,
-			_ => panic!("TryParseVariants: variant `{}` must be a single-field tuple variant", variant_ident),
+			_ => panic!("TryParseVariants: variant `{variant_ident}` must be a single-field tuple variant"),
 		};
 
 		quote! {
@@ -432,7 +305,6 @@ pub fn derive_try_parse_variants(input: TokenStream) -> TokenStream {
 
 	expanded.into()
 }
-
 /// Deprecated alias for [`CompactFormatNamed`]
 #[deprecated(since = "3.0.0", note = "Use CompactFormatNamed instead")]
 #[proc_macro_derive(CompactFormat)]
@@ -2774,6 +2646,133 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+/// cli-like string serialization format, with focus on compactness
+///
+/// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
+///
+/// Macro generates FromStr and Display; assuming this format.
+///```rust
+///#[cfg(feature = "macros")] {
+///#[cfg(feature = "trades")] {
+///use v_utils::macros::CompactFormatNamed;
+///use v_utils::trades::{Timeframe, TimeframeDesignator};
+///
+///#[derive(CompactFormatNamed, Debug, PartialEq)]
+///pub struct SAR {
+///	 pub start: f64,
+///	 pub increment: f64,
+///	 pub max: f64,
+///	 pub timeframe: Timeframe,
+///}
+///
+///let sar = SAR { start: 0.07, increment: 0.02, max: 0.15, timeframe: Timeframe { designator: TimeframeDesignator::Minutes, n: 5 } };
+///let params_str = "sar:s0.07:i0.02:m0.15:t5m";
+///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
+///let sar_write = sar.to_string();
+///assert_eq!(params_str, sar_write);
+///}
+///}
+///```
+//HACK: syn (as of 2.0.117) doesn't parse `default_field_values` (`field: Type = expr`).
+// Pre-process the token stream to strip `= expr` and collect defaults manually.
+// Replace with native syn support when it lands.
+fn strip_field_defaults(input: TokenStream) -> (TokenStream, std::collections::HashMap<String, String>) {
+	use proc_macro::{Delimiter, TokenTree};
+
+	let mut defaults = std::collections::HashMap::new();
+	let tokens: Vec<TokenTree> = input.into_iter().collect();
+	let mut output = Vec::new();
+
+	for tt in &tokens {
+		match tt {
+			TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
+				let inner = strip_fields_in_brace(g.stream(), &mut defaults);
+				let mut new_group = proc_macro::Group::new(Delimiter::Brace, inner);
+				new_group.set_span(g.span());
+				output.push(TokenTree::Group(new_group));
+			}
+			other => output.push(other.clone()),
+		}
+	}
+
+	(output.into_iter().collect(), defaults)
+}
+
+/// Process the inside of the struct brace, stripping `= expr` from fields.
+/// We track the last seen identifier before `:` as the field name, and when we see
+/// `=` after a type (before `,` or `}`), we collect everything between `=` and the delimiter.
+fn strip_fields_in_brace(stream: TokenStream, defaults: &mut std::collections::HashMap<String, String>) -> TokenStream {
+	use proc_macro::{Spacing, TokenTree};
+
+	let tokens: Vec<TokenTree> = stream.into_iter().collect();
+	let mut output: Vec<TokenTree> = Vec::new();
+	let mut i = 0;
+	let mut current_field_name: Option<String> = None;
+	// Track depth: we only strip defaults at the top level of the struct body,
+	// not inside nested attribute groups like #[compact(...)]
+	let mut saw_colon = false; // saw the `:` after field name (type separator)
+
+	while i < tokens.len() {
+		match &tokens[i] {
+			// Track field name: identifier followed by `:`
+			TokenTree::Ident(id) => {
+				// Peek ahead for `:`
+				if i + 1 < tokens.len() {
+					if let TokenTree::Punct(p) = &tokens[i + 1] {
+						if p.as_char() == ':' && p.spacing() == Spacing::Alone {
+							current_field_name = Some(id.to_string());
+							saw_colon = false;
+						}
+					}
+				}
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			TokenTree::Punct(p) if p.as_char() == ':' && p.spacing() == Spacing::Alone => {
+				saw_colon = true;
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			TokenTree::Punct(p) if p.as_char() == '=' && saw_colon => {
+				// This is `= expr` after the type. Collect tokens until `,` or end.
+				i += 1; // skip `=`
+				let mut expr_tokens = Vec::new();
+				while i < tokens.len() {
+					if let TokenTree::Punct(p) = &tokens[i] {
+						if p.as_char() == ',' {
+							break;
+						}
+					}
+					expr_tokens.push(tokens[i].clone());
+					i += 1;
+				}
+				if let Some(ref name) = current_field_name {
+					let expr_str: TokenStream = expr_tokens.into_iter().collect();
+					defaults.insert(name.clone(), expr_str.to_string());
+				}
+				saw_colon = false;
+			}
+			TokenTree::Punct(p) if p.as_char() == ',' => {
+				saw_colon = false;
+				current_field_name = None;
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			// Recurse into groups (but don't strip defaults inside them — they're attrs/types)
+			TokenTree::Group(g) => {
+				output.push(TokenTree::Group(g.clone()));
+				i += 1;
+			}
+			_ => {
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+		}
+	}
+
+	output.into_iter().collect()
+}
+
 /// A helper function to know location of errors in `quote!{}`s
 fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
 	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));

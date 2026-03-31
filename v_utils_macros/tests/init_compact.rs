@@ -207,7 +207,7 @@ fn main() {
 
 	// Test TryParseVariants — derives FromStr on an enum by trying each variant's inner FromStr
 	{
-		#[derive(TryParseVariants, Debug, PartialEq)]
+		#[derive(Debug, PartialEq, TryParseVariants)]
 		enum Strategy {
 			Trailing(TrailingStop),
 			Empty(Empty),
