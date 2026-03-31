@@ -14,7 +14,7 @@ use crate::{other::Timelike, print_rolling};
 ///    pb.progress(i);
 ///}
 ///```
-#[derive(Clone, Debug, Builder)]
+#[derive(Builder, Clone, Debug)]
 pub struct ProgressBar {
 	total: usize,
 	/// Bar width in characters (default: 40)
