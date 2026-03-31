@@ -13,7 +13,7 @@ impl Timelike {
 impl std::fmt::Display for Timelike {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self.0 {
-			0..=59 => write!(f, "{:02}", self.0),
+			0..=59 => write!(f, "{:02}s", self.0),
 			60..=3599 => write!(f, "{:02}:{:02}", self.0 / 60, self.0 % 60),
 			_ => write!(f, "{}:{:02}:{:02}", self.0 / 3600, (self.0 % 3600) / 60, self.0 % 60),
 		}
@@ -114,10 +114,10 @@ mod tests {
 
 	#[test]
 	fn test_time_ser() {
-		assert_eq!(Timelike(30).to_string(), "30");
+		assert_eq!(Timelike(30).to_string(), "30s");
 		assert_eq!(Timelike(2096).to_string(), "34:56");
 		assert_eq!(Timelike(3600).to_string(), "1:00:00");
-		assert_eq!(&json!(Timelike(0)).to_string(), "\"00\"");
+		assert_eq!(&json!(Timelike(0)).to_string(), "\"00s\"");
 		assert_eq!(&json!(Timelike(45296)).to_string(), "\"12:34:56\"");
 	}
 }

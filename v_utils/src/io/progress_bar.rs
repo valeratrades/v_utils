@@ -39,18 +39,23 @@ impl ProgressBar {
 	}
 
 	pub fn progress(&mut self, i: usize) {
+		let is_first = self.started.is_none();
 		let started = *self.started.get_or_insert_with(Instant::now);
+		let finished = i >= self.total;
 		let ratio = if self.total == 0 { 1.0 } else { (i as f64 / self.total as f64).min(1.0) };
 		let filled = (ratio * self.width as f64) as usize;
 		let empty = self.width - filled;
 		let pct = (ratio * 100.0) as u32;
 
-		let eta = if i > 0 {
+		let eta = if finished {
+			let elapsed = started.elapsed().as_secs_f64();
+			format!(" finished in {}", Timelike(elapsed.ceil() as u32))
+		} else if i > 0 && !is_first {
 			let elapsed = started.elapsed().as_secs_f64();
 			let remaining = elapsed * (self.total.saturating_sub(i)) as f64 / i as f64;
 			format!(" ETA {}", Timelike(remaining.ceil() as u32))
 		} else {
-			String::new()
+			" ETA ?".to_string()
 		};
 
 		let prefix = if self.prefix.is_empty() { String::new() } else { format!("{} ", self.prefix) };
@@ -61,7 +66,7 @@ impl ProgressBar {
 			str::repeat(&self.empty.to_string(), empty)
 		);
 
-		if i >= self.total {
+		if finished {
 			eprintln!();
 		}
 	}
