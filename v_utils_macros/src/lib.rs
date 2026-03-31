@@ -88,9 +88,113 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///}
 ///}
 ///```
+//HACK: syn (as of 2.0.117) doesn't parse `default_field_values` (`field: Type = expr`).
+// Pre-process the token stream to strip `= expr` and collect defaults manually.
+// Replace with native syn support when it lands.
+fn strip_field_defaults(input: TokenStream) -> (TokenStream, std::collections::HashMap<String, String>) {
+	use proc_macro::{Delimiter, TokenTree};
+
+	let mut defaults = std::collections::HashMap::new();
+	let tokens: Vec<TokenTree> = input.into_iter().collect();
+	let mut output = Vec::new();
+
+	for tt in &tokens {
+		match tt {
+			TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
+				let inner = strip_fields_in_brace(g.stream(), &mut defaults);
+				let mut new_group = proc_macro::Group::new(Delimiter::Brace, inner);
+				new_group.set_span(g.span());
+				output.push(TokenTree::Group(new_group));
+			}
+			other => output.push(other.clone()),
+		}
+	}
+
+	(output.into_iter().collect(), defaults)
+}
+
+/// Process the inside of the struct brace, stripping `= expr` from fields.
+/// We track the last seen identifier before `:` as the field name, and when we see
+/// `=` after a type (before `,` or `}`), we collect everything between `=` and the delimiter.
+fn strip_fields_in_brace(stream: TokenStream, defaults: &mut std::collections::HashMap<String, String>) -> TokenStream {
+	use proc_macro::{Spacing, TokenTree};
+
+	let tokens: Vec<TokenTree> = stream.into_iter().collect();
+	let mut output: Vec<TokenTree> = Vec::new();
+	let mut i = 0;
+	let mut current_field_name: Option<String> = None;
+	// Track depth: we only strip defaults at the top level of the struct body,
+	// not inside nested attribute groups like #[compact(...)]
+	let mut saw_colon = false; // saw the `:` after field name (type separator)
+
+	while i < tokens.len() {
+		match &tokens[i] {
+			// Track field name: identifier followed by `:`
+			TokenTree::Ident(id) => {
+				// Peek ahead for `:`
+				if i + 1 < tokens.len() {
+					if let TokenTree::Punct(p) = &tokens[i + 1] {
+						if p.as_char() == ':' && p.spacing() == Spacing::Alone {
+							current_field_name = Some(id.to_string());
+							saw_colon = false;
+						}
+					}
+				}
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			TokenTree::Punct(p) if p.as_char() == ':' && p.spacing() == Spacing::Alone => {
+				saw_colon = true;
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			TokenTree::Punct(p) if p.as_char() == '=' && saw_colon => {
+				// This is `= expr` after the type. Collect tokens until `,` or end.
+				i += 1; // skip `=`
+				let mut expr_tokens = Vec::new();
+				while i < tokens.len() {
+					if let TokenTree::Punct(p) = &tokens[i] {
+						if p.as_char() == ',' {
+							break;
+						}
+					}
+					expr_tokens.push(tokens[i].clone());
+					i += 1;
+				}
+				if let Some(ref name) = current_field_name {
+					let expr_str: TokenStream = expr_tokens.into_iter().collect();
+					defaults.insert(name.clone(), expr_str.to_string());
+				}
+				saw_colon = false;
+			}
+			TokenTree::Punct(p) if p.as_char() == ',' => {
+				saw_colon = false;
+				current_field_name = None;
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+			// Recurse into groups (but don't strip defaults inside them — they're attrs/types)
+			TokenTree::Group(g) => {
+				output.push(TokenTree::Group(g.clone()));
+				i += 1;
+			}
+			_ => {
+				output.push(tokens[i].clone());
+				i += 1;
+			}
+		}
+	}
+
+	output.into_iter().collect()
+}
+
 #[proc_macro_derive(CompactFormatNamed, attributes(compact))]
 pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
-	let ast = parse_macro_input!(input as DeriveInput);
+	// Pre-process: strip `= expr` default field values (rust nightly `default_field_values`),
+	// collecting them by field name so we can use them as compact defaults.
+	let (cleaned_input, inline_defaults) = strip_field_defaults(input);
+
+	let ast = parse_macro_input!(cleaned_input as DeriveInput);
 	let name = &ast.ident;
 	let fields = if let Data::Struct(syn::DataStruct {
 		fields: Fields::Named(syn::FieldsNamed { ref named, .. }),
@@ -124,7 +228,7 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 
 	let n_fields = fields.len();
 
-	// Parse per-field #[compact(default)] or #[compact(default = expr)]
+	// Parse per-field #[compact(default)] or #[compact(default = expr)] or inline `= expr`
 	let field_defaults: Vec<Option<proc_macro2::TokenStream>> = fields
 		.iter()
 		.map(|f| {
@@ -147,6 +251,12 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 						}
 					}
 				}
+			}
+			// Check for inline default field value (`field: Type = expr`)
+			let field_name = f.ident.as_ref().unwrap().to_string();
+			if let Some(expr_str) = inline_defaults.get(&field_name) {
+				let expr: proc_macro2::TokenStream = expr_str.parse().expect("invalid inline default expression");
+				return Some(expr);
 			}
 			None
 		})
@@ -255,6 +365,74 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 
 	expanded.into()
 }
+/// Derives `FromStr` for an enum where every variant is a single-field tuple variant.
+///
+/// For each variant `Foo(Bar)`, tries `s.parse::<Bar>()` and wraps the result
+/// in `Self::Foo(v)`. Returns `Err(s.to_string())` if no variant matches.
+///
+/// Pairs well with `CompactFormatNamed` — if each inner type derives `CompactFormatNamed`,
+/// the enum automatically parses any of them by name.
+///
+/// ```rust
+/// # use v_utils_macros::{CompactFormatNamed, TryParseVariants};
+/// #[derive(CompactFormatNamed, Debug, PartialEq)]
+/// pub struct Foo { pub x: u32 }
+///
+/// #[derive(CompactFormatNamed, Debug, PartialEq)]
+/// pub struct Bar { pub y: f64 }
+///
+/// #[derive(TryParseVariants, Debug, PartialEq)]
+/// pub enum MyEnum {
+///     Foo(Foo),
+///     Bar(Bar),
+/// }
+///
+/// let parsed: MyEnum = "foo:x42".parse().unwrap();
+/// assert_eq!(parsed, MyEnum::Foo(Foo { x: 42 }));
+///
+/// let parsed: MyEnum = "bar:y3.14".parse().unwrap();
+/// assert_eq!(parsed, MyEnum::Bar(Bar { y: 3.14 }));
+///
+/// assert!("unknown".parse::<MyEnum>().is_err());
+/// ```
+#[proc_macro_derive(TryParseVariants)]
+pub fn derive_try_parse_variants(input: TokenStream) -> TokenStream {
+	let ast = parse_macro_input!(input as DeriveInput);
+	let name = &ast.ident;
+
+	let variants = match &ast.data {
+		Data::Enum(e) => &e.variants,
+		_ => panic!("TryParseVariants can only be derived on enums"),
+	};
+
+	let arms = variants.iter().map(|v| {
+		let variant_ident = &v.ident;
+		let inner_ty = match &v.fields {
+			Fields::Unnamed(fields) if fields.unnamed.len() == 1 => &fields.unnamed.first().unwrap().ty,
+			_ => panic!("TryParseVariants: variant `{}` must be a single-field tuple variant", variant_ident),
+		};
+
+		quote! {
+			if let Ok(v) = s.parse::<#inner_ty>() {
+				return Ok(#name::#variant_ident(v));
+			}
+		}
+	});
+
+	let expanded = quote! {
+		impl std::str::FromStr for #name {
+			type Err = String;
+
+			fn from_str(s: &str) -> Result<Self, Self::Err> {
+				#(#arms)*
+				Err(s.to_string())
+			}
+		}
+	};
+
+	expanded.into()
+}
+
 /// Deprecated alias for [`CompactFormatNamed`]
 #[deprecated(since = "3.0.0", note = "Use CompactFormatNamed instead")]
 #[proc_macro_derive(CompactFormat)]

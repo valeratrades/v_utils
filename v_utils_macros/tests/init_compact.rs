@@ -1,6 +1,8 @@
+#![feature(default_field_values)]
+
 use std::str::FromStr;
 
-use v_utils_macros::{CompactFormatMap, CompactFormatNamed};
+use v_utils_macros::{CompactFormatMap, CompactFormatNamed, TryParseVariants};
 
 #[derive(CompactFormatNamed, Debug, PartialEq)]
 #[compact(default)]
@@ -27,6 +29,12 @@ pub struct FieldDefaultExpr {
 	pub required: f64,
 	#[compact(default = 100)]
 	pub optional: u32,
+}
+
+#[derive(CompactFormatNamed, Debug, Default, PartialEq)]
+pub struct InlineDefault {
+	pub required: f64,
+	pub count: u32 = 42,
 }
 
 #[derive(CompactFormatNamed, Debug, PartialEq)]
@@ -177,5 +185,40 @@ fn main() {
 	{
 		let bare = FieldDefaultExpr::from_str("fde:r3.14").unwrap();
 		assert_eq!(bare, FieldDefaultExpr { required: 3.14, optional: 100 });
+	}
+
+	// Test inline default field values (`field: Type = expr`)
+	{
+		let bare = InlineDefault::from_str("id:r2.5").unwrap();
+		assert_eq!(bare, InlineDefault { required: 2.5, count: 42 });
+
+		let full = InlineDefault::from_str("id:r2.5:c99").unwrap();
+		assert_eq!(full, InlineDefault { required: 2.5, count: 99 });
+
+		// Missing required field should fail
+		assert!(InlineDefault::from_str("id").is_err());
+
+		// Round-trip
+		let val = InlineDefault { required: 1.0, count: 7 };
+		let s = val.to_string();
+		let parsed = InlineDefault::from_str(&s).unwrap();
+		assert_eq!(val, parsed);
+	}
+
+	// Test TryParseVariants — derives FromStr on an enum by trying each variant's inner FromStr
+	{
+		#[derive(TryParseVariants, Debug, PartialEq)]
+		enum Strategy {
+			Trailing(TrailingStop),
+			Empty(Empty),
+		}
+
+		let parsed: Strategy = "ts:p0.5:s42".parse().unwrap();
+		assert_eq!(parsed, Strategy::Trailing(TrailingStop { percent: 0.5, some_other_field: 42 }));
+
+		let parsed: Strategy = "empty".parse().unwrap();
+		assert_eq!(parsed, Strategy::Empty(Empty {}));
+
+		assert!("unknown:x1".parse::<Strategy>().is_err());
 	}
 }
