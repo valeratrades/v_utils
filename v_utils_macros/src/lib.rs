@@ -88,7 +88,7 @@ pub fn graphemics(input: TokenStream) -> TokenStream {
 ///}
 ///}
 ///```
-#[proc_macro_derive(CompactFormatNamed)]
+#[proc_macro_derive(CompactFormatNamed, attributes(compact))]
 pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
@@ -102,6 +102,16 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
+	// Check for struct-level #[compact(default)]
+	let struct_default = ast.attrs.iter().any(|attr| {
+		if let syn::Meta::List(meta_list) = &attr.meta {
+			if meta_list.path.is_ident("compact") {
+				return meta_list.tokens.to_string().trim() == "default";
+			}
+		}
+		false
+	});
+
 	let mut first_chars: Vec<char> = Vec::new();
 	for field in fields {
 		let first_char = field.ident.as_ref().unwrap().to_string().chars().next().unwrap();
@@ -114,12 +124,54 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 
 	let n_fields = fields.len();
 
-	let map_fields_to_chars = fields.iter().map(|f| {
+	// Parse per-field #[compact(default)] or #[compact(default = expr)]
+	let field_defaults: Vec<Option<proc_macro2::TokenStream>> = fields
+		.iter()
+		.map(|f| {
+			if struct_default {
+				let ident = &f.ident;
+				return Some(quote! { Self::default().#ident });
+			}
+			for attr in &f.attrs {
+				if let syn::Meta::List(meta_list) = &attr.meta {
+					if meta_list.path.is_ident("compact") {
+						let tokens_str = meta_list.tokens.to_string();
+						let trimmed = tokens_str.trim();
+						if trimmed == "default" {
+							let ty = &f.ty;
+							return Some(quote! { <#ty as Default>::default() });
+						}
+						if let Some(expr_str) = trimmed.strip_prefix("default =").or_else(|| trimmed.strip_prefix("default=")) {
+							let expr: proc_macro2::TokenStream = expr_str.trim().parse().expect("invalid expression in #[compact(default = ...)]");
+							return Some(expr);
+						}
+					}
+				}
+			}
+			None
+		})
+		.collect();
+
+	let map_fields_to_chars = fields.iter().zip(field_defaults.iter()).map(|(f, default)| {
 		let ident = &f.ident;
 		let ty = &f.ty;
 		let first_char = ident.as_ref().unwrap().to_string().chars().next().unwrap();
-		quote! {
-			#ident: provided_params.get(&#first_char).unwrap().parse::<#ty>()?,
+		match default {
+			Some(fallback) => quote! {
+				#ident: match provided_params.get(&#first_char) {
+					Some(v) => v.parse::<#ty>()?,
+					None => #fallback,
+				},
+			},
+			None => {
+				let field_name = ident.as_ref().unwrap().to_string();
+				quote! {
+					#ident: match provided_params.get(&#first_char) {
+						Some(v) => v.parse::<#ty>()?,
+						None => v_utils::__internal::eyre::bail!("missing required field '{}'", #field_name),
+					},
+				}
+			}
 		}
 	});
 
@@ -167,8 +219,8 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 					split_respecting_braces(params_part)
 				};
 
-				if params_split.len() != #n_fields {
-					v_utils::__internal::eyre::bail!("Expected {} fields, got {}", #n_fields, params_split.len());
+				if params_split.len() > #n_fields {
+					v_utils::__internal::eyre::bail!("Expected at most {} fields, got {}", #n_fields, params_split.len());
 				}
 				let graphemics = v_utils::macros::graphemics!(#name);
 				if !graphemics.contains(&name) {

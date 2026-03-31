@@ -3,6 +3,33 @@ use std::str::FromStr;
 use v_utils_macros::{CompactFormatMap, CompactFormatNamed};
 
 #[derive(CompactFormatNamed, Debug, PartialEq)]
+#[compact(default)]
+pub struct StructDefault {
+	pub alpha: u32,
+	pub beta: u32,
+}
+
+impl Default for StructDefault {
+	fn default() -> Self {
+		Self { alpha: 10, beta: 20 }
+	}
+}
+
+#[derive(CompactFormatNamed, Debug, PartialEq)]
+pub struct FieldDefault {
+	pub required: f64,
+	#[compact(default)]
+	pub optional: u32,
+}
+
+#[derive(CompactFormatNamed, Debug, PartialEq)]
+pub struct FieldDefaultExpr {
+	pub required: f64,
+	#[compact(default = 100)]
+	pub optional: u32,
+}
+
+#[derive(CompactFormatNamed, Debug, PartialEq)]
 pub struct TrailingStop {
 	pub percent: f64,
 	pub some_other_field: u32,
@@ -120,5 +147,35 @@ fn main() {
 
 		let params_read = PositionParams::from_str(&params_str).unwrap();
 		assert_eq!(params, params_read);
+	}
+
+	// Test #[compact(default)] on struct — all fields optional via Self::default()
+	{
+		let bare = StructDefault::from_str("sd").unwrap();
+		assert_eq!(bare, StructDefault { alpha: 10, beta: 20 });
+
+		let partial = StructDefault::from_str("sd:a99").unwrap();
+		assert_eq!(partial, StructDefault { alpha: 99, beta: 20 });
+
+		let full = StructDefault::from_str("sd:a5:b6").unwrap();
+		assert_eq!(full, StructDefault { alpha: 5, beta: 6 });
+	}
+
+	// Test #[compact(default)] on individual fields
+	{
+		let bare = FieldDefault::from_str("fd:r1.0").unwrap();
+		assert_eq!(bare, FieldDefault { required: 1.0, optional: 0 });
+
+		let full = FieldDefault::from_str("fd:r1.0:o42").unwrap();
+		assert_eq!(full, FieldDefault { required: 1.0, optional: 42 });
+
+		// Missing required field should fail
+		assert!(FieldDefault::from_str("fd").is_err());
+	}
+
+	// Test #[compact(default = expr)] on field
+	{
+		let bare = FieldDefaultExpr::from_str("fde:r3.14").unwrap();
+		assert_eq!(bare, FieldDefaultExpr { required: 3.14, optional: 100 });
 	}
 }
