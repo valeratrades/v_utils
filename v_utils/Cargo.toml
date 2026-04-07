@@ -85,10 +85,12 @@ tracing-log = { version = "^0.2.0", optional = true }
 tracing-subscriber = { version = "^0.3.22", features = ["fmt", "json", "registry", "env-filter"], optional = true }
 ustr = "^1.1"
 xdg = { version = "^3.0.0", optional = true }
+ahash = "0.8.12"
 
 bon.workspace = true
 eyre.workspace = true
 facet = { workspace = true, optional = true }
+indexmap = "2.13.1"
 quote = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true

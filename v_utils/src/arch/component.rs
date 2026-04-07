@@ -1,7 +1,7 @@
 // Lifecycle state machine for system components.
 // Originally from nautilus_trader::common::component.
 
-#![allow(unsafe_code)]
+//#![allow(unsafe_code)]
 
 use std::{
 	cell::{RefCell, UnsafeCell},
@@ -299,7 +299,7 @@ pub enum ComponentTrigger {
 // ── Registry ──────────────────────────────────────────────────────────
 
 thread_local! {
-	static COMPONENT_REGISTRY: ComponentRegistry = ComponentRegistry::new();
+	static COMPONENT_REGISTRY: ComponentRegistry = ComponentRegistry::default();
 }
 
 /// Registry for storing components with runtime borrow tracking.
@@ -310,14 +310,15 @@ pub struct ComponentRegistry {
 	components: RefCell<ustr::UstrMap<Rc<UnsafeCell<dyn Component>>>>,
 	borrows: RefCell<HashSet<Ustr>>,
 }
-impl ComponentRegistry {
-	pub fn new() -> Self {
+impl Default for ComponentRegistry {
+	fn default() -> Self {
 		Self {
 			components: RefCell::new(ustr::UstrMap::default()),
 			borrows: RefCell::new(HashSet::new()),
 		}
 	}
-
+}
+impl ComponentRegistry {
 	pub fn insert(&self, id: Ustr, component: Rc<UnsafeCell<dyn Component>>) {
 		self.components.borrow_mut().insert(id, component);
 	}
@@ -356,12 +357,6 @@ impl Debug for ComponentRegistry {
 			.field("components", &keys)
 			.field("active_borrows", &self.borrows.borrow().len())
 			.finish()
-	}
-}
-
-impl Default for ComponentRegistry {
-	fn default() -> Self {
-		Self::new()
 	}
 }
 

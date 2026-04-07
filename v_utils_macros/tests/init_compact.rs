@@ -183,8 +183,8 @@ fn main() {
 
 	// Test #[compact(default = expr)] on field
 	{
-		let bare = FieldDefaultExpr::from_str("fde:r3.14").unwrap();
-		assert_eq!(bare, FieldDefaultExpr { required: 3.14, optional: 100 });
+		let bare = FieldDefaultExpr::from_str("fde:r1.23").unwrap();
+		assert_eq!(bare, FieldDefaultExpr { required: 1.23, optional: 100 });
 	}
 
 	// Test inline default field values (`field: Type = expr`)

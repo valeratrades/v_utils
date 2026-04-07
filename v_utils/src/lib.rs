@@ -4,6 +4,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(specialization)]
 #![allow(incomplete_features)]
+#![feature(default_field_values)]
 
 #[cfg(all(feature = "assert-wasm-compat", feature = "async-io"))]
 compile_error!("Feature `async-io` is not compatible with wasm.");

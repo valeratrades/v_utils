@@ -38,9 +38,35 @@ impl ProgressBar {
 		Self::builder().total(total).build()
 	}
 
+	/// Render the bar at 0% immediately (before any work starts).
+	pub fn init(&mut self) {
+		self.started.get_or_insert_with(Instant::now);
+		self.render(0);
+	}
+
 	pub fn progress(&mut self, i: usize) {
-		let is_first = self.started.is_none();
+		self.started.get_or_insert_with(Instant::now);
+		self.render(i);
+		if i >= self.total {
+			eprintln!();
+		}
+	}
+
+	/// Force-print the "finished in X" line regardless of current count.
+	pub fn finish(&mut self) {
 		let started = *self.started.get_or_insert_with(Instant::now);
+		let elapsed = started.elapsed().as_secs_f64();
+		let prefix = if self.prefix.is_empty() { String::new() } else { format!("{} ", self.prefix) };
+		print_rolling!(
+			"{prefix}▕{}▏ 100% finished in {}",
+			str::repeat(&self.fill.to_string(), self.width),
+			Timelike(elapsed.ceil() as u32)
+		);
+		eprintln!();
+	}
+
+	fn render(&self, i: usize) {
+		let started = self.started.expect("render called before started was set");
 		let finished = i >= self.total;
 		let ratio = if self.total == 0 { 1.0 } else { (i as f64 / self.total as f64).min(1.0) };
 		let filled = (ratio * self.width as f64) as usize;
@@ -50,7 +76,7 @@ impl ProgressBar {
 		let eta = if finished {
 			let elapsed = started.elapsed().as_secs_f64();
 			format!(" finished in {}", Timelike(elapsed.ceil() as u32))
-		} else if i > 0 && !is_first {
+		} else if i > 0 {
 			let elapsed = started.elapsed().as_secs_f64();
 			let remaining = elapsed * (self.total.saturating_sub(i)) as f64 / i as f64;
 			format!(" ETA {}", Timelike(remaining.ceil() as u32))
@@ -65,9 +91,5 @@ impl ProgressBar {
 			str::repeat(&self.fill.to_string(), filled),
 			str::repeat(&self.empty.to_string(), empty)
 		);
-
-		if finished {
-			eprintln!();
-		}
 	}
 }
