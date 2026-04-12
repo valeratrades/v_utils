@@ -310,14 +310,6 @@ pub struct ComponentRegistry {
 	components: RefCell<ustr::UstrMap<Rc<UnsafeCell<dyn Component>>>>,
 	borrows: RefCell<HashSet<Ustr>>,
 }
-impl Default for ComponentRegistry {
-	fn default() -> Self {
-		Self {
-			components: RefCell::new(ustr::UstrMap::default()),
-			borrows: RefCell::new(HashSet::new()),
-		}
-	}
-}
 impl ComponentRegistry {
 	pub fn insert(&self, id: Ustr, component: Rc<UnsafeCell<dyn Component>>) {
 		self.components.borrow_mut().insert(id, component);
@@ -346,6 +338,15 @@ impl ComponentRegistry {
 	/// Releases a borrow on a component.
 	fn release_borrow(&self, id: &Ustr) {
 		self.borrows.borrow_mut().remove(id);
+	}
+}
+
+impl Default for ComponentRegistry {
+	fn default() -> Self {
+		Self {
+			components: RefCell::new(ustr::UstrMap::default()),
+			borrows: RefCell::new(HashSet::new()),
+		}
 	}
 }
 

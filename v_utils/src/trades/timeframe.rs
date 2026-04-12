@@ -82,7 +82,7 @@ impl FromStr for TimeframeDesignator {
 }
 
 /// Implemented over the number of milliseconds
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(derive_more::Add, Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, derive_more::Sub)]
 pub struct Timeframe(pub u64);
 impl Timeframe {
 	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {
@@ -188,6 +188,27 @@ impl From<&&str> for Timeframe {
 impl From<Duration> for Timeframe {
 	fn from(d: Duration) -> Self {
 		Timeframe(d.as_millis() as u64)
+	}
+}
+impl std::ops::Div for Timeframe {
+	type Output = u64;
+
+	fn div(self, rhs: Timeframe) -> u64 {
+		self.0 / rhs.0
+	}
+}
+impl std::ops::Div<u64> for Timeframe {
+	type Output = Timeframe;
+
+	fn div(self, rhs: u64) -> Timeframe {
+		Timeframe(self.0 / rhs)
+	}
+}
+impl std::ops::Mul<u64> for Timeframe {
+	type Output = Timeframe;
+
+	fn mul(self, rhs: u64) -> Timeframe {
+		Timeframe(self.0 * rhs)
 	}
 }
 

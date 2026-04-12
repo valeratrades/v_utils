@@ -96,7 +96,6 @@ impl Default for Config {
 		}
 	}
 }
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize, SettingsNested)]
 struct Database {
 	#[serde(default)]

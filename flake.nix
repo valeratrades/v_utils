@@ -23,20 +23,6 @@
         pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        github = v-utils.github {
-          inherit pkgs pname;
-          lastSupportedVersion = "nightly-2025-10-12";
-          langs = [ "rs" ];
-          jobs = {
-            default = true;
-            warnings.augment = [
-              { name = "rust-doc"; args = { package = "v_utils"; }; }
-            ];
-            warnings.exclude = [ "rust-doc" ];
-          };
-        };
-        readme = v-utils.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
-
         rs = v-utils.rs {
           inherit pkgs rust;
           build = {
@@ -48,6 +34,19 @@
             };
           };
         };
+        github = v-utils.github {
+          inherit pkgs pname;
+          lastSupportedVersion = "nightly-2025-10-12";
+          enable = true;
+          jobs = {
+            default = true;
+            warnings.augment = [
+              { name = "rust-doc"; args = { package = "v_utils"; }; }
+            ];
+            warnings.exclude = [ "rust-doc" ];
+          };
+        };
+        readme = v-utils.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
       in
       {
         devShells.default = with pkgs; mkShell {

@@ -179,7 +179,7 @@ impl From<&str> for Percent {
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentS(Percent);
 impl PercentS {
-	pub fn new(value: f64) -> Result<Self> {
+	pub fn try_new(value: f64) -> Result<Self> {
 		if !(-1.0..=1.0).contains(&value) {
 			bail!("PercentS value {value} is outside valid range [-1.0, 1.0]");
 		}
@@ -199,7 +199,7 @@ impl TryFrom<Percent> for PercentS {
 	type Error = eyre::Report;
 
 	fn try_from(p: Percent) -> Result<Self> {
-		Self::new(p.0)
+		Self::try_new(p.0)
 	}
 }
 
@@ -216,7 +216,7 @@ impl<'de> Deserialize<'de> for PercentS {
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct PercentU(Percent);
 impl PercentU {
-	pub fn new(value: f64) -> Result<Self> {
+	pub fn try_new(value: f64) -> Result<Self> {
 		if !(0.0..=1.0).contains(&value) {
 			bail!("PercentU value {value} is outside valid range [0.0, 1.0]");
 		}
@@ -236,7 +236,7 @@ impl TryFrom<Percent> for PercentU {
 	type Error = eyre::Report;
 
 	fn try_from(p: Percent) -> Result<Self> {
-		Self::new(p.0)
+		Self::try_new(p.0)
 	}
 }
 
@@ -340,15 +340,15 @@ mod tests {
 
 	#[test]
 	fn percent_s_range() {
-		assert!(PercentS::new(0.5).is_ok());
-		assert!(PercentS::new(-1.1).is_err());
-		assert!(PercentS::new(1.1).is_err());
+		assert!(PercentS::try_new(0.5).is_ok());
+		assert!(PercentS::try_new(-1.1).is_err());
+		assert!(PercentS::try_new(1.1).is_err());
 	}
 
 	#[test]
 	fn percent_u_range() {
-		assert!(PercentU::new(0.5).is_ok());
-		assert!(PercentU::new(-0.1).is_err());
-		assert!(PercentU::new(1.1).is_err());
+		assert!(PercentU::try_new(0.5).is_ok());
+		assert!(PercentU::try_new(-0.1).is_err());
+		assert!(PercentU::try_new(1.1).is_err());
 	}
 }

@@ -14,6 +14,10 @@ use crate::{other::Timelike, print_rolling};
 ///    pb.progress(i);
 ///}
 ///```
+/// # NB
+/// apparently, there is [this crate](https://github.com/console-rs/indicatif), which does what we do but better...
+/// Users should probably always prefer to use that instead.
+//Q: deprecate?
 #[derive(Builder, Clone, Debug)]
 pub struct ProgressBar {
 	total: usize,
