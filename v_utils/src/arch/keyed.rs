@@ -11,10 +11,10 @@ pub trait Keyed {
 		self.keys().parent
 	}
 }
+pub trait KeyBounds: Eq + Hash + Copy + Debug + PartialEq + Default {}
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, derive_new::new)]
 pub struct MyKey<Key: KeyBounds> {
 	pub id: Key,
 	pub parent: Option<Key>,
 }
-pub trait KeyBounds: Eq + Hash + Copy + Debug + PartialEq + Default {}
 impl<T: Eq + Hash + Copy + Debug + PartialEq + Default> KeyBounds for T {}
