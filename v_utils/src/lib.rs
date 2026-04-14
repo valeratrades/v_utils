@@ -6,6 +6,11 @@
 #![allow(incomplete_features)]
 #![feature(default_field_values)]
 
+#[cfg(all(feature = "wasm", feature = "full"))]
+compile_error!(
+	"This crate has features incompatible with each other. Do not use `--all-features`. Incompatible pairs: `wasm`+`async-io`, `wasm`+`full`, `wasm`+`xdg`. Use e.g. `--features lite` or `--features wasm` instead."
+);
+
 #[cfg(all(feature = "assert-wasm-compat", feature = "async-io"))]
 compile_error!("Feature `async-io` is not compatible with wasm.");
 

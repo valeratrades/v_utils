@@ -173,8 +173,9 @@ fn patch_legacy_v_prefix(path: &std::path::Path, content: &str) {
 		let trimmed = line.trim_start();
 		if trimmed.starts_with("#[deprecated") {
 			if let Some(since_version) = extract_since(trimmed) {
-				if let Some(corrected_version) = since_version.strip_prefix('v') {
+				if since_version.starts_with('v') {
 					// Strip the 'v' prefix
+					let corrected_version = &since_version[1..];
 					let new_line = line
 						.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
 						.replace(&format!("since=\"{}\"", since_version), &format!("since = \"{}\"", corrected_version));
@@ -218,7 +219,7 @@ fn update_since_in_file(path: &str, line_num: usize, old_line: &str, target_vers
 	let lines: Vec<&str> = content.lines().collect();
 
 	// Verify line still matches
-	if lines.get(line_num) != Some(&old_line) {
+	if lines.get(line_num) != Some(&old_line.as_ref()) {
 		return Ok(()); // Line changed, skip
 	}
 
