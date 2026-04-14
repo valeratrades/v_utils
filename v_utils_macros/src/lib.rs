@@ -11,6 +11,88 @@ use syn::{
 	parse_macro_input, token,
 };
 
+//TODO: add `#[own]` and `#[foreign]` variant attributes:
+// - `#[own]` on a variant: wraps with `#[error(transparent)]` + `#[from] #[backtrace]` (delegates backtrace to inner)
+// - `#[foreign]` on a variant: wraps the inner type in `Wrap<T>`, adds `#[error(transparent)]`,
+//   and generates a `From<T> for MyError` impl that calls `Wrap::from(e)` (captures both at ? site)
+
+/// Attribute macro that injects `backtrace: std::backtrace::Backtrace` and
+/// `spantrace: tracing_error::SpanTrace` into error types.
+///
+/// On a **struct**: injects both fields into the named fields.
+///
+/// On an **enum**: injects both fields into any variant marked `#[leaf]`.
+///
+/// # Example
+/// ```ignore
+/// #[wrap_err]
+/// #[derive(Debug, thiserror::Error)]
+/// #[error("something went wrong: {msg}")]
+/// pub struct MyLeafError {
+///     msg: String,
+/// }
+///
+/// #[wrap_err]
+/// #[derive(Debug, thiserror::Error)]
+/// pub enum MyError {
+///     #[leaf]
+///     #[error("bad value: {val}")]
+///     BadValue { val: String },
+///
+///     #[error(transparent)]
+///     Io(#[from] #[backtrace] std::io::Error),
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
+	let input = parse_macro_input!(item as syn::Item);
+
+	match input {
+		syn::Item::Struct(mut s) => {
+			match &mut s.fields {
+				syn::Fields::Named(fields) => {
+					let backtrace_field: syn::Field = syn::parse_quote! {
+						backtrace: std::backtrace::Backtrace
+					};
+					let spantrace_field: syn::Field = syn::parse_quote! {
+						spantrace: tracing_error::SpanTrace
+					};
+					fields.named.push(backtrace_field);
+					fields.named.push(spantrace_field);
+				}
+				_ => panic!("#[wrap_err] on a struct requires named fields"),
+			}
+			quote! { #s }.into()
+		}
+		syn::Item::Enum(mut e) => {
+			for variant in &mut e.variants {
+				let is_leaf = variant.attrs.iter().any(|a| a.path().is_ident("leaf"));
+				if !is_leaf {
+					continue;
+				}
+				// Remove the #[leaf] attribute — it's not a real Rust attribute
+				variant.attrs.retain(|a| !a.path().is_ident("leaf"));
+
+				match &mut variant.fields {
+					syn::Fields::Named(fields) => {
+						let backtrace_field: syn::Field = syn::parse_quote! {
+							backtrace: std::backtrace::Backtrace
+						};
+						let spantrace_field: syn::Field = syn::parse_quote! {
+							spantrace: tracing_error::SpanTrace
+						};
+						fields.named.push(backtrace_field);
+						fields.named.push(spantrace_field);
+					}
+					_ => panic!("#[leaf] variants must have named fields (use `VariantName {{ field: Type }}` syntax)"),
+				}
+			}
+			quote! { #e }.into()
+		}
+		_ => panic!("#[wrap_err] can only be applied to structs or enums"),
+	}
+}
+
 // helpers {{{
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///

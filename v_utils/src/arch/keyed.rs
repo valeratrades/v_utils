@@ -16,5 +16,5 @@ pub struct MyKey<Key: KeyBounds> {
 	pub id: Key,
 	pub parent: Option<Key>,
 }
-trait KeyBounds: Eq + Hash + Copy + Debug + PartialEq + Default {}
+pub trait KeyBounds: Eq + Hash + Copy + Debug + PartialEq + Default {}
 impl<T: Eq + Hash + Copy + Debug + PartialEq + Default> KeyBounds for T {}
