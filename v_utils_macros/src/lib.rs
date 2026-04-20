@@ -2482,6 +2482,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				#(#source_quotes)*
 
+				if self.yes {
+					map.insert(
+						"yes".to_owned(),
+						v_utils::__internal::config::Value::new(Some(&"flags".to_owned()), v_utils::__internal::config::ValueKind::Boolean(true)),
+					);
+				}
+
 				Ok(map)
 			}
 		}
