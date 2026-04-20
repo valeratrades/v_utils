@@ -54,47 +54,46 @@ full = [
 [dependencies]
 v_utils_macros = { path = "../v_utils_macros", version = "^2.11.38", optional = true }
 
-ahash = { workspace = true }
+ahash.workspace = true
 async-sse = { workspace = true, optional = true }
 bevy = { workspace = true, features = ["bevy_state", "bevy_ui"], optional = true }
+bon.workspace = true
 bytes = { workspace = true, optional = true }
 config = { workspace = true, optional = true }
 console-subscriber = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true, optional = true }
-const_format = { workspace = true }
-derive-new = { workspace = true }
+const_format.workspace = true
+derive-new.workspace = true
 derive_more = { workspace = true, features = ["full"] }
 dirs = { workspace = true, optional = true }
+eyre.workspace = true
+facet = { workspace = true, optional = true }
 facet-json = { workspace = true, optional = true }
 facet-toml = { workspace = true, optional = true }
-function_name = { workspace = true } # weird to include this without a feature flag, but this is a utils crate in the end
+function_name.workspace = true # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { workspace = true, optional = true }
-indexmap = { workspace = true }
+indexmap.workspace = true
 jiff = { workspace = true, features = ["serde"], optional = true }
 libc = { workspace = true, optional = true }
 macro-attr = { workspace = true, features = ["unstable-macros-1-1"] }
 miette = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rand_distr = { workspace = true, optional = true }
 reqwest = { workspace = true, features = ["json", "blocking", "stream", "rustls"], optional = true }
+serde.workspace = true
+serde_json.workspace = true
 strum = { workspace = true, features = ["derive"], optional = true }
-thiserror = { workspace = true }
+thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
+toml = { workspace = true, optional = true }
 tracing = { workspace = true, features = ["log", "std", "async-await"] }
 tracing-error = { workspace = true, optional = true }
 tracing-log = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", "env-filter"], optional = true }
-ustr = { workspace = true }
+ustr.workspace = true
 xdg = { workspace = true, optional = true }
-
-bon.workspace = true
-eyre.workspace = true
-facet = { workspace = true, optional = true }
-quote = { workspace = true, optional = true }
-serde.workspace = true
-serde_json.workspace = true
-toml = { workspace = true, optional = true }
 
 [dev-dependencies]
 v_utils_macros = { path = "../v_utils_macros" }
