@@ -1,0 +1,10 @@
+error: proc-macro derive panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/try_parse_variants_multi_field_variant.rs:4:17
+  |
+4 | #[derive(Debug, TryParseVariants)]
+  |                 ^^^^^^^^^^^^^^^^
+  |
+  = help: message: TryParseVariants: variant `Trailing` must be a single-field tuple variant
+
+error: aborting due to 1 previous error
+

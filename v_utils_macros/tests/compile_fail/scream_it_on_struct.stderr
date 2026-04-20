@@ -1,0 +1,10 @@
+error: proc-macro derive panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/scream_it_on_struct.rs:4:17
+  |
+4 | #[derive(Debug, ScreamIt)]
+  |                 ^^^^^^^^
+  |
+  = help: message: #[derive(ScreamIt)] can only be used on enums
+
+error: aborting due to 1 previous error
+

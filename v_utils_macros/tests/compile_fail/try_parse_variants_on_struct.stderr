@@ -1,0 +1,10 @@
+error: proc-macro derive panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/try_parse_variants_on_struct.rs:4:17
+  |
+4 | #[derive(Debug, TryParseVariants)]
+  |                 ^^^^^^^^^^^^^^^^
+  |
+  = help: message: TryParseVariants can only be derived on enums
+
+error: aborting due to 1 previous error
+

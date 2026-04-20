@@ -1,0 +1,10 @@
+error: custom attribute panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/wrap_err_on_tuple_struct.rs:4:1
+  |
+4 | #[wrap_err]
+  | ^^^^^^^^^^^
+  |
+  = help: message: #[wrap_err] on a struct requires named fields
+
+error: aborting due to 1 previous error
+

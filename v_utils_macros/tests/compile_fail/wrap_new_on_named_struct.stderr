@@ -1,0 +1,10 @@
+error: proc-macro derive panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/wrap_new_on_named_struct.rs:4:17
+  |
+4 | #[derive(Debug, WrapNew)]
+  |                 ^^^^^^^
+  |
+  = help: message: NewWrapper can only be derived for tuple structs with one field
+
+error: aborting due to 1 previous error
+
