@@ -52,8 +52,6 @@ full = [
 ]
 
 [dependencies]
-v_utils_macros = { workspace = true, optional = true }
-
 ahash.workspace = true
 async-sse = { workspace = true, optional = true }
 bevy = { workspace = true, features = ["bevy_state", "bevy_ui"], optional = true }
@@ -74,6 +72,7 @@ facet-toml = { workspace = true, optional = true }
 function_name.workspace = true # weird to include this without a feature flag, but this is a utils crate in the end
 futures = { workspace = true, optional = true }
 indexmap.workspace = true
+insta.workspace = true
 jiff = { workspace = true, features = ["serde"], optional = true }
 libc = { workspace = true, optional = true }
 macro-attr = { workspace = true, features = ["unstable-macros-1-1"] }
@@ -92,8 +91,7 @@ tracing = { workspace = true, features = ["log", "std", "async-await"] }
 tracing-error = { workspace = true, optional = true }
 tracing-log = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", "env-filter"], optional = true }
-ustr.workspace = true
-xdg = { workspace = true, optional = true }
-
-insta.workspace = true
 trybuild.workspace = true
+ustr.workspace = true
+v_utils_macros = { workspace = true, optional = true }
+xdg = { workspace = true, optional = true }
