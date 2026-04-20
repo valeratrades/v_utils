@@ -11,26 +11,35 @@ use syn::{
 	parse_macro_input, token,
 };
 
-//TODO: add `#[own]` and `#[foreign]` variant attributes:
-// - `#[own]` on a variant: wraps with `#[error(transparent)]` + `#[from] #[backtrace]` (delegates backtrace to inner)
-// - `#[foreign]` on a variant: wraps the inner type in `Wrap<T>`, adds `#[error(transparent)]`,
-//   and generates a `From<T> for MyError` impl that calls `Wrap::from(e)` (captures both at ? site)
+//TODO: add `#[own]` variant attribute:
+// - `#[own]` on a variant: for wrapping our own typed errors that already carry backtrace/spantrace.
+//   Generates `#[error(transparent)]` + `#[backtrace]` on the source field so provide() delegates
+//   to the inner error rather than capturing a new backtrace at the wrapping site.
 
 /// Attribute macro that injects `backtrace: std::backtrace::Backtrace` and
-/// `spantrace: tracing_error::SpanTrace` into error types.
+/// `spantrace: tracing_error::SpanTrace` into error types, and generates constructors
+/// that auto-capture both at the call site.
 ///
-/// On a **struct**: injects both fields into the named fields.
+/// ## Variant annotations (enum only)
 ///
-/// On an **enum**: injects both fields into any variant marked `#[leaf]`.
+/// - **`#[leaf]`** — a freshly constructed error with no source. Injects `backtrace`+`spantrace`
+///   fields and generates a `new_snake_case_name(…)` constructor.
 ///
-/// # Example
+/// - **`#[foreign]`** — wraps a foreign error type (`Foreign(T)` tuple variant).
+///   Converts to named fields `{ source: T, backtrace, spantrace }`, adds `#[error("{source}")]`
+///   if no `#[error(…)]` is already present, and generates a `From<T>` impl that captures
+///   both backtrace and spantrace at the conversion site (`?`).
+///
+/// ## Struct usage
+///
+/// Injects `backtrace`+`spantrace` into the named fields and generates `Self::new(…user_fields…)`.
+///
+/// ## Example
 /// ```ignore
 /// #[wrap_err]
 /// #[derive(Debug, thiserror::Error)]
 /// #[error("something went wrong: {msg}")]
-/// pub struct MyLeafError {
-///     msg: String,
-/// }
+/// pub struct MyLeafError { msg: String }
 ///
 /// #[wrap_err]
 /// #[derive(Debug, thiserror::Error)]
@@ -39,8 +48,12 @@ use syn::{
 ///     #[error("bad value: {val}")]
 ///     BadValue { val: String },
 ///
-///     #[error(transparent)]
-///     Io(#[from] #[backtrace] std::io::Error),
+///     #[foreign]
+///     Io(std::io::Error),
+///
+///     #[foreign]
+///     #[error("parse error: {source}")]
+///     Parse(std::num::ParseIntError),
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -90,36 +103,61 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 				ident: syn::Ident,
 				user_fields: Vec<(syn::Ident, syn::Type)>,
 			}
+			struct ForeignVariant {
+				ident: syn::Ident,
+				inner_type: syn::Type,
+			}
 			let mut leaf_variants: Vec<LeafVariant> = Vec::new();
+			let mut foreign_variants: Vec<ForeignVariant> = Vec::new();
 
 			for variant in &mut e.variants {
-				if !variant.attrs.iter().any(|a| a.path().is_ident("leaf")) {
-					continue;
-				}
-				variant.attrs.retain(|a| !a.path().is_ident("leaf"));
+				let is_leaf = variant.attrs.iter().any(|a| a.path().is_ident("leaf"));
+				let is_foreign = variant.attrs.iter().any(|a| a.path().is_ident("foreign"));
 
-				match &mut variant.fields {
-					syn::Fields::Named(fields) => {
-						let user_fields = fields.named.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
-						leaf_variants.push(LeafVariant {
-							ident: variant.ident.clone(),
-							user_fields,
-						});
-						fields.named.push(syn::parse_quote! { backtrace: ::std::backtrace::Backtrace });
-						fields.named.push(syn::parse_quote! { spantrace: ::tracing_error::SpanTrace });
+				if is_leaf {
+					variant.attrs.retain(|a| !a.path().is_ident("leaf"));
+					match &mut variant.fields {
+						syn::Fields::Named(fields) => {
+							let user_fields = fields.named.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
+							leaf_variants.push(LeafVariant {
+								ident: variant.ident.clone(),
+								user_fields,
+							});
+							fields.named.push(syn::parse_quote! { backtrace: ::std::backtrace::Backtrace });
+							fields.named.push(syn::parse_quote! { spantrace: ::tracing_error::SpanTrace });
+						}
+						syn::Fields::Unit => {
+							leaf_variants.push(LeafVariant {
+								ident: variant.ident.clone(),
+								user_fields: vec![],
+							});
+							variant.fields = syn::Fields::Named(syn::parse_quote! {{
+								backtrace: ::std::backtrace::Backtrace,
+								spantrace: ::tracing_error::SpanTrace
+							}});
+						}
+						_ => panic!("#[leaf] variants must have named or unit fields"),
 					}
-					syn::Fields::Unit => {
-						// Convert unit variant to named-field variant with just the two capture fields
-						leaf_variants.push(LeafVariant {
-							ident: variant.ident.clone(),
-							user_fields: vec![],
-						});
-						variant.fields = syn::Fields::Named(syn::parse_quote! {{
-							backtrace: ::std::backtrace::Backtrace,
-							spantrace: ::tracing_error::SpanTrace
-						}});
+				} else if is_foreign {
+					variant.attrs.retain(|a| !a.path().is_ident("foreign"));
+					let inner_type = match &variant.fields {
+						syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => fields.unnamed[0].ty.clone(),
+						_ => panic!("#[foreign] variants must be tuple variants with exactly one field, e.g. `Io(std::io::Error)`"),
+					};
+					foreign_variants.push(ForeignVariant {
+						ident: variant.ident.clone(),
+						inner_type: inner_type.clone(),
+					});
+					// Add #[error("{source}")] only if no #[error(...)] attribute is present
+					if !variant.attrs.iter().any(|a| a.path().is_ident("error")) {
+						variant.attrs.push(syn::parse_quote! { #[error("{source}")] });
 					}
-					_ => panic!("#[leaf] variants must have named or unit fields"),
+					// Convert tuple field to named fields: { source: T, backtrace, spantrace }
+					variant.fields = syn::Fields::Named(syn::parse_quote! {{
+						source: #inner_type,
+						backtrace: ::std::backtrace::Backtrace,
+						spantrace: ::tracing_error::SpanTrace
+					}});
 				}
 			}
 
@@ -139,11 +177,28 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 				}
 			});
 
+			let from_impls = foreign_variants.iter().map(|fv| {
+				let variant_ident = &fv.ident;
+				let inner_type = &fv.inner_type;
+				quote! {
+					impl From<#inner_type> for #name {
+						fn from(source: #inner_type) -> Self {
+							Self::#variant_ident {
+								source,
+								backtrace: ::std::backtrace::Backtrace::capture(),
+								spantrace: ::tracing_error::SpanTrace::capture(),
+							}
+						}
+					}
+				}
+			});
+
 			quote! {
 				#e
 				impl #name {
 					#(#constructors)*
 				}
+				#(#from_impls)*
 			}
 			.into()
 		}
