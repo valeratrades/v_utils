@@ -13,7 +13,8 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-fn main() {
+#[test]
+fn test() {
 	// Test that LiveSettings struct was generated
 	let flags = SettingsFlags {
 		config: None,

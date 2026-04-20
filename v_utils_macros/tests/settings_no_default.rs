@@ -10,7 +10,8 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-fn main() {
+#[test]
+fn test() {
 	// Verify the SettingsFlags struct was created
 	let flags = SettingsFlags {
 		config: None,

@@ -1,7 +1,7 @@
 #![feature(error_generic_member_access)]
 use v_utils_macros::wrap_err;
 
-// Struct case: #[wrap_err] injects backtrace + spantrace and generates new()
+// Struct case: injects backtrace + spantrace, generates new()
 #[wrap_err]
 #[derive(Debug, thiserror::Error)]
 #[error("leaf struct error: {msg}")]
@@ -9,7 +9,7 @@ pub struct LeafStructError {
 	msg: String,
 }
 
-// Enum case: #[leaf] variants get fields injected + new_variant_name() constructors generated
+// Enum case: named-field leaf, unit leaf, and non-leaf variants
 #[wrap_err]
 #[derive(Debug, thiserror::Error)]
 pub enum MyError {
@@ -18,20 +18,24 @@ pub enum MyError {
 	BadValue { val: String },
 
 	#[leaf]
-	#[error("missing field: {field}")]
-	MissingField { field: &'static str },
+	#[error("unit variant, no user fields")]
+	UnitVariant,
 
 	#[error(transparent)]
 	Io(#[from] std::io::Error),
 }
 
-fn main() {
+#[test]
+fn test() {
+	// Struct: new() auto-captures
 	let e = LeafStructError::new("oops".into());
 	println!("{e}");
 
+	// Enum named leaf: new_bad_value()
 	let e2 = MyError::new_bad_value("x".into());
 	println!("{e2}");
 
-	let e3 = MyError::new_missing_field("name");
+	// Enum unit leaf: new_unit_variant() — no args
+	let e3 = MyError::new_unit_variant();
 	println!("{e3}");
 }

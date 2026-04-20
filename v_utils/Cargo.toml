@@ -91,7 +91,6 @@ tracing = { workspace = true, features = ["log", "std", "async-await"] }
 tracing-error = { workspace = true, optional = true }
 tracing-log = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", "env-filter"], optional = true }
-trybuild.workspace = true
 ustr.workspace = true
 v_utils_macros = { workspace = true, optional = true }
 xdg = { workspace = true, optional = true }

@@ -37,7 +37,8 @@ pub struct Test {
 	#[private_value]
 	optional_port: Option<Port>,
 }
-fn main() {
+#[test]
+fn test() {
 	let toml_str = r#"
 	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
 	alpaca_secret = { env = "HOME" }

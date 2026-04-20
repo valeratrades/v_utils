@@ -36,13 +36,67 @@ serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 tracing-error.workspace = true
-trybuild.workspace = true
+ui_test.workspace = true
 v_utils = { workspace = true, features = ["full"] }
 
 [[test]]
-name = "tests"
-path = "tests/main.rs"
+name = "graphemics"
+path = "tests/graphemics.rs"
+
+[[test]]
+name = "from_vec_str"
+path = "tests/from_vec_str.rs"
+
+[[test]]
+name = "init_compact"
+path = "tests/init_compact.rs"
+
+[[test]]
+name = "my_config_primitives"
+path = "tests/my_config_primitives.rs"
+
+[[test]]
+name = "make_df"
+path = "tests/make_df.rs"
+
+[[test]]
+name = "wrap_new"
+path = "tests/wrap_new.rs"
+
+[[test]]
+name = "wrap_err"
+path = "tests/wrap_err.rs"
+
+[[test]]
+name = "scream_it"
+path = "tests/scream_it.rs"
+
+[[test]]
+name = "derive_settings"
+path = "tests/derive_settings.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "live_settings"
+path = "tests/live_settings.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "settings_no_default"
+path = "tests/settings_no_default.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "diff_from_defaults"
+path = "tests/diff_from_defaults.rs"
+required-features = ["cli"]
 
 [[test]]
 name = "test_unknown_field_warning"
 path = "tests/test_unknown_field_warning.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "compile_fail"
+path = "tests/compile_fail.rs"
+harness = false

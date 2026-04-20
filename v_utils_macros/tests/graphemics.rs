@@ -1,6 +1,7 @@
 use v_utils_macros::graphemics;
 
-fn main() {
+#[test]
+fn test() {
 	let mut gr = graphemics!(SAR);
 	//assert!(gr.len() == 3);
 	//assert!(gr.contains(&"SAR"));

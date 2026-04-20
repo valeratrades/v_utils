@@ -1,6 +1,7 @@
 use v_utils_macros::{CompactFormatNamed, OptionalFieldsFromVecStr, VecFieldsFromVecStr};
 
-fn main() {
+#[test]
+fn test() {
 	let o1 = OptionalProtocols::try_from(vec!["0.1", "ts:p-0.2", "0.3"]).unwrap();
 	assert_eq!(
 		o1,

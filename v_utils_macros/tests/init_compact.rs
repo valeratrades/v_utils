@@ -72,7 +72,8 @@ pub struct PositionParams {
 	pub count: u32,
 }
 
-fn main() {
+#[test]
+fn test() {
 	{
 		let ts = TrailingStop { percent: 0.5, some_other_field: 42 };
 		let ts_write = ts.to_string();

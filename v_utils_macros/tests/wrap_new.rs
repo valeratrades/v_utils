@@ -15,7 +15,8 @@ impl MockClient {
 #[derive(Debug, WrapNew)]
 pub struct MockBinance(pub MockClient);
 
-fn main() {
+#[test]
+fn test() {
 	let binance = MockBinance::new();
 	assert_debug_snapshot!(binance, @r#"
  MockBinance(

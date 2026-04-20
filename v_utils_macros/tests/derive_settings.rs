@@ -48,7 +48,8 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-fn main() {
+#[test]
+fn test() {
 	// Test that the Settings macro generates the expected SettingsFlags struct //HACK: relies on exact name
 	let flags = SettingsFlags {
 		config: None,

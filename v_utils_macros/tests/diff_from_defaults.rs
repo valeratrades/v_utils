@@ -5,7 +5,8 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
 
-fn main() {
+#[test]
+fn test() {
 	// Verify write_defaults method exists and has correct signature
 	let _write_defaults_exists: fn() -> Result<std::path::PathBuf, v_utils::__internal::eyre::Report> = Config::write_defaults;
 

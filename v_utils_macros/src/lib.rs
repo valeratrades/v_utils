@@ -108,7 +108,18 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 						fields.named.push(syn::parse_quote! { backtrace: ::std::backtrace::Backtrace });
 						fields.named.push(syn::parse_quote! { spantrace: ::tracing_error::SpanTrace });
 					}
-					_ => panic!("#[leaf] variants must have named fields (use `VariantName {{ field: Type }}` syntax)"),
+					syn::Fields::Unit => {
+						// Convert unit variant to named-field variant with just the two capture fields
+						leaf_variants.push(LeafVariant {
+							ident: variant.ident.clone(),
+							user_fields: vec![],
+						});
+						variant.fields = syn::Fields::Named(syn::parse_quote! {{
+							backtrace: ::std::backtrace::Backtrace,
+							spantrace: ::tracing_error::SpanTrace
+						}});
+					}
+					_ => panic!("#[leaf] variants must have named or unit fields"),
 				}
 			}
 
