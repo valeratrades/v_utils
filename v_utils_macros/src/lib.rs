@@ -49,45 +49,92 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 	match input {
 		syn::Item::Struct(mut s) => {
+			let name = s.ident.clone();
+			let vis = s.vis.clone();
+
+			let user_fields: Vec<(syn::Ident, syn::Type)> = match &s.fields {
+				syn::Fields::Named(fields) => fields.named.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect(),
+				_ => panic!("#[wrap_err] on a struct requires named fields"),
+			};
+
 			match &mut s.fields {
 				syn::Fields::Named(fields) => {
-					let backtrace_field: syn::Field = syn::parse_quote! {
-						backtrace: std::backtrace::Backtrace
-					};
-					let spantrace_field: syn::Field = syn::parse_quote! {
-						spantrace: tracing_error::SpanTrace
-					};
-					fields.named.push(backtrace_field);
-					fields.named.push(spantrace_field);
+					fields.named.push(syn::parse_quote! { backtrace: ::std::backtrace::Backtrace });
+					fields.named.push(syn::parse_quote! { spantrace: ::tracing_error::SpanTrace });
 				}
-				_ => panic!("#[wrap_err] on a struct requires named fields"),
+				_ => unreachable!(),
 			}
-			quote! { #s }.into()
+
+			let param_names: Vec<&syn::Ident> = user_fields.iter().map(|(n, _)| n).collect();
+			let param_types: Vec<&syn::Type> = user_fields.iter().map(|(_, t)| t).collect();
+
+			quote! {
+				#s
+				impl #name {
+					#vis fn new(#(#param_names: #param_types),*) -> Self {
+						Self {
+							#(#param_names,)*
+							backtrace: ::std::backtrace::Backtrace::capture(),
+							spantrace: ::tracing_error::SpanTrace::capture(),
+						}
+					}
+				}
+			}
+			.into()
 		}
 		syn::Item::Enum(mut e) => {
+			let name = e.ident.clone();
+			let vis = e.vis.clone();
+
+			struct LeafVariant {
+				ident: syn::Ident,
+				user_fields: Vec<(syn::Ident, syn::Type)>,
+			}
+			let mut leaf_variants: Vec<LeafVariant> = Vec::new();
+
 			for variant in &mut e.variants {
-				let is_leaf = variant.attrs.iter().any(|a| a.path().is_ident("leaf"));
-				if !is_leaf {
+				if !variant.attrs.iter().any(|a| a.path().is_ident("leaf")) {
 					continue;
 				}
-				// Remove the #[leaf] attribute — it's not a real Rust attribute
 				variant.attrs.retain(|a| !a.path().is_ident("leaf"));
 
 				match &mut variant.fields {
 					syn::Fields::Named(fields) => {
-						let backtrace_field: syn::Field = syn::parse_quote! {
-							backtrace: std::backtrace::Backtrace
-						};
-						let spantrace_field: syn::Field = syn::parse_quote! {
-							spantrace: tracing_error::SpanTrace
-						};
-						fields.named.push(backtrace_field);
-						fields.named.push(spantrace_field);
+						let user_fields = fields.named.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
+						leaf_variants.push(LeafVariant {
+							ident: variant.ident.clone(),
+							user_fields,
+						});
+						fields.named.push(syn::parse_quote! { backtrace: ::std::backtrace::Backtrace });
+						fields.named.push(syn::parse_quote! { spantrace: ::tracing_error::SpanTrace });
 					}
 					_ => panic!("#[leaf] variants must have named fields (use `VariantName {{ field: Type }}` syntax)"),
 				}
 			}
-			quote! { #e }.into()
+
+			let constructors = leaf_variants.iter().map(|lv| {
+				let variant_ident = &lv.ident;
+				let method_name = format_ident!("new_{}", AsSnakeCase(lv.ident.to_string()).to_string());
+				let param_names: Vec<&syn::Ident> = lv.user_fields.iter().map(|(n, _)| n).collect();
+				let param_types: Vec<&syn::Type> = lv.user_fields.iter().map(|(_, t)| t).collect();
+				quote! {
+					#vis fn #method_name(#(#param_names: #param_types),*) -> Self {
+						Self::#variant_ident {
+							#(#param_names,)*
+							backtrace: ::std::backtrace::Backtrace::capture(),
+							spantrace: ::tracing_error::SpanTrace::capture(),
+						}
+					}
+				}
+			});
+
+			quote! {
+				#e
+				impl #name {
+					#(#constructors)*
+				}
+			}
+			.into()
 		}
 		_ => panic!("#[wrap_err] can only be applied to structs or enums"),
 	}

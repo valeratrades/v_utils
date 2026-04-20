@@ -1,7 +1,7 @@
 #![feature(error_generic_member_access)]
 use v_utils_macros::wrap_err;
 
-// Struct case: #[wrap_err] injects backtrace + spantrace into a named-field struct
+// Struct case: #[wrap_err] injects backtrace + spantrace and generates new()
 #[wrap_err]
 #[derive(Debug, thiserror::Error)]
 #[error("leaf struct error: {msg}")]
@@ -9,7 +9,7 @@ pub struct LeafStructError {
 	msg: String,
 }
 
-// Enum case: #[leaf] variants get backtrace + spantrace injected; others untouched
+// Enum case: #[leaf] variants get fields injected + new_variant_name() constructors generated
 #[wrap_err]
 #[derive(Debug, thiserror::Error)]
 pub enum MyError {
@@ -26,24 +26,12 @@ pub enum MyError {
 }
 
 fn main() {
-	let e = LeafStructError {
-		msg: "oops".into(),
-		backtrace: std::backtrace::Backtrace::capture(),
-		spantrace: tracing_error::SpanTrace::capture(),
-	};
+	let e = LeafStructError::new("oops".into());
 	println!("{e}");
 
-	let e2 = MyError::BadValue {
-		val: "x".into(),
-		backtrace: std::backtrace::Backtrace::capture(),
-		spantrace: tracing_error::SpanTrace::capture(),
-	};
+	let e2 = MyError::new_bad_value("x".into());
 	println!("{e2}");
 
-	let e3 = MyError::MissingField {
-		field: "name",
-		backtrace: std::backtrace::Backtrace::capture(),
-		spantrace: tracing_error::SpanTrace::capture(),
-	};
+	let e3 = MyError::new_missing_field("name");
 	println!("{e3}");
 }
