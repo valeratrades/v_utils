@@ -1,8 +1,8 @@
 error: proc-macro derive panicked
- --> $DIR/v_utils_macros/tests/compile_fail/compact_format_map_duplicate_first_char.rs:5:17
+ --> $DIR/v_utils_macros/tests/compile_fail/compact_format_map_duplicate_first_char.rs:5:10
   |
-5 | #[derive(Debug, CompactFormatMap)]
-  |                 ^^^^^^^^^^^^^^^^
+5 | #[derive(CompactFormatMap, Debug)]
+  |          ^^^^^^^^^^^^^^^^
   |
   = help: message: Field names must have unique first characters
 

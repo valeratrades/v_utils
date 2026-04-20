@@ -11,11 +11,6 @@ use syn::{
 	parse_macro_input, token,
 };
 
-//TODO: add `#[own]` variant attribute:
-// - `#[own]` on a variant: for wrapping our own typed errors that already carry backtrace/spantrace.
-//   Generates `#[error(transparent)]` + `#[backtrace]` on the source field so provide() delegates
-//   to the inner error rather than capturing a new backtrace at the wrapping site.
-
 /// Attribute macro that injects `backtrace: std::backtrace::Backtrace` and
 /// `spantrace: tracing_error::SpanTrace` into error types, and generates constructors
 /// that auto-capture both at the call site.
@@ -29,6 +24,11 @@ use syn::{
 ///   Converts to named fields `{ source: T, backtrace, spantrace }`, adds `#[error("{source}")]`
 ///   if no `#[error(…)]` is already present, and generates a `From<T>` impl that captures
 ///   both backtrace and spantrace at the conversion site (`?`).
+///
+/// - **`#[own]`** — wraps one of our own typed errors that already carries backtrace/spantrace
+///   (`Own(InnerError)` tuple variant). Adds `#[error(transparent)]` to the variant (if absent)
+///   and `#[from]` + `#[backtrace]` to the inner field, so `thiserror`'s `provide()` delegates
+///   to the source rather than capturing a new backtrace at the wrapping site.
 ///
 /// ## Struct usage
 ///
@@ -54,6 +54,9 @@ use syn::{
 ///     #[foreign]
 ///     #[error("parse error: {source}")]
 ///     Parse(std::num::ParseIntError),
+///
+///     #[own]
+///     Inner(MyLeafError),
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -113,6 +116,7 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 			for variant in &mut e.variants {
 				let is_leaf = variant.attrs.iter().any(|a| a.path().is_ident("leaf"));
 				let is_foreign = variant.attrs.iter().any(|a| a.path().is_ident("foreign"));
+				let is_own = variant.attrs.iter().any(|a| a.path().is_ident("own"));
 
 				if is_leaf {
 					variant.attrs.retain(|a| !a.path().is_ident("leaf"));
@@ -158,6 +162,21 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 						backtrace: ::std::backtrace::Backtrace,
 						spantrace: ::tracing_error::SpanTrace
 					}});
+				} else if is_own {
+					variant.attrs.retain(|a| !a.path().is_ident("own"));
+					match &mut variant.fields {
+						syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
+							// Add #[error(transparent)] if no #[error(...)] is present
+							if !variant.attrs.iter().any(|a| a.path().is_ident("error")) {
+								variant.attrs.push(syn::parse_quote! { #[error(transparent)] });
+							}
+							// Add #[from] and #[backtrace] to the inner field so thiserror delegates
+							let field = &mut fields.unnamed[0];
+							field.attrs.push(syn::parse_quote! { #[from] });
+							field.attrs.push(syn::parse_quote! { #[backtrace] });
+						}
+						_ => panic!("#[own] variants must be tuple variants with exactly one field, e.g. `Inner(InnerError)`"),
+					}
 				}
 			}
 

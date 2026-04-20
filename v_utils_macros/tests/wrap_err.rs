@@ -9,7 +9,15 @@ pub struct LeafStructError {
 	msg: String,
 }
 
-// Enum case: named-field leaf, unit leaf, foreign wrap, and plain variant
+// Own: a typed inner error that already carries backtrace + spantrace
+#[wrap_err]
+#[derive(Debug, thiserror::Error)]
+#[error("inner: {reason}")]
+pub struct InnerError {
+	reason: String,
+}
+
+// Enum case: named-field leaf, unit leaf, foreign wrap, own wrap, and plain variant
 #[wrap_err]
 #[derive(Debug, thiserror::Error)]
 pub enum MyError {
@@ -29,6 +37,10 @@ pub enum MyError {
 	#[foreign]
 	#[error("parse failed: {source}")]
 	Parse(std::num::ParseIntError),
+
+	// Own: delegates to InnerError's backtrace via #[backtrace], transparent display
+	#[own]
+	Inner(InnerError),
 }
 
 #[test]
@@ -52,4 +64,24 @@ fn test() {
 	// Foreign with explicit format
 	let e5: MyError = "not_a_number".parse::<i32>().unwrap_err().into();
 	println!("{e5}");
+
+	// Own: From impl delegates (no new backtrace captured)
+	let inner = InnerError::new("oops".into());
+	let e6: MyError = inner.into();
+	// Display is transparent — shows InnerError's message
+	assert_eq!(e6.to_string(), "inner: oops");
+}
+
+fn produces_inner() -> Result<(), InnerError> {
+	Err(InnerError::new("from inner".into()))
+}
+
+#[test]
+fn test_own_question_mark() {
+	let result: Result<(), MyError> = (|| {
+		produces_inner()?;
+		Ok(())
+	})();
+	assert!(result.is_err());
+	assert_eq!(result.unwrap_err().to_string(), "inner: from inner");
 }
