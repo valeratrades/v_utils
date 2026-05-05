@@ -83,5 +83,6 @@ fn test_own_question_mark() {
 		Ok(())
 	})();
 	assert!(result.is_err());
-	assert_eq!(result.unwrap_err().to_string(), "inner: from inner");
+	//assert_eq!(result.unwrap_err().to_string(), "inner: from inner");
+	insta::assert_snapshot!(result.unwrap_err().to_string(), @"inner: from inner");
 }
