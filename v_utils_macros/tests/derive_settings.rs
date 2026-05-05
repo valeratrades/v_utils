@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
@@ -129,7 +131,7 @@ fn test() {
 	// Test loading config with unknown field (will warn to stderr)
 	eprintln!("\n=== Testing unknown field warning ===");
 	let flags_with_config = SettingsFlags {
-		config: Some(v_utils::io::ExpandedPath(std::path::PathBuf::from("tests/test_unknown_field.toml"))),
+		config: Some(v_utils::io::ExpandedPath(PathBuf::from("tests/test_unknown_field.toml"))),
 		yes: false,
 		host: None,
 		port: None,

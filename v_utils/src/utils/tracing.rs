@@ -2,7 +2,7 @@ use std::{
 	borrow::Cow,
 	fs::File,
 	io::{BufRead, BufReader, Seek, SeekFrom, Write},
-	path::PathBuf,
+	path::{Path, PathBuf},
 	sync::{
 		Arc, Mutex,
 		atomic::{AtomicBool, Ordering},
@@ -294,7 +294,7 @@ fn normalize_directives(s: &str) -> String {
 	s.lines().map(|l| l.trim()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect::<Vec<_>>().join(",")
 }
 
-fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&std::path::Path>, compiled_directives: Option<&'static str>) -> EnvFilter {
+fn filter_with_directives(logs_during_init: &mut Vec<Box<dyn FnOnce()>>, log_dir: Option<&Path>, compiled_directives: Option<&'static str>) -> EnvFilter {
 	static DEFAULT_DIRECTIVES: &str = "debug,hyper=info,hyper_util=info";
 
 	let log_dir_path = log_dir.map(|d| d.join(DIRECTIVES_FILENAME));

@@ -59,6 +59,8 @@ pub mod __internal {
 	#[cfg(feature = "xdg")]
 	pub extern crate xdg;
 
+	use std::path::PathBuf;
+
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
 	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
 
@@ -66,7 +68,7 @@ pub mod __internal {
 	#[derive(Debug, thiserror::Error)]
 	pub enum SettingsError {
 		#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
-		MultipleConfigs { paths: Vec<std::path::PathBuf> },
+		MultipleConfigs { paths: Vec<PathBuf> },
 		/// NB: no `#[from]`/`#[source]` — these are terminal error messages, not chain links.
 		/// With `#[from]`, thiserror sets `source()` to the inner type, which causes
 		/// `format_eyre_chain_for_user` to print the same message twice (once as root, once as wrapper).

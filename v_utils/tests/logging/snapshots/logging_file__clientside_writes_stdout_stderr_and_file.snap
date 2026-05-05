@@ -1,0 +1,48 @@
+---
+source: v_utils/tests/logging/file.rs
+expression: combined
+---
+===== STDOUT =====
+===== STDERR =====
+<TIMESTAMP>  WARN logging_emit: compute saw a slow path
+<TIMESTAMP>  WARN logging_emit: late teardown
+<TIMESTAMP> ERROR logging_emit: simulated terminal error
+===== FILE =====
+  <TIMESTAMP>  INFO v_utils::utils::tracing: Using log directives from `<TMPDIR>/v_utils/_log_directives`:
+info
+    at v_utils/src/utils/tracing.rs:327
+
+  <TIMESTAMP>  INFO v_utils::utils::tracing: Starting ...
+    at v_utils/src/utils/tracing.rs:200
+
+  <TIMESTAMP>  INFO logging_emit: boot starting
+    at v_utils/examples/logging_emit.rs:23
+    in logging_emit::boot
+
+  <TIMESTAMP>  INFO logging_emit: compute starting
+    at v_utils/examples/logging_emit.rs:32
+    in logging_emit::compute
+
+  <TIMESTAMP>  INFO logging_emit: phase A
+    at v_utils/examples/logging_emit.rs:33
+    in logging_emit::compute
+
+  <TIMESTAMP>  INFO logging_emit: phase B
+    at v_utils/examples/logging_emit.rs:34
+    in logging_emit::compute
+
+  <TIMESTAMP>  WARN logging_emit: compute saw a slow path
+    at v_utils/examples/logging_emit.rs:35
+    in logging_emit::compute
+
+  <TIMESTAMP>  INFO logging_emit: cleanup
+    at v_utils/examples/logging_emit.rs:46
+    in logging_emit::cleanup
+
+  <TIMESTAMP>  WARN logging_emit: late teardown
+    at v_utils/examples/logging_emit.rs:47
+    in logging_emit::cleanup
+
+  <TIMESTAMP> ERROR logging_emit: simulated terminal error
+    at v_utils/examples/logging_emit.rs:54
+    in logging_emit::cleanup

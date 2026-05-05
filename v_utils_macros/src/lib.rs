@@ -2,6 +2,8 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 extern crate proc_macro2;
+use std::path::PathBuf;
+
 use heck::{AsShoutySnakeCase, AsSnakeCase};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, quote_spanned};
@@ -2997,7 +2999,7 @@ fn strip_fields_in_brace(stream: TokenStream, defaults: &mut std::collections::H
 /// A helper function to know location of errors in `quote!{}`s
 fn _dbg_token_stream(expanded: proc_macro2::TokenStream, name: &str) -> proc_macro2::TokenStream {
 	let fpath = format!("/tmp/{}_expanded/{name}.rs", env!("CARGO_PKG_NAME"));
-	std::fs::create_dir_all(std::path::PathBuf::from(&fpath).parent().unwrap()).unwrap();
+	std::fs::create_dir_all(PathBuf::from(&fpath).parent().unwrap()).unwrap();
 	std::fs::write(&fpath, expanded.to_string()).unwrap();
 	std::process::Command::new("rustfmt").arg("--edition=2024").arg(&fpath).output().unwrap();
 	quote! {include!(#fpath); }

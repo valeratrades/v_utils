@@ -1,6 +1,8 @@
 //! Test that unknown fields in config files produce warnings.
 //! Run with: cargo test --package v_utils_macros test_unknown_field_warning -- --nocapture
 
+use std::path::PathBuf;
+
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
@@ -35,10 +37,7 @@ struct Database {
 fn test_unknown_field_warning() {
 	// Create the SettingsFlags pointing to our test config file
 	let flags = SettingsFlags {
-		config: Some(v_utils::io::ExpandedPath(std::path::PathBuf::from(concat!(
-			env!("CARGO_MANIFEST_DIR"),
-			"/tests/test_unknown_field.toml"
-		)))),
+		config: Some(v_utils::io::ExpandedPath(PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/test_unknown_field.toml")))),
 		yes: false,
 		host: None,
 		port: None,

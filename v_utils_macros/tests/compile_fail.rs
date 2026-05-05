@@ -1,5 +1,6 @@
+use std::path::{Path, PathBuf};
 fn main() -> ui_test::color_eyre::Result<()> {
-	let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+	let root = Path::new(env!("CARGO_MANIFEST_DIR"));
 	let proc_macro = find_proc_macro();
 
 	let mut config = ui_test::Config::rustc(root.join("tests/compile_fail"));
@@ -11,8 +12,8 @@ fn main() -> ui_test::color_eyre::Result<()> {
 	ui_test::run_tests(config)
 }
 
-fn find_proc_macro() -> std::path::PathBuf {
-	let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("CARGO_MANIFEST_DIR has parent");
+fn find_proc_macro() -> PathBuf {
+	let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("CARGO_MANIFEST_DIR has parent");
 	let deps_dir = workspace_root.join("target/debug/deps");
 
 	let mut candidates: Vec<_> = std::fs::read_dir(&deps_dir)

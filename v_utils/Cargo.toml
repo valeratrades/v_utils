@@ -94,3 +94,17 @@ tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", 
 ustr.workspace = true
 v_utils_macros = { workspace = true, optional = true }
 xdg = { workspace = true, optional = true }
+
+[dev-dependencies]
+color-eyre.workspace = true
+miette = { workspace = true, features = ["fancy"] }
+tempfile.workspace = true
+
+[[example]]
+name = "logging_emit"
+required-features = ["tracing", "xdg"]
+
+[[test]]
+name = "logging_file"
+path = "tests/logging/file.rs"
+required-features = ["tracing", "xdg"]
