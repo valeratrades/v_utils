@@ -226,8 +226,6 @@ pub fn wrap_err(_attr: TokenStream, item: TokenStream) -> TokenStream {
 		_ => panic!("#[wrap_err] can only be applied to structs or enums"),
 	}
 }
-
-// helpers {{{
 /// returns `Vec<String>` of the ways to refer to a struct name
 ///
 /// For some reason not a `HashSet`, no clue why.
@@ -857,6 +855,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// ```
 #[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives, default))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
+	let input = strip_field_default_values(input);
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 	let fields = if let syn::Data::Struct(syn::DataStruct {
@@ -1493,6 +1492,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 #[cfg(feature = "cli")]
 #[proc_macro_derive(Settings, attributes(settings))]
 pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
+	let input = strip_field_default_values(input);
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
@@ -2579,6 +2579,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 /// This generates CLI flags like `--database-url`, `--database-pool-min-size`, etc.
 #[proc_macro_derive(SettingsNested, attributes(settings))]
 pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
+	let input = strip_field_default_values(input);
 	let ast = parse_macro_input!(input as DeriveInput);
 	let name = &ast.ident;
 	let snake_case_name = AsSnakeCase(name.to_string()).to_string();
@@ -2737,6 +2738,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 #[cfg(feature = "cli")]
 #[proc_macro_derive(LiveSettings)]
 pub fn derive_live_settings(input: TokenStream) -> TokenStream {
+	let input = strip_field_default_values(input);
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
@@ -2869,6 +2871,61 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+/// Strip `field: T = expr` default-value tail from struct fields before handing the input to `syn`.
+///
+/// `syn` 2.0 does not yet understand `#![feature(default_field_values)]` (RFC 3681) syntax, so
+/// every macro that parses a user struct must scrub the `= expr` portion first. The token defaults
+/// are still seen by the compiler itself — only our macros' view is stripped — so the built-in
+/// `#[derive(Default)]` keeps producing the expected values.
+fn strip_field_default_values(input: TokenStream) -> TokenStream {
+	use proc_macro2::{Delimiter, Group, TokenStream as TS2, TokenTree};
+
+	fn process(stream: TS2, inside_struct_body: bool) -> TS2 {
+		let mut out = TS2::new();
+		let mut iter = stream.into_iter().peekable();
+		let mut saw_struct_or_enum = false;
+		let mut body_done = false;
+		while let Some(tt) = iter.next() {
+			match &tt {
+				TokenTree::Ident(id) if !inside_struct_body && (id == "struct" || id == "enum") => {
+					saw_struct_or_enum = true;
+					out.extend([tt]);
+				}
+				TokenTree::Group(g) if !inside_struct_body && saw_struct_or_enum && !body_done && g.delimiter() == Delimiter::Brace => {
+					let inner = process(g.stream(), true);
+					let mut ng = Group::new(Delimiter::Brace, inner);
+					ng.set_span(g.span());
+					out.extend([TokenTree::Group(ng)]);
+					body_done = true;
+				}
+				TokenTree::Group(g) if inside_struct_body && g.delimiter() == Delimiter::Brace => {
+					// Brace inside a field (variant struct fields): recurse.
+					let inner = process(g.stream(), true);
+					let mut ng = Group::new(Delimiter::Brace, inner);
+					ng.set_span(g.span());
+					out.extend([TokenTree::Group(ng)]);
+				}
+				TokenTree::Punct(p) if inside_struct_body && p.as_char() == '=' => {
+					// Drop `= <expr>` up to the next top-level `,` (or end of group).
+					while let Some(next) = iter.peek() {
+						if let TokenTree::Punct(p2) = next {
+							if p2.as_char() == ',' {
+								break;
+							}
+						}
+						iter.next();
+					}
+				}
+				_ => out.extend([tt]),
+			}
+		}
+		out
+	}
+
+	process(input.into(), false).into()
+}
+
+// helpers {{{
 /// cli-like string serialization format, with focus on compactness
 ///
 /// A brain-dead child format of mine. Idea is to make parameter specification as compact as possible. Very similar to how you would pass arguments to `clap`, but here all the args are [arg(short)] by default, and instead of spaces, equal signs, and separating names from values, we write `named_argument: my_value` as `-nmy_value`. Entries are separated by ':' char.
