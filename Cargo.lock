@@ -6408,7 +6408,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils_macros"
-version = "2.11.45"
+version = "2.11.46"
 dependencies = [
  "clap",
  "eyre",

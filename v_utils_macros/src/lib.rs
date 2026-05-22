@@ -855,7 +855,11 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// ```
 #[proc_macro_derive(MyConfigPrimitives, attributes(private_value, serde, settings, primitives, default))]
 pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
-	let input = strip_field_default_values(input);
+	// Strip `field: T = expr` defaults so `syn` can parse, *and* keep the
+	// expressions so we can wire them up as `#[serde(default = "...")]` on the
+	// synthesized Helper struct below — making the nightly `default_field_values`
+	// syntax work for deserialization too, not just for `#[derive(Default)]`.
+	let (input, inline_defaults) = strip_field_defaults(input);
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 	let fields = if let syn::Data::Struct(syn::DataStruct {
@@ -912,13 +916,20 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				false
 			});
 
-			// Extract #[default(expr)] value from SmartDefault if present
-			let smart_default_expr: Option<syn::Expr> = f.attrs.iter().find_map(|attr| {
+			// Two ways a default expression can reach us:
+			//   1. `#[default(expr)]` from SmartDefault (parsed as a `syn::Expr`)
+			//   2. `field: T = expr` from nightly `default_field_values` — stripped
+			//      before `syn` ever sees it, recovered via `inline_defaults`.
+			// SmartDefault wins if both are present (explicit attribute > implicit syntax).
+			let default_expr: Option<proc_macro2::TokenStream> = f.attrs.iter().find_map(|attr| {
 				if attr.path().is_ident("default") {
-					attr.parse_args::<syn::Expr>().ok()
+					attr.parse_args::<syn::Expr>().ok().map(|e| quote! { #e })
 				} else {
 					None
 				}
+			}).or_else(|| {
+				let field_name = ident.as_ref().expect("named fields only").to_string();
+				inline_defaults.get(&field_name).map(|s| s.parse::<proc_macro2::TokenStream>().expect("inline default expression must parse as tokens"))
 			});
 
 			// Check if field already has an explicit #[serde(default...)] attribute
@@ -937,9 +948,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives") && !attr.path().is_ident("default")
 			}).map(|attr| quote! { #attr }).collect();
 
-			// If field has #[default(expr)] from SmartDefault but no explicit #[serde(default)],
-			// generate a default function and inject #[serde(default = "fn_name")] for the Helper struct
-			if let (Some(expr), false) = (&smart_default_expr, has_serde_default) {
+			// If we recovered a default expression and the user didn't already write
+			// an explicit `#[serde(default)]`, generate `fn __default_<field>() -> Ty { expr }`
+			// and inject `#[serde(default = "...")]` onto the Helper field.
+			if let (Some(expr), false) = (&default_expr, has_serde_default) {
 				let fn_name = syn::Ident::new(&format!("__default_{}", ident.as_ref().unwrap()), proc_macro2::Span::call_site());
 				default_fns.push(quote! {
 					fn #fn_name() -> #ty { #expr }

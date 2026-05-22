@@ -13,7 +13,9 @@
 //! also needs `#[derive(Deserialize)]` would fail at serde's macro. The intended pattern is
 //! `#[derive(MyConfigPrimitives)]`, which synthesises the `Deserialize` impl on the user's
 //! behalf (via an internal helper) and is the entry point this crate's `Settings` /
-//! `LiveSettings` story is built on.
+//! `LiveSettings` story is built on. `MyConfigPrimitives` also threads the stripped
+//! `= expr` defaults into the synthesised Helper as `#[serde(default = "...")]`, so
+//! missing fields deserialize to the RFC-3681 default rather than erroring.
 
 #![feature(default_field_values)]
 
@@ -22,13 +24,9 @@ use v_utils_macros::{LiveSettings, MyConfigPrimitives, Settings};
 #[derive(Clone, Debug, Default, LiveSettings, MyConfigPrimitives, Settings)]
 #[allow(unused)]
 struct AppConfig {
-	#[serde(default)]
 	pub port: u16 = 50736,
-	#[serde(default)]
 	pub debug: bool = true,
-	#[serde(default)]
 	pub workers: usize = 8,
-	#[serde(default)]
 	pub maybe_threads: Option<u32> = None,
 }
 
@@ -39,6 +37,23 @@ fn defaults_take_effect() {
 	assert!(c.debug);
 	assert_eq!(c.workers, 8);
 	assert!(c.maybe_threads.is_none());
+}
+
+#[test]
+fn deserialize_uses_field_defaults() {
+	// Empty TOML — every field is missing. Without the macro propagating
+	// `= expr` defaults into serde, this would error with "missing field …".
+	let c: AppConfig = toml::from_str("").expect("empty config should deserialize via field defaults");
+	assert_eq!(c.port, 50736);
+	assert!(c.debug);
+	assert_eq!(c.workers, 8);
+	assert!(c.maybe_threads.is_none());
+
+	// Partial TOML — present fields override, absent fields fall back.
+	let c: AppConfig = toml::from_str("port = 9000\n").expect("partial config should deserialize");
+	assert_eq!(c.port, 9000);
+	assert!(c.debug);
+	assert_eq!(c.workers, 8);
 }
 
 #[test]
