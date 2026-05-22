@@ -868,7 +868,17 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
+	// Struct-level opt-out from auto-generated Serialize impl.
+	// Use when you need a custom `impl Serialize` (e.g. to mask secret fields).
+	let skip_serialize = ast.attrs.iter().any(|attr| {
+		if !attr.path().is_ident("primitives") {
+			return false;
+		}
+		attr.parse_args::<syn::Ident>().map(|i| i == "skip_serialize").unwrap_or(false)
+	});
+
 	let mut default_fns: Vec<proc_macro2::TokenStream> = Vec::new();
+	let mut serialize_field_calls: Vec<proc_macro2::TokenStream> = Vec::new();
 
 	let (helper_fields, init_fields): (Vec<_>, Vec<_>) = fields
 		.iter()
@@ -876,6 +886,16 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			let ident = &f.ident;
 			let ty = &f.ty;
 			let type_string = quote! { #ty }.to_string();
+
+			// Serialize: SecretString is masked, everything else serialized verbatim.
+			// `#[primitives(skip)]` doesn't affect Serialize — the field still round-trips.
+			let ident_str = ident.as_ref().expect("named fields only").to_string();
+			let ser_call = if type_string == "SecretString" || type_string == "Option < SecretString >" {
+				quote! { state.serialize_field(#ident_str, &"***")?; }
+			} else {
+				quote! { state.serialize_field(#ident_str, &self.#ident)?; }
+			};
+			serialize_field_calls.push(ser_call);
 
 			// Check if field has #[private_value] attribute
 			let has_private_value_attr = f.attrs.iter().any(|attr| {
@@ -1189,7 +1209,37 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			}
 		}
 	};
-	q.into()
+
+	// `MyConfigPrimitives` also provides a Serialize impl, because the regular
+	// `#[derive(serde::Serialize)]` cannot operate on structs that use the
+	// `pub field: T = default_value` syntax (stripped before our derive sees the AST).
+	//
+	// Opt out via `#[primitives(skip_serialize)]` if a custom impl is needed.
+	let name_str = name.to_string();
+	let field_count = serialize_field_calls.len();
+	let serialize_impl = if skip_serialize {
+		quote! {}
+	} else {
+		quote! {
+			impl v_utils::__internal::serde::Serialize for #name {
+				fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+				where
+					S: v_utils::__internal::serde::Serializer,
+				{
+					use v_utils::__internal::serde::ser::SerializeStruct as _;
+					let mut state = serializer.serialize_struct(#name_str, #field_count)?;
+					#(#serialize_field_calls)*
+					state.end()
+				}
+			}
+		}
+	};
+
+	let combined = quote! {
+		#q
+		#serialize_impl
+	};
+	combined.into()
 }
 #[proc_macro]
 pub fn make_df(input: TokenStream) -> TokenStream {
