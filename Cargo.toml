@@ -6,7 +6,7 @@ resolver = "1"
 
 [workspace.dependencies]
 v_utils = { path = "v_utils" }
-v_utils_macros = { path = "v_utils_macros", version = "2.11.43" }
+v_utils_macros = { path = "v_utils_macros", version = "2.11.44" }
 
 ahash = "0.8.12"
 async-sse = "5.1.0"
