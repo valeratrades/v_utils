@@ -1686,6 +1686,28 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					::v_utils::__internal::serde_json::to_value(&default_instance).ok()
 				}
 			}
+
+			/// Reports whether `T: Default` (via autoref specialization).
+			pub trait HasDefault<T> {
+				fn has_default(&self) -> bool;
+			}
+			impl<T> HasDefault<T> for &Wrapper<T> {
+				fn has_default(&self) -> bool { false }
+			}
+			impl<T: Default> HasDefault<T> for Wrapper<T> {
+				fn has_default(&self) -> bool { true }
+			}
+
+			/// Reports whether `T: serde::Serialize` (via autoref specialization).
+			pub trait HasSerialize<T> {
+				fn has_serialize(&self) -> bool;
+			}
+			impl<T> HasSerialize<T> for &Wrapper<T> {
+				fn has_serialize(&self) -> bool { false }
+			}
+			impl<T: ::v_utils::__internal::serde::Serialize> HasSerialize<T> for Wrapper<T> {
+				fn has_serialize(&self) -> bool { true }
+			}
 		}
 
 		impl #name {
@@ -2187,14 +2209,34 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			///
 			/// Returns `Err` if Default + Serialize are not implemented, or if file operations fail.
 			pub fn write_defaults() -> Result<std::path::PathBuf, ::v_utils::__internal::eyre::Report> {
-				use __settings_default_provider::GetDefaults as _;
+				use __settings_default_provider::{GetDefaults as _, HasDefault as _, HasSerialize as _};
 				use ::v_utils::__internal::eyre::WrapErr as _;
 
 				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
 				let defaults = (&wrapper).get_defaults()
-					.ok_or_else(|| ::v_utils::__internal::eyre::eyre!(
-						"write_defaults requires Default + Serialize to be implemented on the struct"
-					))?;
+					.ok_or_else(|| {
+						let has_default = (&wrapper).has_default();
+						let has_serialize = (&wrapper).has_serialize();
+						let missing: Vec<&'static str> = [
+							(!has_default).then_some("Default"),
+							(!has_serialize).then_some("serde::Serialize"),
+						].into_iter().flatten().collect();
+						let struct_name = std::any::type_name::<Self>();
+						if missing.is_empty() {
+							// Both traits present but serialization failed at runtime.
+							::v_utils::__internal::eyre::eyre!(
+								"write_defaults: `{}` implements Default + Serialize, but `serde_json::to_value(&Self::default())` returned Err (likely a Serialize impl rejecting some value, e.g. non-string map key or `f64::NAN`)",
+								struct_name
+							)
+						} else {
+							::v_utils::__internal::eyre::eyre!(
+								"write_defaults requires `{}` to `impl` {} (missing: {})",
+								struct_name,
+								missing.join(" + "),
+								missing.join(", "),
+							)
+						}
+					})?;
 
 				let app_name = env!("CARGO_PKG_NAME");
 
