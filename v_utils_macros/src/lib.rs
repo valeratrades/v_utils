@@ -921,6 +921,9 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			//   2. `field: T = expr` from nightly `default_field_values` — stripped
 			//      before `syn` ever sees it, recovered via `inline_defaults`.
 			// SmartDefault wins if both are present (explicit attribute > implicit syntax).
+			let smart_default_present = f.attrs.iter().any(|attr| attr.path().is_ident("default"));
+			let field_name_str = ident.as_ref().expect("named fields only").to_string();
+			let inline_default_present = inline_defaults.contains_key(&field_name_str);
 			let default_expr: Option<proc_macro2::TokenStream> = f.attrs.iter().find_map(|attr| {
 				if attr.path().is_ident("default") {
 					attr.parse_args::<syn::Expr>().ok().map(|e| quote! { #e })
@@ -928,9 +931,20 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 					None
 				}
 			}).or_else(|| {
-				let field_name = ident.as_ref().expect("named fields only").to_string();
-				inline_defaults.get(&field_name).map(|s| s.parse::<proc_macro2::TokenStream>().expect("inline default expression must parse as tokens"))
+				inline_defaults.get(&field_name_str).map(|s| s.parse::<proc_macro2::TokenStream>().expect("inline default expression must parse as tokens"))
 			});
+
+			// `#[private_value]` fields resolve via `PrivateValue` (string / `{ env = "..." }`)
+			// at deserialization. A typed default expression is incompatible: the generated
+			// `fn __default_<field>() -> Ty { expr }` would return `Ty` while the Helper field
+			// is `PrivateValue`, producing a confusing type error far from the source.
+			// Reject the combo at macro time with a clear message.
+			if has_private_value_attr && smart_default_present {
+				panic!("field `{field_name_str}`: `#[private_value]` is incompatible with `#[default(expr)]` (SmartDefault). Private values are resolved at deserialization from string / `{{ env = \"...\" }}`; supply the default through the environment instead.");
+			}
+			if has_private_value_attr && inline_default_present {
+				panic!("field `{field_name_str}`: `#[private_value]` is incompatible with the nightly `field: T = expr` default-field-value syntax. Private values are resolved at deserialization from string / `{{ env = \"...\" }}`; supply the default through the environment instead.");
+			}
 
 			// Check if field already has an explicit #[serde(default...)] attribute
 			let has_serde_default = f.attrs.iter().any(|attr| {

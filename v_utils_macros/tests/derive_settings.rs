@@ -167,7 +167,7 @@ fn test() {
 	eprintln!("=== End of unknown field warning test ===\n");
 }
 /// Settings struct with Default and Serialize for config auto-extension support.
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
+#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
 #[allow(unused)]
 struct AppConfig {
 	#[serde(default)]

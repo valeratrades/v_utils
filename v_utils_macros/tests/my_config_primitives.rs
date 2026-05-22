@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use secrecy::SecretString;
 use v_utils_macros::MyConfigPrimitives;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct Port(u16);
 
 impl std::str::FromStr for Port {

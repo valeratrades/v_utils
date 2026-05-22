@@ -1,0 +1,18 @@
+error: the `#[default]` attribute may only be used on unit enum variants
+ --> $DIR/v_utils_macros/tests/compile_fail/private_value_with_smart_default.rs:9:2
+  |
+9 |     #[default(42u16)]
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = help: consider a manual implementation of `Default`
+
+error: proc-macro derive panicked
+ --> $DIR/v_utils_macros/tests/compile_fail/private_value_with_smart_default.rs:6:33
+  |
+6 | #[derive(Clone, Debug, Default, MyConfigPrimitives)]
+  |                                 ^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: field `port`: `#[private_value]` is incompatible with `#[default(expr)]` (SmartDefault). Private values are resolved at deserialization from string / `{ env = "..." }`; supply the default through the environment instead.
+
+error: aborting due to 2 previous errors
+
