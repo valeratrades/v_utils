@@ -132,48 +132,115 @@ impl PartialOrd<f64> for Percent {
 	}
 }
 
-// Froms {{{
-impl From<f32> for Percent {
-	fn from(f: f32) -> Self {
-		Percent(f as f64)
-	}
-}
-impl From<isize> for Percent {
-	fn from(i: isize) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
-impl From<usize> for Percent {
-	fn from(i: usize) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
-impl From<i32> for Percent {
-	fn from(i: i32) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
-impl From<i64> for Percent {
-	fn from(i: i64) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
-impl From<u32> for Percent {
-	fn from(i: u32) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
-impl From<u64> for Percent {
-	fn from(i: u64) -> Self {
-		Percent(i as f64 / 100.)
-	}
-}
 impl From<&str> for Percent {
 	fn from(s: &str) -> Self {
 		Percent::from_str(s).unwrap()
 	}
 }
-//,}}}
+
+/// Generate numeric conversions for percent wrapper types.
+/// - `infallible $T`: emits `From<f32/isize/usize/i32/i64/u32/u64>` (f64 comes from the derive).
+/// - `fallible $T`: emits `TryFrom<f64/f32/isize/usize/i32/i64/u32/u64>` going through `$T::try_new`.
+/// Integer inputs are interpreted as raw percentage values (divided by 100); floats are treated as already-normalized.
+macro_rules! impl_numeric_conversions {
+	(infallible $T:ty) => {
+		impl From<f32> for $T {
+			fn from(v: f32) -> Self {
+				Self::from(v as f64)
+			}
+		}
+		impl From<isize> for $T {
+			fn from(v: isize) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+		impl From<usize> for $T {
+			fn from(v: usize) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+		impl From<i32> for $T {
+			fn from(v: i32) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+		impl From<i64> for $T {
+			fn from(v: i64) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+		impl From<u32> for $T {
+			fn from(v: u32) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+		impl From<u64> for $T {
+			fn from(v: u64) -> Self {
+				Self::from(v as f64 / 100.)
+			}
+		}
+	};
+	(fallible $T:ty) => {
+		impl TryFrom<f64> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: f64) -> Result<Self> {
+				Self::try_new(v)
+			}
+		}
+		impl TryFrom<f32> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: f32) -> Result<Self> {
+				Self::try_new(v as f64)
+			}
+		}
+		impl TryFrom<isize> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: isize) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+		impl TryFrom<usize> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: usize) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+		impl TryFrom<i32> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: i32) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+		impl TryFrom<i64> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: i64) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+		impl TryFrom<u32> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: u32) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+		impl TryFrom<u64> for $T {
+			type Error = eyre::Report;
+
+			fn try_from(v: u64) -> Result<Self> {
+				Self::try_new(v as f64 / 100.)
+			}
+		}
+	};
+}
+
+impl_numeric_conversions!(infallible Percent);
 
 /// Signed percent wrapper that guarantees values are in the range [-1.0, 1.0] (i.e., -100% to 100%)
 #[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize)]
@@ -202,6 +269,8 @@ impl TryFrom<Percent> for PercentS {
 		Self::try_new(p.0)
 	}
 }
+
+impl_numeric_conversions!(fallible PercentS);
 
 impl<'de> Deserialize<'de> for PercentS {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -239,6 +308,8 @@ impl TryFrom<Percent> for PercentU {
 		Self::try_new(p.0)
 	}
 }
+
+impl_numeric_conversions!(fallible PercentU);
 
 impl<'de> Deserialize<'de> for PercentU {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
