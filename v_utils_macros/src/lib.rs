@@ -1830,6 +1830,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						let conf_files_found: Vec<_> = locations.iter().filter(|p| p.exists()).collect();
 						match conf_files_found.len() {
 							0 => {
+								// No config file on disk: we still build from env + flags
+								// (every field has a default), but warn unconditionally so a
+								// missing/mislocated config never silently degrades to
+								// defaults. The same note rides `err_msg` as error context
+								// for the failure path below.
+								eprintln!("warning: no config file found for `{app_name}`, building from env + flags only. Searched in {locations:?}");
 								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
 								(builder.build()?, None, None)
 							},
