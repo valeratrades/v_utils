@@ -1463,8 +1463,13 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// - Supports multiple config formats: TOML, JSON, YAML, and Nix
 /// - Automatically searches for config files in XDG-compliant directories
 /// - Generates `SettingsFlags` struct for CLI integration with clap
-/// - Generates `SettingsCommand` enum (subcommands: `write-defaults`, `diff`) and
+/// - Generates `SettingsCommand` enum (subcommands: `write-defaults`, `diff`, `schema`) and
 ///   `handle_settings_command()` method for config management CLI
+/// - **JSON Schema export**: if the struct *also* derives `schemars::JsonSchema`, the `schema`
+///   subcommand / `write_schema()` emit a JSON Schema file editors can use for autocomplete,
+///   inline docs, and validation. Deriving `JsonSchema` is optional — without it the macro
+///   still compiles and `write_schema()` simply returns an informative `Err`. NB: schema-aware
+///   LSPs cover TOML/JSON/YAML configs; the default `.nix` config path has no schema tooling.
 /// - Uses facet for deserialization with detailed error messages
 /// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
 /// - **Auto-extension**: When a field is missing from the config, offers to extend the config file
@@ -1534,9 +1539,10 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///
 /// The macro generates:
 /// - `SettingsFlags` — clap-compatible struct for CLI flag overrides
-/// - `SettingsCommand` — clap subcommands for config management (`write-defaults`, `diff`)
+/// - `SettingsCommand` — clap subcommands for config management (`write-defaults`, `diff`, `schema`)
 /// - `fn try_build(flags: SettingsFlags) -> Result<Self>`
 /// - `fn write_defaults() -> Result<PathBuf>`
+/// - `fn write_schema() -> Result<PathBuf>` (requires `#[derive(JsonSchema)]`)
 /// - `fn diff_from_defaults(&self) -> Option<String>`
 /// - `fn handle_settings_command(cmd: SettingsCommand, flags: SettingsFlags) -> !`
 ///
@@ -1783,6 +1789,31 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 			impl<T: ::v_utils::__internal::serde::Serialize> HasSerialize<T> for Wrapper<T> {
 				fn has_serialize(&self) -> bool { true }
+			}
+
+			/// Produces the JSON Schema for `T` as a pretty-printed string — but only
+			/// when `T: schemars::JsonSchema`. Falls back to `None` otherwise via
+			/// autoref specialization, so deriving `JsonSchema` stays optional.
+			pub trait GetSchema<T> {
+				fn get_schema(&self) -> Option<String>;
+			}
+
+			/// Fallback impl for reference - returns None (lower priority in method resolution)
+			impl<T> GetSchema<T> for &Wrapper<T> {
+				fn get_schema(&self) -> Option<String> {
+					None
+				}
+			}
+
+			/// Impl for types that implement JsonSchema (higher priority)
+			impl<T> GetSchema<T> for Wrapper<T>
+			where
+				T: ::v_utils::__internal::schemars::JsonSchema,
+			{
+				fn get_schema(&self) -> Option<String> {
+					let schema = ::v_utils::__internal::schemars::schema_for!(T);
+					::v_utils::__internal::serde_json::to_string_pretty(&schema).ok()
+				}
 			}
 		}
 
@@ -2284,6 +2315,39 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				(&wrapper).compute_diff(self)
 			}
 
+			/// Writes the JSON Schema for this settings struct to `<config_dir>/<app_name>.schema.json`.
+			///
+			/// Editors with a JSON/TOML/YAML schema-aware LSP can then consume this file for
+			/// autocomplete, inline docs, and validation of the config.
+			///
+			/// Returns `Err` if the struct does not `impl schemars::JsonSchema`
+			/// (i.e. it does not also `#[derive(JsonSchema)]`), or if file operations fail.
+			pub fn write_schema() -> Result<std::path::PathBuf, ::v_utils::__internal::eyre::Report> {
+				use __settings_default_provider::GetSchema as _;
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+				let schema = (&wrapper).get_schema()
+					.ok_or_else(|| ::v_utils::__internal::eyre::eyre!(
+						"write_schema requires `{}` to `#[derive(schemars::JsonSchema)]`",
+						std::any::type_name::<Self>(),
+					))?;
+
+				let app_name = env!("CARGO_PKG_NAME");
+
+				#xdg_conf_dir
+
+				let schema_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.schema.json"));
+				if let Some(parent) = schema_path.parent() {
+					std::fs::create_dir_all(parent)
+						.wrap_err_with(|| format!("Failed to create config directory: {}", parent.display()))?;
+				}
+				std::fs::write(&schema_path, schema)
+					.wrap_err_with(|| format!("Failed to write schema file: {}", schema_path.display()))?;
+
+				Ok(schema_path)
+			}
+
 			/// Writes default values to the config file for fields that aren't already specified.
 			///
 			/// If the config file doesn't exist, creates a new one at `~/.config/<app_name>.nix`
@@ -2627,6 +2691,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			WriteDefaults,
 			/// Show settings that differ from their default values
 			Diff,
+			/// Write the JSON Schema for the config to `<config_dir>/<app_name>.schema.json` (requires `#[derive(JsonSchema)]`)
+			Schema,
 		}
 	};
 
@@ -2661,6 +2727,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						}
 						std::process::exit(0);
 					}
+					SettingsCommand::Schema => match Self::write_schema() {
+						Ok(path) => {
+							println!("Wrote schema to: {}", path.display());
+							std::process::exit(0);
+						}
+						Err(e) => {
+							eprintln!("Failed to write schema: {e}");
+							std::process::exit(1);
+						}
+					},
 				}
 			}
 		}

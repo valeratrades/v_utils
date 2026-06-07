@@ -31,8 +31,10 @@ syn = { workspace = true, features = ["full", "extra-traits"] }
 clap = { workspace = true, features = ["derive"] }
 insta.workspace = true
 polars = { workspace = true, features = ["fmt"] } # pains me to add this entire dep for one test. Maybe I'll figure out a way to get rid of this at some point.
+schemars.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 tracing-error.workspace = true
@@ -89,6 +91,16 @@ required-features = ["cli"]
 [[test]]
 name = "diff_from_defaults"
 path = "tests/diff_from_defaults.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "settings_schema"
+path = "tests/settings_schema.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "settings_schema_optional"
+path = "tests/settings_schema_optional.rs"
 required-features = ["cli"]
 
 [[test]]
