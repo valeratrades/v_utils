@@ -1463,13 +1463,18 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// - Supports multiple config formats: TOML, JSON, YAML, and Nix
 /// - Automatically searches for config files in XDG-compliant directories
 /// - Generates `SettingsFlags` struct for CLI integration with clap
-/// - Generates `SettingsCommand` enum (subcommands: `write-defaults`, `diff`, `schema`) and
+/// - Generates `SettingsCommand` enum (subcommands: `write-defaults`, `diff`, `schema`, `module`) and
 ///   `handle_settings_command()` method for config management CLI
 /// - **JSON Schema export**: if the struct *also* derives `schemars::JsonSchema`, the `schema`
 ///   subcommand / `write_schema()` emit a JSON Schema file editors can use for autocomplete,
 ///   inline docs, and validation. Deriving `JsonSchema` is optional — without it the macro
-///   still compiles and `write_schema()` simply returns an informative `Err`. NB: schema-aware
-///   LSPs cover TOML/JSON/YAML configs; the default `.nix` config path has no schema tooling.
+///   still compiles and `write_schema()` simply returns an informative `Err`. Schema-aware
+///   LSPs cover TOML/JSON/YAML configs.
+/// - **Nix module export**: also gated on `JsonSchema`, the `module` subcommand / `write_module()`
+///   emit a NixOS-style options module (`{ lib, ... }: { options = { … }; }`) declaring the exact
+///   field names and types. A `.nix` config can `import`/`evalModules` it for eval-time type
+///   checking and editor awareness (`nixd`/`nil`). Options-only: it bakes in no value-defaults
+///   (Rust's `Default` owns those); the config still sets every value itself.
 /// - Uses facet for deserialization with detailed error messages
 /// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
 /// - **Auto-extension**: When a field is missing from the config, offers to extend the config file
@@ -1543,6 +1548,7 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// - `fn try_build(flags: SettingsFlags) -> Result<Self>`
 /// - `fn write_defaults() -> Result<PathBuf>`
 /// - `fn write_schema() -> Result<PathBuf>` (requires `#[derive(JsonSchema)]`)
+/// - `fn write_module() -> Result<PathBuf>` (requires `#[derive(JsonSchema)]`)
 /// - `fn diff_from_defaults(&self) -> Option<String>`
 /// - `fn handle_settings_command(cmd: SettingsCommand, flags: SettingsFlags) -> !`
 ///
@@ -2348,6 +2354,45 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				Ok(schema_path)
 			}
 
+			/// Writes a NixOS-style options module for this settings struct to
+			/// `<config_dir>/<app_name>.module.nix`.
+			///
+			/// The module declares the exact field names and types (options-only, no value
+			/// defaults — those stay in Rust's `Default`). A config can `import` / `evalModules`
+			/// it to get eval-time type checking and editor awareness (`nixd`/`nil`) while still
+			/// setting all the values itself.
+			///
+			/// Returns `Err` if the struct does not `impl schemars::JsonSchema`
+			/// (i.e. it does not also `#[derive(JsonSchema)]`), or if file operations fail.
+			pub fn write_module() -> Result<std::path::PathBuf, ::v_utils::__internal::eyre::Report> {
+				use __settings_default_provider::GetSchema as _;
+				use ::v_utils::__internal::eyre::WrapErr as _;
+
+				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+				let schema_str = (&wrapper).get_schema()
+					.ok_or_else(|| ::v_utils::__internal::eyre::eyre!(
+						"write_module requires `{}` to `#[derive(schemars::JsonSchema)]`",
+						std::any::type_name::<Self>(),
+					))?;
+				let schema: ::v_utils::__internal::serde_json::Value = ::v_utils::__internal::serde_json::from_str(&schema_str)
+					.wrap_err("schemars produced invalid JSON")?;
+				let module = ::v_utils::__internal::schema_to_nix_module(&schema)?;
+
+				let app_name = env!("CARGO_PKG_NAME");
+
+				#xdg_conf_dir
+
+				let module_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.module.nix"));
+				if let Some(parent) = module_path.parent() {
+					std::fs::create_dir_all(parent)
+						.wrap_err_with(|| format!("Failed to create config directory: {}", parent.display()))?;
+				}
+				std::fs::write(&module_path, module)
+					.wrap_err_with(|| format!("Failed to write module file: {}", module_path.display()))?;
+
+				Ok(module_path)
+			}
+
 			/// Writes default values to the config file for fields that aren't already specified.
 			///
 			/// If the config file doesn't exist, creates a new one at `~/.config/<app_name>.nix`
@@ -2693,6 +2738,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			Diff,
 			/// Write the JSON Schema for the config to `<config_dir>/<app_name>.schema.json` (requires `#[derive(JsonSchema)]`)
 			Schema,
+			/// Write a NixOS-style options module to `<config_dir>/<app_name>.module.nix` for `import`/`evalModules` (requires `#[derive(JsonSchema)]`)
+			Module,
 		}
 	};
 
@@ -2734,6 +2781,16 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						}
 						Err(e) => {
 							eprintln!("Failed to write schema: {e}");
+							std::process::exit(1);
+						}
+					},
+					SettingsCommand::Module => match Self::write_module() {
+						Ok(path) => {
+							println!("Wrote module to: {}", path.display());
+							std::process::exit(0);
+						}
+						Err(e) => {
+							eprintln!("Failed to write module: {e}");
 							std::process::exit(1);
 						}
 					},

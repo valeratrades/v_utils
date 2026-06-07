@@ -104,6 +104,11 @@ path = "tests/settings_schema_optional.rs"
 required-features = ["cli"]
 
 [[test]]
+name = "settings_module"
+path = "tests/settings_module.rs"
+required-features = ["cli"]
+
+[[test]]
 name = "test_unknown_field_warning"
 path = "tests/test_unknown_field_warning.rs"
 required-features = ["cli"]
