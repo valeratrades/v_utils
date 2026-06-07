@@ -10,6 +10,8 @@
 //! is covered by `settings_schema_optional.rs`'s sibling `write_schema` assertion; both share the
 //! same `GetSchema` autoref gate, so one negative test suffices for the gate itself.)
 
+use std::path::{Path, PathBuf};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use v_utils_macros::{Settings, SettingsNested};
@@ -38,7 +40,7 @@ struct ModuleConfig {
 }
 
 /// Write the module into a throwaway `$XDG_CONFIG_HOME` and return (its path, its contents).
-fn emit_module() -> (std::path::PathBuf, String) {
+fn emit_module() -> (PathBuf, String) {
 	let tmp = tempfile::tempdir().unwrap();
 	// `write_module` (non-xdg branch) resolves the config dir via `xdg_config_fallback`,
 	// which honors `$XDG_CONFIG_HOME`. SAFETY: single-threaded test.
@@ -82,7 +84,7 @@ fn nix_available() -> bool {
 
 /// Evaluate `<module> + <config>` through `lib.evalModules` and report whether it type-checks.
 /// `config_body` is the Nix attrset body the user would write (without the surrounding braces).
-fn eval_check(module_path: &std::path::Path, config_body: &str) -> bool {
+fn eval_check(module_path: &Path, config_body: &str) -> bool {
 	let expr = format!(
 		r#"let pkgs = import <nixpkgs> {{}}; cfg = (pkgs.lib.evalModules {{ modules = [ {module} ({{ ... }}: {{ {body} }}) ]; }}).config; in builtins.deepSeq cfg true"#,
 		module = module_path.display(),

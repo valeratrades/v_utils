@@ -113,8 +113,10 @@ pub mod __internal {
 	/// in a `lib.evalModules { modules = [ ./this.nix ./user-config.nix ]; }` evaluation.
 	#[cfg(feature = "cli")]
 	pub fn schema_to_nix_module(schema: &crate::__internal::serde_json::Value) -> Result<String, crate::__internal::eyre::Report> {
-		use crate::__internal::eyre::{eyre, OptionExt as _};
-		use crate::__internal::serde_json::Value;
+		use crate::__internal::{
+			eyre::{OptionExt as _, eyre},
+			serde_json::Value,
+		};
 
 		let defs = schema.get("$defs").and_then(Value::as_object);
 
@@ -182,8 +184,11 @@ pub mod __internal {
 				// An object with no declared properties is a degenerate (empty) submodule.
 				return Ok("{ }".to_string());
 			};
-			let required: std::collections::HashSet<&str> =
-				obj.get("required").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+			let required: std::collections::HashSet<&str> = obj
+				.get("required")
+				.and_then(Value::as_array)
+				.map(|a| a.iter().filter_map(Value::as_str).collect())
+				.unwrap_or_default();
 
 			let indent = "  ".repeat(depth);
 			let inner_indent = "  ".repeat(depth + 1);
@@ -208,7 +213,7 @@ pub mod __internal {
 		}
 
 		if schema.get("type").and_then(Value::as_str) != Some("object") {
-			return Err(eyre!("top-level settings schema must be an object, got {:?}", schema.get("type")));
+			bail!("top-level settings schema must be an object, got {:?}", schema.get("type"));
 		}
 		let options = options_block(schema, defs, 1)?;
 		Ok(format!("{{ lib, ... }}:\n{{\n  options = {options};\n}}\n"))
