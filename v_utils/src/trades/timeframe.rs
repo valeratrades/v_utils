@@ -171,6 +171,20 @@ impl Serialize for Timeframe {
 		serializer.serialize_str(&self.to_string())
 	}
 }
+// A `Timeframe` is (de)serialized as a string like "1m"/"5s", so its JSON Schema is a string.
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Timeframe {
+	fn schema_name() -> std::borrow::Cow<'static, str> {
+		"Timeframe".into()
+	}
+
+	fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+		schemars::json_schema!({
+			"type": "string",
+			"description": "A timeframe like \"1m\", \"5s\", \"4h\", \"1d\".",
+		})
+	}
+}
 
 /// # Panics
 impl From<&str> for Timeframe {

@@ -51,7 +51,7 @@ pub mod __internal {
 	pub extern crate facet_json;
 	#[cfg(feature = "cli")]
 	pub extern crate facet_toml;
-	#[cfg(feature = "cli")]
+	#[cfg(feature = "schemars")]
 	pub extern crate schemars;
 	#[cfg(feature = "cli")]
 	pub extern crate serde_json;
@@ -114,7 +114,7 @@ pub mod __internal {
 	#[cfg(feature = "cli")]
 	pub fn schema_to_nix_module(schema: &crate::__internal::serde_json::Value) -> Result<String, crate::__internal::eyre::Report> {
 		use crate::__internal::{
-			eyre::{OptionExt as _, eyre},
+			eyre::{OptionExt as _, bail, eyre},
 			serde_json::Value,
 		};
 
@@ -136,7 +136,7 @@ pub mod __internal {
 		fn nix_type(node: &Value, defs: Option<&serde_json::Map<String, Value>>, depth: usize) -> Result<String, crate::__internal::eyre::Report> {
 			let node = resolve(node, defs)?;
 
-			// `Option<T>` is encoded as `"type": ["T", "null"]`. Peel the null and wrap in nullOr.
+			// `Option<primitive>` is encoded as `"type": ["T", "null"]`. Peel the null and wrap in nullOr.
 			if let Some(arr) = node.get("type").and_then(Value::as_array) {
 				let non_null: Vec<&Value> = arr.iter().filter(|t| t.as_str() != Some("null")).collect();
 				let inner = non_null.first().ok_or_eyre("type array with only null")?;
@@ -144,6 +144,28 @@ pub mod __internal {
 				let mut single = node.clone();
 				single["type"] = (*inner).clone();
 				return Ok(format!("lib.types.nullOr {}", nix_type(&single, defs, depth)?));
+			}
+
+			// `Option<NamedType>` (and other unions) are encoded as `anyOf`/`oneOf` lists of
+			// subschemas. A `{ "type": "null" }` branch means nullability; the rest are real
+			// alternatives → `nullOr` for one survivor, `either`/`oneOf` for several.
+			if let Some(branches) = node.get("anyOf").or_else(|| node.get("oneOf")).and_then(Value::as_array) {
+				let nullable = branches.iter().any(|b| b.get("type").and_then(Value::as_str) == Some("null"));
+				let alts: Vec<&Value> = branches.iter().filter(|b| b.get("type").and_then(Value::as_str) != Some("null")).collect();
+				let inner = match alts.as_slice() {
+					[] => bail!("anyOf/oneOf with only a null branch"),
+					[one] => nix_type(one, defs, depth)?,
+					many => {
+						let rendered = many.iter().map(|b| nix_type(b, defs, depth)).collect::<Result<Vec<_>, _>>()?;
+						// `either` is binary; `oneOf` takes a list and fits 3+ alternatives.
+						if rendered.len() == 2 {
+							format!("lib.types.either {} {}", rendered[0], rendered[1])
+						} else {
+							format!("lib.types.oneOf [ {} ]", rendered.join(" "))
+						}
+					}
+				};
+				return Ok(if nullable { format!("lib.types.nullOr {inner}") } else { inner });
 			}
 
 			// Unit-variant enums: `"type": "string", "enum": [...]`.
@@ -177,6 +199,12 @@ pub mod __internal {
 			}
 		}
 
+		/// Escape a string for a Nix double-quoted literal: backslash, quote, the `${`
+		/// interpolation opener, and newlines (kept legal but on one line).
+		fn nix_escape(s: &str) -> String {
+			s.replace('\\', "\\\\").replace('"', "\\\"").replace("${", "\\${").replace('\n', "\\n")
+		}
+
 		/// Build the `{ <field> = lib.mkOption {...}; ... }` block for an object node.
 		fn options_block(obj: &Value, defs: Option<&serde_json::Map<String, Value>>, depth: usize) -> Result<String, crate::__internal::eyre::Report> {
 			let properties = obj.get("properties").and_then(Value::as_object);
@@ -184,11 +212,6 @@ pub mod __internal {
 				// An object with no declared properties is a degenerate (empty) submodule.
 				return Ok("{ }".to_string());
 			};
-			let required: std::collections::HashSet<&str> = obj
-				.get("required")
-				.and_then(Value::as_array)
-				.map(|a| a.iter().filter_map(Value::as_str).collect())
-				.unwrap_or_default();
 
 			let indent = "  ".repeat(depth);
 			let inner_indent = "  ".repeat(depth + 1);
@@ -196,15 +219,17 @@ pub mod __internal {
 			for (field, node) in properties {
 				let ty = nix_type(node, defs, depth + 1)?;
 				let description = resolve(node, defs)?.get("description").and_then(Value::as_str);
-				// Optional fields (absent from `required`, i.e. `Option<T>`) get `default = null;`
-				// so the user may omit them; required fields stay mandatory (no default).
-				let is_optional = !required.contains(field.as_str());
 
 				let mut parts = vec![format!("type = {ty};")];
 				if let Some(desc) = description {
-					parts.push(format!("description = \"{}\";", desc.replace('\\', "\\\\").replace('"', "\\\"")));
+					parts.push(format!("description = \"{}\";", nix_escape(desc)));
 				}
-				if is_optional {
+				// `default = null;` is emitted iff the type actually admits null (`nullOr …`, i.e.
+				// an `Option<T>` field) — so the field may be omitted. We do NOT key this off the
+				// schema's `required` array: a `#[serde(default)]` struct marks every field
+				// optional there, but a `bool`/`int` option still rejects `null`, so a blanket
+				// null-default would be a Nix type error.
+				if ty.starts_with("lib.types.nullOr") {
 					parts.push("default = null;".to_string());
 				}
 				lines.push(format!("{inner_indent}{field} = lib.mkOption {{ {} }};", parts.join(" ")));

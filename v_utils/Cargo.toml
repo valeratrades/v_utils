@@ -18,13 +18,16 @@ cli = [
     "io",
     # Required for confirm_blocking in Settings macro
     "v_utils_macros/cli",
+    "schemars",
     "dep:config",
     "dep:facet",
     "dep:facet-json",
     "dep:facet-toml",
-    "dep:schemars",
     "dep:toml",
 ]
+# JSON Schema generation (`schemars::JsonSchema`). Pulled in by `cli` for the Settings macro's
+# schema/module export; also enables `JsonSchema` for our own public types (e.g. `Timeframe`).
+schemars = ["dep:schemars"]
 async-io = ["dep:tokio", "tokio/io-std", "tokio/process", "tokio/rt-multi-thread"]
 assert-wasm-compat = []
 trades = ["dep:jiff", "dep:strum"]
