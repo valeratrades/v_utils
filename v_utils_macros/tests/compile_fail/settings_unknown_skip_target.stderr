@@ -1,0 +1,8 @@
+error: unknown `flagg`; valid values are: flag, env
+ --> $DIR/v_utils_macros/tests/compile_fail/settings_unknown_skip_target.rs:7:18
+  |
+7 |     #[settings(skip(flagg))]
+  |                     ^^^^^
+
+error: aborting due to 1 previous error
+

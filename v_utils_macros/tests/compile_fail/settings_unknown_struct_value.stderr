@@ -1,0 +1,8 @@
+error: unknown `prefxi`; valid values are: prefix, use_env
+ --> $DIR/v_utils_macros/tests/compile_fail/settings_unknown_struct_value.rs:7:12
+  |
+7 | #[settings(prefxi = "strategy")]
+  |            ^^^^^^
+
+error: aborting due to 1 previous error
+

@@ -874,12 +874,50 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 
 	// Struct-level opt-out from auto-generated Serialize impl.
 	// Use when you need a custom `impl Serialize` (e.g. to mask secret fields).
-	let skip_serialize = ast.attrs.iter().any(|attr| {
+	// Unknown contents inside `#[primitives(...)]` are a hard error, not silently ignored.
+	let mut skip_serialize = false;
+	for attr in &ast.attrs {
 		if !attr.path().is_ident("primitives") {
-			return false;
+			continue;
 		}
-		attr.parse_args::<syn::Ident>().map(|i| i == "skip_serialize").unwrap_or(false)
-	});
+		let ident = match attr.parse_args::<syn::Ident>() {
+			Ok(i) => i,
+			Err(_) =>
+				return syn::Error::new_spanned(attr, "`#[primitives(...)]` on a struct expects a single identifier: `skip_serialize`")
+					.to_compile_error()
+					.into(),
+		};
+		if ident == "skip_serialize" {
+			skip_serialize = true;
+		} else {
+			return syn::Error::new_spanned(&ident, format!("unknown `#[primitives({ident})]` on struct; the only supported value is `skip_serialize`"))
+				.to_compile_error()
+				.into();
+		}
+	}
+
+	// Validate field-level `#[primitives(...)]` up front so unknown contents are a hard
+	// error instead of being silently ignored downstream (where they'd just leave the
+	// field unwrapped, with no diagnostic).
+	for f in fields {
+		for attr in &f.attrs {
+			if !attr.path().is_ident("primitives") {
+				continue;
+			}
+			let ident = match attr.parse_args::<syn::Ident>() {
+				Ok(i) => i,
+				Err(_) =>
+					return syn::Error::new_spanned(attr, "`#[primitives(...)]` on a field expects a single identifier: `skip`")
+						.to_compile_error()
+						.into(),
+			};
+			if ident != "skip" {
+				return syn::Error::new_spanned(&ident, format!("unknown `#[primitives({ident})]` on field; the only supported value is `skip`"))
+					.to_compile_error()
+					.into();
+			}
+		}
+	}
 
 	let mut default_fns: Vec<proc_macro2::TokenStream> = Vec::new();
 	let mut serialize_field_calls: Vec<proc_macro2::TokenStream> = Vec::new();
@@ -1594,24 +1632,37 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		unimplemented!()
 	};
 
-	// Parse #[settings(use_env = true)] struct-level attribute
-	let use_env = ast.attrs.iter().any(|attr| {
-		if attr.path().is_ident("settings") {
-			attr.parse_args_with(|input: syn::parse::ParseStream| {
-				let ident: syn::Ident = input.parse()?;
-				if ident == "use_env" {
-					let _: Token![=] = input.parse()?;
-					let lit: syn::LitBool = input.parse()?;
-					Ok(lit.value)
-				} else {
-					Ok(false)
-				}
-			})
-			.unwrap_or(false)
-		} else {
-			false
+	// Validate every field's `#[settings(...)]` up front so unknown contents are a hard
+	// error rather than silently ignored (the per-field closures below re-parse but, since
+	// we've validated here, cannot fail).
+	for field in fields {
+		if let Err(e) = SettingsFieldAttrs::parse(&field.attrs) {
+			return e.to_compile_error().into();
 		}
-	});
+	}
+
+	// Parse #[settings(use_env = true)] struct-level attribute.
+	// Unknown struct-level idents are rejected (the only one accepted here is `use_env`).
+	let mut use_env = false;
+	for attr in &ast.attrs {
+		if !attr.path().is_ident("settings") {
+			continue;
+		}
+		let parsed = attr.parse_args_with(|input: syn::parse::ParseStream| {
+			let ident: syn::Ident = input.parse()?;
+			if ident == "use_env" {
+				let _: Token![=] = input.parse()?;
+				let lit: syn::LitBool = input.parse()?;
+				use_env = lit.value;
+				Ok(())
+			} else {
+				Err(unknown_attr_ident(&ident, &["use_env"]))
+			}
+		});
+		if let Err(e) = parsed {
+			return e.to_compile_error().into();
+		}
+	}
 
 	#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
@@ -2607,7 +2658,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with both skip_flag and skip_env (completely hidden from CLI)
 		if field_attrs.skip_flag && field_attrs.skip_env {
@@ -2666,7 +2717,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			}
 		}
 
-		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with skip_flag (not in SettingsFlags struct, so can't collect from them)
 		if field_attrs.skip_flag {
@@ -2850,28 +2901,42 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		unimplemented!()
 	};
 
-	// Find the optional #[settings(prefix = "...", use_env = true)] attributes
+	// Validate every field's `#[settings(...)]` up front (see the same pass in `Settings`).
+	for field in fields {
+		if let Err(e) = SettingsFieldAttrs::parse(&field.attrs) {
+			return e.to_compile_error().into();
+		}
+	}
+
+	// Find the optional #[settings(prefix = "...", use_env = true)] attributes.
+	// Unknown struct-level idents are rejected.
 	let mut prefix = None;
 	let mut use_env = false;
 	for attr in &ast.attrs {
-		if attr.path().is_ident("settings") {
-			let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
-				while !input.is_empty() {
-					let ident: syn::Ident = input.parse()?;
-					if ident == "prefix" {
-						let _: Token![=] = input.parse()?;
-						let lit: syn::LitStr = input.parse()?;
-						prefix = Some(lit.value());
-					} else if ident == "use_env" {
-						let _: Token![=] = input.parse()?;
-						let lit: syn::LitBool = input.parse()?;
-						use_env = lit.value;
-					}
-					// Skip comma if present
-					let _ = input.parse::<Option<Token![,]>>();
+		if !attr.path().is_ident("settings") {
+			continue;
+		}
+		let parsed = attr.parse_args_with(|input: syn::parse::ParseStream| {
+			while !input.is_empty() {
+				let ident: syn::Ident = input.parse()?;
+				if ident == "prefix" {
+					let _: Token![=] = input.parse()?;
+					let lit: syn::LitStr = input.parse()?;
+					prefix = Some(lit.value());
+				} else if ident == "use_env" {
+					let _: Token![=] = input.parse()?;
+					let lit: syn::LitBool = input.parse()?;
+					use_env = lit.value;
+				} else {
+					return Err(unknown_attr_ident(&ident, &["prefix", "use_env"]));
 				}
-				Ok(())
-			});
+				// Skip comma if present
+				let _ = input.parse::<Option<Token![,]>>();
+			}
+			Ok(())
+		});
+		if let Err(e) = parsed {
+			return e.to_compile_error().into();
 		}
 	}
 	let prefix = prefix.unwrap_or(snake_case_name);
@@ -2883,7 +2948,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with skip_flag (no CLI flag generation)
 		if field_attrs.skip_flag {
@@ -2927,7 +2992,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		let ident = &field.ident;
 		let ty = &field.ty;
 
-		let field_attrs = SettingsFieldAttrs::parse(&field.attrs);
+		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with skip_flag (not in the struct, so can't collect from them)
 		if field_attrs.skip_flag {
@@ -3387,6 +3452,15 @@ fn _single_option_wrapped_ty(ty: &syn::Type) -> proc_macro2::TokenStream {
 
 //,}}}
 
+/// Reject an unrecognized identifier inside a `#[settings(...)]` / `#[primitives(...)]`
+/// attribute. Shared so every parse site fails loudly (with the same shape of message,
+/// spanned at the offending token) instead of silently ignoring typos. The returned
+/// `Err` propagates out of `parse_args_with` and becomes a `compile_error!` at the call
+/// site.
+fn unknown_attr_ident(ident: &syn::Ident, valid: &[&str]) -> syn::Error {
+	syn::Error::new(ident.span(), format!("unknown `{ident}`; valid values are: {}", valid.join(", ")))
+}
+
 /// Parsed field-level settings attributes
 ///
 /// Supports:
@@ -3403,11 +3477,11 @@ struct SettingsFieldAttrs {
 }
 
 impl SettingsFieldAttrs {
-	fn parse(attrs: &[syn::Attribute]) -> Self {
+	fn parse(attrs: &[syn::Attribute]) -> syn::Result<Self> {
 		let mut result = Self::default();
 		for attr in attrs {
 			if attr.path().is_ident("settings") {
-				let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
+				attr.parse_args_with(|input: syn::parse::ParseStream| {
 					while !input.is_empty() {
 						let ident: syn::Ident = input.parse()?;
 						if ident == "flatten" {
@@ -3423,6 +3497,8 @@ impl SettingsFieldAttrs {
 										result.skip_flag = true;
 									} else if target == "env" {
 										result.skip_env = true;
+									} else {
+										return Err(unknown_attr_ident(&target, &["flag", "env"]));
 									}
 									// Skip comma if present
 									let _ = content.parse::<Option<Token![,]>>();
@@ -3432,15 +3508,17 @@ impl SettingsFieldAttrs {
 								result.skip_flag = true;
 								result.skip_env = true;
 							}
+						} else {
+							return Err(unknown_attr_ident(&ident, &["flatten", "skip", "skip(flag)", "skip(env)"]));
 						}
 						// Skip comma if present
 						let _ = input.parse::<Option<Token![,]>>();
 					}
 					Ok(())
-				});
+				})?;
 			}
 		}
-		result
+		Ok(result)
 	}
 }
 
