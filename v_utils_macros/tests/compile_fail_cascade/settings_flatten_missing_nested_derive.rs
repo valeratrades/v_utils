@@ -11,7 +11,8 @@ use v_utils_macros::Settings;
 // every derive, the config-source impl), so the diagnostic cascades; this directory runs with
 // annotations off and pins the whole `.stderr` rather than tagging each line. The contract under
 // test is just that the error is the named trait bound, not a `__SettingsNested*` resolution miss.
-#[derive(Clone, Debug, Default, Deserialize, v_utils_macros::MyConfigPrimitives, Serialize, Settings)]
+// `MyConfigPrimitives` already emits the serde impls, so `AppConfig` must NOT also derive them.
+#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
 pub struct AppConfig {
 	#[settings(flatten)]
 	#[serde(default)]
