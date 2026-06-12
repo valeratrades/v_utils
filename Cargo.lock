@@ -6414,7 +6414,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils"
-version = "2.15.49"
+version = "2.15.50"
 dependencies = [
  "ahash",
  "async-sse",
@@ -6465,7 +6465,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils_macros"
-version = "2.11.50"
+version = "2.11.51"
 dependencies = [
  "clap",
  "eyre",
