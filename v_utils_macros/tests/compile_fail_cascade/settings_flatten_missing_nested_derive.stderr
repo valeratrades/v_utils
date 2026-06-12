@@ -1,0 +1,471 @@
+error[E0119]: conflicting implementations of trait `_::_serde::Deserialize<'_>` for type `AppConfig`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:57
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                 -----------             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `AppConfig`
+   |                                 |
+   |                                 first implementation here
+   |
+   = note: this error originates in the derive macro `v_utils_macros::MyConfigPrimitives` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0119]: conflicting implementations of trait `_::_serde::Serialize` for type `AppConfig`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:57
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                              ---------  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ conflicting implementation for `AppConfig`
+   |                                              |
+   |                                              first implementation here
+   |
+   = note: this error originates in the derive macro `v_utils_macros::MyConfigPrimitives` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by an implicit `Sized` bound in `std::result::Result`
+   --> /nix/store/xgxryx29bkhsnicq1z7kfhmi3bnm69y1-rust-default-1.94.0-nightly-2025-12-29/lib/rustlib/src/rust/library/core/src/result.rs:557:17
+    |
+557 | pub enum Result<T, E> {
+    |                 ^ required by the implicit `Sized` requirement on this type parameter in `Result`
+    = note: this error originates in the derive macro `clap::Args` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `FromArgMatches`
+   --> /home/v/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.0/src/derive.rs:130:27
+    |
+130 | pub trait FromArgMatches: Sized {
+    |                           ^^^^^ required by this bound in `FromArgMatches`
+    = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `clap::Args`
+   --> /home/v/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.0/src/derive.rs:227:34
+    |
+227 | pub trait Args: FromArgMatches + Sized {
+    |                                  ^^^^^ required by this bound in `Args`
+    = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `std::clone::Clone`
+   --> /nix/store/xgxryx29bkhsnicq1z7kfhmi3bnm69y1-rust-default-1.94.0-nightly-2025-12-29/lib/rustlib/src/rust/library/core/src/clone.rs:194:24
+    |
+194 | pub const trait Clone: Sized {
+    |                        ^^^^^ required by this bound in `Clone`
+    = note: this error originates in the derive macro `Clone` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `std::default::Default`
+   --> /nix/store/xgxryx29bkhsnicq1z7kfhmi3bnm69y1-rust-default-1.94.0-nightly-2025-12-29/lib/rustlib/src/rust/library/core/src/default.rs:107:26
+    |
+107 | pub const trait Default: Sized {
+    |                          ^^^^^ required by this bound in `Default`
+    = note: this error originates in the derive macro `Default` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `StructuralPartialEq`
+   --> /nix/store/xgxryx29bkhsnicq1z7kfhmi3bnm69y1-rust-default-1.94.0-nightly-2025-12-29/lib/rustlib/src/rust/library/core/src/marker.rs:262:1
+    |
+262 | / pub trait StructuralPartialEq {
+263 | |     // Empty.
+264 | | }
+    | |_^ required by this bound in `StructuralPartialEq`
+    = note: this error originates in the derive macro `PartialEq` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+note: required by a bound in `Source`
+  --> /home/v/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/config-0.15.23/src/source.rs:13:1
+   |
+13 | / pub trait Source: Debug {
+14 | |     fn clone_into_box(&self) -> Box<dyn Source + Send + Sync>;
+15 | |
+16 | |     /// Collect all configuration properties available from this source into
+...  |
+28 | | }
+   | |_^ required by this bound in `Source`
+   = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = note: the return type of a function must have a statically known size
+   = note: this error originates in the derive macro `Clone` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = note: the return type of a function must have a statically known size
+   = note: this error originates in the derive macro `Default` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = help: unsized fn params are gated as an unstable feature
+   = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `from_arg_matches_mut`
+   --> /home/v/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.0/src/derive.rs:130:27
+    |
+130 | pub trait FromArgMatches: Sized {
+    |                           ^^^^^ required by this bound in `FromArgMatches::from_arg_matches_mut`
+...
+201 |     fn from_arg_matches_mut(matches: &mut ArgMatches) -> Result<Self, Error> {
+    |        -------------------- required by a bound in this associated function
+    = note: this error originates in the derive macro `clap::Args` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:18:16
+   |
+18 |     pub strategy: Strategy,
+   |                   ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: `?` couldn't convert the error: `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:100
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             -------^
+   |                                                                                             |      |
+   |                                                                                             |      within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   |                                                                                             this can't be annotated with `?` because it has type `Result<_, clap::error::Error>`
+   |
+note: `Strategy` needs to implement `SettingsNested`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = note: all local variables must have a statically known size
+   = note: this error originates in the derive macro `clap::Args` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: this function depends on never type fallback being `()`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   |
+   = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+   = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+   = help: specify the types explicitly
+note: in edition 2024, the requirement `!: FromArgMatches` will fail
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^
+   = note: `#[deny(dependency_on_unit_never_type_fallback)]` (part of `#[deny(rust_2024_compatibility)]`) on by default
+   = note: this error originates in the derive macro `clap::Args` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `update_from_arg_matches_mut`
+   --> /home/v/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/clap_builder-4.6.0/src/derive.rs:130:27
+    |
+130 | pub trait FromArgMatches: Sized {
+    |                           ^^^^^ required by this bound in `FromArgMatches::update_from_arg_matches_mut`
+...
+209 |     fn update_from_arg_matches_mut(&mut self, matches: &mut ArgMatches) -> Result<(), Error> {
+    |        --------------------------- required by a bound in this associated function
+    = note: this error originates in the derive macro `clap::Args` which comes from the expansion of the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+   = note: this error originates in the derive macro `clap::Args` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+   |
+14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+   |                                                                                             ^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SettingsNested` is not implemented for `Strategy`
+  --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+   |
+22 | pub struct Strategy {
+   | ^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `Strategy: SettingsNested` is not satisfied in `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^ unsatisfied trait bound
+    |
+help: within `SettingsFlags`, the trait `SettingsNested` is not implemented for `Strategy`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:22:1
+    |
+ 22 | pub struct Strategy {
+    | ^^^^^^^^^^^^^^^^^^^
+note: required because it appears within the type `SettingsFlags`
+   --> $DIR/v_utils_macros/tests/compile_fail_cascade/settings_flatten_missing_nested_derive.rs:14:93
+    |
+ 14 | #[derive(Clone, Debug, Default, Deserialize, Serialize, v_utils_macros::MyConfigPrimitives, Settings)]
+    |                                                                                             ^^^^^^^^
+note: required by a bound in `clone`
+   --> /nix/store/xgxryx29bkhsnicq1z7kfhmi3bnm69y1-rust-default-1.94.0-nightly-2025-12-29/lib/rustlib/src/rust/library/core/src/clone.rs:194:24
+    |
+194 | pub const trait Clone: Sized {
+    |                        ^^^^^ required by this bound in `Clone::clone`
+...
+236 |     fn clone(&self) -> Self;
+    |        ----- required by a bound in this associated function
+    = note: this error originates in the derive macro `Settings` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: aborting due to 25 previous errors
+
+Some errors have detailed explanations: E0119, E0277.
+For more information about an error, try `rustc --explain E0119`.

@@ -79,6 +79,11 @@ path = "tests/derive_settings.rs"
 required-features = ["cli"]
 
 [[test]]
+name = "settings_flatten_cross_module"
+path = "tests/settings_flatten_cross_module.rs"
+required-features = ["cli"]
+
+[[test]]
 name = "live_settings"
 path = "tests/live_settings.rs"
 required-features = ["cli"]

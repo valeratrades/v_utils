@@ -1893,7 +1893,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
 
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/)).add_source(flags.clone());
+				// Source precedence is config-rs add order (later wins): env < file < flags.
+				// Flags are appended LAST at every build site below — a CLI flag is the
+				// most explicit user intent and must override the config file.
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/));
 
 				let mut err_msg = "Could not construct config from aggregated sources (conf, env, flags).".to_owned();
 				#[allow(unused_imports)]
@@ -1905,12 +1908,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 							let json_str = Self::eval_nix_file(path.to_str().unwrap())?;
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 							let file_only = file_builder.clone().build().ok();
-							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json)).add_source(flags.clone());
 							(builder.build()?, file_only, Some(path))
 						} else {
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
 							let file_only = file_builder.clone().build().ok();
-							let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true));
+							let builder = builder.add_source(::v_utils::__internal::config::File::from(path.clone()).required(true)).add_source(flags.clone());
 							(builder.build()?, file_only, Some(path))
 						}
 					}
@@ -1925,7 +1928,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 								// for the failure path below.
 								eprintln!("warning: no config file found for `{app_name}`, building from env + flags only. Searched in {locations:?}");
 								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
-								(builder.build()?, None, None)
+								(builder.add_source(flags.clone()).build()?, None, None)
 							},
 							1 => {
 								let found_path = conf_files_found[0];
@@ -1933,12 +1936,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 									let json_str = Self::eval_nix_file(found_path.to_str().unwrap())?;
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 									let file_only = file_builder.clone().build().ok();
-									let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
+									let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json)).add_source(flags.clone());
 									(builder.build()?, file_only, Some(found_path.clone()))
 								} else {
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
 									let file_only = file_builder.clone().build().ok();
-									builder = builder.add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true));
+									builder = builder.add_source(::v_utils::__internal::config::File::from(found_path.as_path()).required(true)).add_source(flags.clone());
 									(builder.build()?, file_only, Some(found_path.clone()))
 								}
 							},
@@ -2651,13 +2654,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let flag_quotes = fields.iter().filter_map(|field| {
 		let ty = &field.ty;
 
-		// Skip Vec fields
-		if let syn::Type::Path(type_path) = ty {
-			if is_vec_type(type_path) {
-				return None;
-			}
-		}
-
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with both skip_flag and skip_env (completely hidden from CLI)
@@ -2673,32 +2669,38 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let ident = &field.ident;
 		Some(match field_attrs.flatten {
 			true => {
-				use quote::ToTokens as _;
 				// Extract inner type if Option<T>
 				let inner_type = if let syn::Type::Path(type_path) = ty {
 					if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
 				} else {
 					ty
 				};
-				let type_name = inner_type.to_token_stream().to_string();
-				let nested_struct_name = format_ident!("__SettingsNested{type_name}");
 				quote! {
 					#[clap(flatten)]
-					#ident: #nested_struct_name,
+					#ident: <#inner_type as v_utils::macros::SettingsNested>::Flags,
 				}
 			}
 			false => {
 				let clap_ty = clap_compatible_option_wrapped_ty(ty);
+				// Vec flags also accept a single comma-delimited value (`--pairs A,B`).
+				let inner_type = match ty {
+					syn::Type::Path(type_path) if is_option_type(type_path) => extract_option_inner_type(type_path),
+					_ => ty,
+				};
+				let delimiter = match inner_type {
+					syn::Type::Path(type_path) if is_vec_type(type_path) => quote! { , value_delimiter = ',' },
+					_ => quote! {},
+				};
 				// Only add env binding if use_env is enabled AND skip_env is not set
 				if use_env && !field_attrs.skip_env {
 					let env_var_name = AsShoutySnakeCase(ident.as_ref().unwrap().to_string()).to_string();
 					quote! {
-						#[arg(long, env = #env_var_name)]
+						#[arg(long, env = #env_var_name #delimiter)]
 						#ident: #clap_ty,
 					}
 				} else {
 					quote! {
-						#[arg(long)]
+						#[arg(long #delimiter)]
 						#ident: #clap_ty,
 					}
 				}
@@ -2710,13 +2712,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let source_quotes = fields.iter().filter_map(|field| {
 		let ty = &field.ty;
 
-		// Skip Vec fields
-		if let syn::Type::Path(type_path) = ty {
-			if is_vec_type(type_path) {
-				return None;
-			}
-		}
-
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
 		// Skip fields with skip_flag (not in SettingsFlags struct, so can't collect from them)
@@ -2727,8 +2722,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let ident = &field.ident;
 		Some(match field_attrs.flatten {
 			true => {
+				let inner_type = if let syn::Type::Path(type_path) = ty {
+					if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
+				} else {
+					ty
+				};
 				quote! {
-					let _ = &self.#ident.collect_config(&mut map);
+					<#inner_type as v_utils::macros::SettingsNested>::collect_config(&self.#ident, &mut map);
 				}
 			}
 			false => {
@@ -2957,17 +2957,14 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 
 		if field_attrs.flatten {
 			// For flattened nested structs, include the nested struct's flags
-			use quote::ToTokens as _;
 			let inner_type = if let syn::Type::Path(type_path) = ty {
 				if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
 			} else {
 				ty
 			};
-			let type_name = inner_type.to_token_stream().to_string();
-			let nested_struct_name = format_ident!("__SettingsNested{type_name}");
 			Some(quote! {
 				#[clap(flatten)]
-				#ident: #nested_struct_name,
+				#ident: <#inner_type as v_utils::macros::SettingsNested>::Flags,
 			})
 		} else {
 			let clap_ty = clap_compatible_option_wrapped_ty(ty);
@@ -3000,8 +2997,13 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		}
 
 		if field_attrs.flatten {
+			let inner_type = if let syn::Type::Path(type_path) = ty {
+				if is_option_type(type_path) { extract_option_inner_type(type_path) } else { ty }
+			} else {
+				ty
+			};
 			Some(quote! {
-				let _ = &self.#ident.collect_config(map);
+				<#inner_type as v_utils::macros::SettingsNested>::collect_config(&flags.#ident, map);
 			})
 		} else {
 			let config_value_kind = clap_to_config(ident.as_ref().unwrap(), ty);
@@ -3009,7 +3011,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 			let config_value_path = format!("{config_prefix}.{}", ident.as_ref().unwrap());
 			let source_tag = format!("flags:{prefix}");
 			Some(quote! {
-				if let Some(#ident) = &self.#prefixed_field_name {
+				if let Some(#ident) = &flags.#prefixed_field_name {
 					map.insert(
 						#config_value_path.to_owned(),
 						v_utils::__internal::config::Value::new(Some(&#source_tag.to_owned()), #config_value_kind),
@@ -3022,12 +3024,14 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 	let produced_struct_name = format_ident!("__SettingsNested{name}");
 	let expanded = quote! {
 		#[allow(dead_code)]
+		#[doc(hidden)]
 		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
 		pub struct #produced_struct_name {
 			#(#prefixed_flags)*
 		}
-		impl #produced_struct_name {
-			pub fn collect_config(&self, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
+		impl v_utils::macros::SettingsNested for #name {
+			type Flags = #produced_struct_name;
+			fn collect_config(flags: &Self::Flags, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
 				#(#config_inserts)*
 			}
 		}
@@ -3574,6 +3578,8 @@ impl Parse for DataFrameDef {
 // Settings {{{
 
 //TODO!: error messages (like the one about necessity of deriving SettingsNested on children)
+//REVIEW: flatten wiring goes through the `v_utils::macros::SettingsNested` trait bound, so a child
+// missing the derive now yields a first-class trait-bound error naming the trait.
 //NB: requires `clap` to be in the scope (wouldn't make sense to bring it with the lib, as it's meant to be used in tandem and a local import will always be necessary)
 
 /// Takes in field identifier and type, returns the appropriate config::ValueKind conversion

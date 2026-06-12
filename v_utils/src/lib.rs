@@ -254,4 +254,18 @@ pub(crate) mod internal_utils;
 pub use other::*;
 
 #[cfg(feature = "macros")]
-pub extern crate v_utils_macros as macros;
+pub mod macros {
+	pub use v_utils_macros::*;
+
+	/// Associates a nested-settings flags struct with the type it configures.
+	///
+	/// `#[derive(SettingsNested)]` implements this; `#[settings(flatten)]` in a parent
+	/// resolves the flags struct through `<FieldTy as SettingsNested>::Flags`, so the
+	/// flattened type can be imported from anywhere by name alone. A flattened field whose
+	/// type does not derive `SettingsNested` produces a trait-bound error naming this trait.
+	#[cfg(feature = "cli")]
+	pub trait SettingsNested {
+		type Flags;
+		fn collect_config(flags: &Self::Flags, map: &mut crate::__internal::config::Map<String, crate::__internal::config::Value>);
+	}
+}

@@ -1,31 +1,36 @@
 use std::path::{Path, PathBuf};
+
+use ui_test::{dependencies::DependencyBuilder, spanned::Spanned};
+
 fn main() -> ui_test::color_eyre::Result<()> {
 	let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-	let proc_macro = find_proc_macro();
 
-	let mut config = ui_test::Config::rustc(root.join("tests/compile_fail"));
-	config.program.args.push("--extern".into());
-	config.program.args.push(format!("v_utils_macros={}", proc_macro.display()).into());
-	config.bless_command = Some("cargo test --test compile_fail -- --bless".to_string());
-	config.path_stderr_filter(root, "$DIR");
+	// Strict suite: every diagnostic must be annotated (these pin exact macro-expansion errors).
+	let strict = base_config(root.join("tests/compile_fail"), root);
+	// Cascade suite: the `SettingsNested` trait-bound failure necessarily repeats across every
+	// site that names `<T as SettingsNested>::Flags`. Annotating each is brittle, so this dir
+	// runs with annotations off and pins the full `.stderr` snapshot instead.
+	let mut cascade = base_config(root.join("tests/compile_fail_cascade"), root);
+	cascade.comment_defaults.base().require_annotations = Spanned::dummy(false).into();
 
-	ui_test::run_tests(config)
+	ui_test::run_tests(strict)?;
+	ui_test::run_tests(cascade)
 }
 
-fn find_proc_macro() -> PathBuf {
-	let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("CARGO_MANIFEST_DIR has parent");
-	let deps_dir = workspace_root.join("target/debug/deps");
-
-	let mut candidates: Vec<_> = std::fs::read_dir(&deps_dir)
-		.unwrap_or_else(|_| panic!("target deps dir not found: {}", deps_dir.display()))
-		.filter_map(|e| e.ok())
-		.map(|e| e.path())
-		.filter(|p| {
-			let name = p.file_name().unwrap_or_default().to_string_lossy();
-			name.starts_with("libv_utils_macros") && (name.ends_with(".so") || name.ends_with(".dylib") || name.ends_with(".dll"))
-		})
-		.collect();
-
-	candidates.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
-	candidates.pop().unwrap_or_else(|| panic!("compiled v_utils_macros not found in {}", deps_dir.display()))
+fn base_config(dir: PathBuf, root: &Path) -> ui_test::Config {
+	let mut config = ui_test::Config::rustc(dir);
+	// Resolve extern crates through cargo from a side manifest, so a case can reference both
+	// `v_utils_macros` and the `cli`-featured `v_utils` facade (the latter is needed for the
+	// `SettingsNested` trait-bound diagnostic, which only surfaces at type-check time in code
+	// the macro emits against `v_utils::...` paths). Hand-picking rlibs cannot pin features.
+	config.comment_defaults.base().set_custom(
+		"dependencies",
+		DependencyBuilder {
+			crate_manifest_path: root.join("tests/compile_fail_deps/Cargo.toml"),
+			..DependencyBuilder::default()
+		},
+	);
+	config.bless_command = Some("cargo test --test compile_fail -- --bless".to_string());
+	config.path_stderr_filter(root, "$DIR");
+	config
 }

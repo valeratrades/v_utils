@@ -1,0 +1,20 @@
+# Dependency manifest for the `compile_fail` ui_test harness. Its `[dependencies]`
+# become the extern crates available to each `tests/compile_fail/*.rs` case, resolved
+# through cargo (correct features, transitive deps) rather than by hand-picking rlibs.
+# Detached from the parent workspace so the `v_utils_*` member glob doesn't claim it.
+[workspace]
+
+[package]
+name = "compile_fail_deps"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+v_utils_macros = { path = "../.." }
+v_utils = { path = "../../../v_utils", features = ["full"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+
+[lib]
+path = "src/lib.rs"
