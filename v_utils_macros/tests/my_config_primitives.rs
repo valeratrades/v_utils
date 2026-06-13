@@ -32,6 +32,11 @@ pub struct Test {
 	string_with_default: String,
 	#[serde(default = "__default_num_of_retries")]
 	pub num_of_retries: u8,
+	// Attribute form of a field default: works without the nightly `field: T = expr` syntax,
+	// and without an external `#[serde(default = "..")]`. MyConfigPrimitives wires it into the
+	// synthesized Helper as a serde default, so a missing field deserializes to this value.
+	#[settings(default = 24)]
+	comparison_offset_h: usize,
 	#[primitives(skip)]
 	skipped_string: String,
 	#[private_value]
@@ -69,6 +74,7 @@ optional_port = "9090"
 	);
 	assert_eq!(t.string_with_default, ""); // Test that serde(default) works - empty string is the default for String
 	assert_eq!(t.num_of_retries, 3); // Test that custom default function works
+	assert_eq!(t.comparison_offset_h, 24); // `#[settings(default = 24)]` applied to a missing field
 	assert_eq!(t.skipped_string, "this should not be wrapped in PrivateValue"); // Test that #[primitives(skip)] works
 	assert_eq!(t.optional_port, Some(Port(9090))); // Test that Option<T> with #[private_value] works
 

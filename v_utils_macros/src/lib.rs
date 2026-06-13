@@ -954,11 +954,20 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				false
 			});
 
-			// Two ways a default expression can reach us:
+			// Three ways a default expression can reach us:
 			//   1. `#[default(expr)]` from SmartDefault (parsed as a `syn::Expr`)
-			//   2. `field: T = expr` from nightly `default_field_values` — stripped
+			//   2. `#[settings(default = expr)]` — the attribute form (works without nightly)
+			//   3. `field: T = expr` from nightly `default_field_values` — stripped
 			//      before `syn` ever sees it, recovered via `inline_defaults`.
-			// SmartDefault wins if both are present (explicit attribute > implicit syntax).
+			// Precedence is the listing order above (explicit attribute > implicit syntax).
+			let settings_default: Option<proc_macro2::TokenStream> = f.attrs.iter().find_map(|attr| {
+				if !attr.path().is_ident("settings") {
+					return None;
+				}
+				// Reuse the canonical parser so `#[settings(default = ..)]` accepts exactly the
+				// forms `Settings` validates — no second, drifting grammar for the same attribute.
+				SettingsFieldAttrs::parse(std::slice::from_ref(attr)).ok().and_then(|a| a.default).map(|e| quote! { #e })
+			});
 			let smart_default_present = f.attrs.iter().any(|attr| attr.path().is_ident("default"));
 			let field_name_str = ident.as_ref().expect("named fields only").to_string();
 			let inline_default_present = inline_defaults.contains_key(&field_name_str);
@@ -968,7 +977,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				} else {
 					None
 				}
-			}).or_else(|| {
+			}).or(settings_default).or_else(|| {
 				inline_defaults.get(&field_name_str).map(|s| s.parse::<proc_macro2::TokenStream>().expect("inline default expression must parse as tokens"))
 			});
 
@@ -1305,6 +1314,77 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	};
 	combined.into()
 }
+
+/// Drop-in replacement for `#[derive(schemars::JsonSchema)]` on config structs that use the
+/// `field: T = expr` default-field-value syntax (RFC 3681), the `#[settings(default = ..)]`
+/// attribute, or SmartDefault's `#[default(..)]`.
+///
+/// schemars' own derive parses the struct body with `syn`, which rejects `field: T = expr`. This
+/// macro strips those `= expr` tails first (exactly as `MyConfigPrimitives` does for serde), derives
+/// `JsonSchema` on a private mirror struct, and forwards the schema through `impl JsonSchema for #name`
+/// — so the resulting schema is titled after the real struct, not the mirror. Do **not** also
+/// `#[derive(schemars::JsonSchema)]`: this macro provides that impl itself.
+#[proc_macro_derive(ConfigJsonSchema, attributes(schemars, serde, settings, primitives, private_value, default))]
+pub fn derive_config_json_schema(input: TokenStream) -> TokenStream {
+	let (input, _inline_defaults) = strip_field_defaults(input);
+	let ast = parse_macro_input!(input as syn::DeriveInput);
+	let name = &ast.ident;
+	let name_str = name.to_string();
+	let fields = if let syn::Data::Struct(syn::DataStruct {
+		fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
+		..
+	}) = ast.data
+	{
+		named
+	} else {
+		unimplemented!("ConfigJsonSchema only supports named-field structs")
+	};
+
+	// Mirror each field with its public type, forwarding only schema-relevant attributes. schemars
+	// honours `#[serde(..)]`, so those carry through (e.g. `rename`, `default`, `skip`); our own
+	// `#[settings(..)]` / `#[primitives(..)]` / `#[private_value]` / `#[default(..)]` are internal
+	// and must be dropped, as schemars would reject them.
+	let mirror_fields = fields.iter().map(|f| {
+		let ident = &f.ident;
+		let ty = &f.ty;
+		let attrs = f
+			.attrs
+			.iter()
+			.filter(|attr| attr.path().is_ident("doc") || attr.path().is_ident("schemars") || attr.path().is_ident("serde"));
+		quote! {
+			#(#attrs)*
+			#ident: #ty
+		}
+	});
+
+	quote! {
+		const _: () = {
+			#[derive(::v_utils::__internal::schemars::JsonSchema)]
+			#[schemars(crate = "::v_utils::__internal::schemars", rename = #name_str)]
+			#[allow(dead_code)]
+			struct __ConfigSchemaMirror {
+				#(#mirror_fields),*
+			}
+
+			impl ::v_utils::__internal::schemars::JsonSchema for #name {
+				fn inline_schema() -> bool {
+					<__ConfigSchemaMirror as ::v_utils::__internal::schemars::JsonSchema>::inline_schema()
+				}
+				fn schema_name() -> std::borrow::Cow<'static, str> {
+					<__ConfigSchemaMirror as ::v_utils::__internal::schemars::JsonSchema>::schema_name()
+				}
+				fn schema_id() -> std::borrow::Cow<'static, str> {
+					<__ConfigSchemaMirror as ::v_utils::__internal::schemars::JsonSchema>::schema_id()
+				}
+				fn json_schema(generator: &mut ::v_utils::__internal::schemars::SchemaGenerator) -> ::v_utils::__internal::schemars::Schema {
+					<__ConfigSchemaMirror as ::v_utils::__internal::schemars::JsonSchema>::json_schema(generator)
+				}
+			}
+		};
+	}
+	.into()
+}
+
 #[proc_macro]
 pub fn make_df(input: TokenStream) -> TokenStream {
 	let DataFrameDef { values_vec, fields, .. } = parse_macro_input!(input as DataFrameDef);
@@ -3526,11 +3606,14 @@ fn unknown_attr_ident(ident: &syn::Ident, valid: &[&str]) -> syn::Error {
 /// - `#[settings(skip(env))]` - skip only env var binding
 /// - `#[settings(skip(flag, env))]` - skip both (same as `skip`)
 /// - `#[settings(flatten)]` - flatten nested struct
+/// - `#[settings(default = expr)]` - field default (attribute form of the nightly `field: T = expr`
+///   syntax; consumed by `MyConfigPrimitives` for both `Default` and serde-default wiring)
 #[derive(Default)]
 struct SettingsFieldAttrs {
 	flatten: bool,
 	skip_flag: bool,
 	skip_env: bool,
+	default: Option<syn::Expr>,
 }
 
 impl SettingsFieldAttrs {
@@ -3543,6 +3626,9 @@ impl SettingsFieldAttrs {
 						let ident: syn::Ident = input.parse()?;
 						if ident == "flatten" {
 							result.flatten = true;
+						} else if ident == "default" {
+							let _: Token![=] = input.parse()?;
+							result.default = Some(input.parse()?);
 						} else if ident == "skip" {
 							// Check if followed by parentheses with specific targets
 							if input.peek(token::Paren) {
@@ -3566,7 +3652,7 @@ impl SettingsFieldAttrs {
 								result.skip_env = true;
 							}
 						} else {
-							return Err(unknown_attr_ident(&ident, &["flatten", "skip", "skip(flag)", "skip(env)"]));
+							return Err(unknown_attr_ident(&ident, &["flatten", "skip", "skip(flag)", "skip(env)", "default"]));
 						}
 						// Skip comma if present
 						let _ = input.parse::<Option<Token![,]>>();

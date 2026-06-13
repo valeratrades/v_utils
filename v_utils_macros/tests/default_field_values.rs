@@ -19,9 +19,12 @@
 
 #![feature(default_field_values)]
 
-use v_utils_macros::{LiveSettings, MyConfigPrimitives, Settings};
+use v_utils_macros::{ConfigJsonSchema, LiveSettings, MyConfigPrimitives, Settings};
 
-#[derive(Clone, Debug, Default, LiveSettings, MyConfigPrimitives, Settings)]
+// `ConfigJsonSchema` stands in for `schemars::JsonSchema`: the latter's derive can't parse the
+// `field: T = expr` tails, so before this macro existed a field-default struct could not also
+// produce a JSON Schema (the `Settings` macro's schema/module export silently degraded to `None`).
+#[derive(Clone, ConfigJsonSchema, Debug, Default, LiveSettings, MyConfigPrimitives, Settings)]
 #[allow(unused)]
 struct AppConfig {
 	pub port: u16 = 50736,
@@ -60,4 +63,17 @@ fn deserialize_uses_field_defaults() {
 fn try_build_signature_compiles() {
 	// Proves `Settings` generated a working `try_build` on a struct with field defaults.
 	let _f: fn(SettingsFlags) -> Result<AppConfig, v_utils::__internal::SettingsError> = AppConfig::try_build;
+}
+
+#[test]
+fn config_json_schema_emits_named_schema() {
+	// `ConfigJsonSchema` must produce a real schema (not degrade), titled after the user struct
+	// rather than the internal mirror, with every field present.
+	let schema = v_utils::__internal::schemars::schema_for!(AppConfig);
+	let json = v_utils::__internal::serde_json::to_value(&schema).unwrap();
+	assert_eq!(json["title"], "AppConfig", "schema title must be the real struct name, not the mirror");
+	let props = &json["properties"];
+	for field in ["port", "debug", "workers", "maybe_threads"] {
+		assert!(props.get(field).is_some(), "schema missing field `{field}`: {json}");
+	}
 }

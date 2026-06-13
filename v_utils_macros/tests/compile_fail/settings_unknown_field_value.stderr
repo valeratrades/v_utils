@@ -1,4 +1,4 @@
-error: unknown `flaten`; valid values are: flatten, skip, skip(flag), skip(env)
+error: unknown `flaten`; valid values are: flatten, skip, skip(flag), skip(env), default
  --> $DIR/v_utils_macros/tests/compile_fail/settings_unknown_field_value.rs:7:13
   |
 7 |     #[settings(flaten)]
