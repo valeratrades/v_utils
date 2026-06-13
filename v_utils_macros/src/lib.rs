@@ -1525,6 +1525,12 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///    - `~/.config/<app_name>.{toml,json,yaml}`
 ///    - `~/.config/<app_name>/config.{toml,json,yaml}`
 ///
+/// `<app_name>` defaults to `CARGO_PKG_NAME` and can be overridden with the struct-level
+/// `#[settings(config_name = "...")]`. The override may contain `/` to nest a tool's config
+/// inside a parent app's dir, e.g. `config_name = "parent_app/tool"` resolves
+/// `~/.config/parent_app/tool.{nix,toml,...}` (and is where `write-defaults`/`schema`/`module`
+/// write to). The env-var prefix is *not* affected — it stays `CARGO_PKG_NAME`.
+///
 /// # Auto-extension of Config Files
 /// When the config is missing a required field, the macro will:
 /// 1. Parse the error to identify the missing field
@@ -1641,28 +1647,44 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		}
 	}
 
-	// Parse #[settings(use_env = true)] struct-level attribute.
-	// Unknown struct-level idents are rejected (the only one accepted here is `use_env`).
+	// Parse struct-level #[settings(...)] attributes. Unknown idents are rejected.
 	let mut use_env = false;
+	let mut config_name: Option<String> = None;
 	for attr in &ast.attrs {
 		if !attr.path().is_ident("settings") {
 			continue;
 		}
 		let parsed = attr.parse_args_with(|input: syn::parse::ParseStream| {
-			let ident: syn::Ident = input.parse()?;
-			if ident == "use_env" {
-				let _: Token![=] = input.parse()?;
-				let lit: syn::LitBool = input.parse()?;
-				use_env = lit.value;
-				Ok(())
-			} else {
-				Err(unknown_attr_ident(&ident, &["use_env"]))
+			loop {
+				let ident: syn::Ident = input.parse()?;
+				if ident == "use_env" {
+					let _: Token![=] = input.parse()?;
+					let lit: syn::LitBool = input.parse()?;
+					use_env = lit.value;
+				} else if ident == "config_name" {
+					let _: Token![=] = input.parse()?;
+					let lit: syn::LitStr = input.parse()?;
+					config_name = Some(lit.value());
+				} else {
+					return Err(unknown_attr_ident(&ident, &["use_env", "config_name"]));
+				}
+				if input.is_empty() {
+					return Ok(());
+				}
+				let _: Token![,] = input.parse()?;
 			}
 		});
 		if let Err(e) = parsed {
 			return e.to_compile_error().into();
 		}
 	}
+	// Basename for config-file resolution under the XDG config dir; may contain `/` to nest
+	// inside another app's dir (e.g. "parent_app/tool" -> ~/.config/parent_app/tool.nix).
+	// Env-var prefix is NOT derived from it — that stays CARGO_PKG_NAME.
+	let config_name_expr = match &config_name {
+		Some(s) => quote! { #s },
+		None => quote! { env!("CARGO_PKG_NAME") },
+	};
 
 	#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
@@ -1883,12 +1905,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			fn try_build_internal(flags: SettingsFlags, allow_extend: bool) -> Result<Self, ::v_utils::__internal::SettingsError> {
 				let path = flags.config.as_ref().map(|p| p.0.clone());
 				let app_name = env!("CARGO_PKG_NAME");
+				let config_name = #config_name_expr;
 
 				#xdg_conf_dir
 
 				let location_bases = [
-					format!("{xdg_conf_dir}/{app_name}"),
-					format!("{xdg_conf_dir}/{app_name}/config"),
+					format!("{xdg_conf_dir}/{config_name}"),
+					format!("{xdg_conf_dir}/{config_name}/config"),
 				];
 				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
@@ -1926,7 +1949,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 								// missing/mislocated config never silently degrades to
 								// defaults. The same note rides `err_msg` as error context
 								// for the failure path below.
-								eprintln!("warning: no config file found for `{app_name}`, building from env + flags only. Searched in {locations:?}");
+								eprintln!("warning: no config file found for `{config_name}`, building from env + flags only. Searched in {locations:?}");
 								err_msg.push_str(&format!("\nNOTE: conf file is missing. Searched in {:?}", locations));
 								(builder.add_source(flags.clone()).build()?, None, None)
 							},
@@ -2393,11 +2416,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						std::any::type_name::<Self>(),
 					))?;
 
-				let app_name = env!("CARGO_PKG_NAME");
+				let config_name = #config_name_expr;
 
 				#xdg_conf_dir
 
-				let schema_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.schema.json"));
+				let schema_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{config_name}.schema.json"));
 				if let Some(parent) = schema_path.parent() {
 					std::fs::create_dir_all(parent)
 						.wrap_err_with(|| format!("Failed to create config directory: {}", parent.display()))?;
@@ -2432,11 +2455,11 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					.wrap_err("schemars produced invalid JSON")?;
 				let module = ::v_utils::__internal::schema_to_nix_module(&schema)?;
 
-				let app_name = env!("CARGO_PKG_NAME");
+				let config_name = #config_name_expr;
 
 				#xdg_conf_dir
 
-				let module_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.module.nix"));
+				let module_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{config_name}.module.nix"));
 				if let Some(parent) = module_path.parent() {
 					std::fs::create_dir_all(parent)
 						.wrap_err_with(|| format!("Failed to create config directory: {}", parent.display()))?;
@@ -2483,13 +2506,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						}
 					})?;
 
-				let app_name = env!("CARGO_PKG_NAME");
+				let config_name = #config_name_expr;
 
 				#xdg_conf_dir
 
 				let location_bases = [
-					format!("{xdg_conf_dir}/{app_name}"),
-					format!("{xdg_conf_dir}/{app_name}/config"),
+					format!("{xdg_conf_dir}/{config_name}"),
+					format!("{xdg_conf_dir}/{config_name}/config"),
 				];
 				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 
@@ -2506,7 +2529,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					}
 					None => {
 						// No config exists - create new one with all defaults
-						let new_config_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{app_name}.nix"));
+						let new_config_path = std::path::PathBuf::from(format!("{xdg_conf_dir}/{config_name}.nix"));
 
 						// Ensure parent directory exists
 						if let Some(parent) = new_config_path.parent() {
@@ -3068,6 +3091,36 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
 	let name = &ast.ident;
 
+	// `Settings` (required on the same struct) owns `#[settings(...)]`; we only mirror its
+	// `config_name` so both derives resolve the same file. Other idents are its concern.
+	let mut config_name: Option<String> = None;
+	for attr in &ast.attrs {
+		if !attr.path().is_ident("settings") {
+			continue;
+		}
+		// parse failures are Settings' to report; it validates the same tokens strictly
+		let _ = attr.parse_args_with(|input: syn::parse::ParseStream| {
+			loop {
+				let ident: syn::Ident = input.parse()?;
+				let _: Token![=] = input.parse()?;
+				if ident == "config_name" {
+					let lit: syn::LitStr = input.parse()?;
+					config_name = Some(lit.value());
+				} else {
+					input.parse::<proc_macro2::TokenTree>()?;
+				}
+				if input.is_empty() {
+					return Ok(());
+				}
+				let _: Token![,] = input.parse()?;
+			}
+		});
+	}
+	let config_name_expr = match &config_name {
+		Some(s) => quote! { #s },
+		None => quote! { env!("CARGO_PKG_NAME") },
+	};
+
 	#[cfg(feature = "xdg")]
 	let xdg_conf_dir = quote_spanned! { proc_macro2::Span::call_site()=>
 		let xdg_dirs = ::v_utils::__internal::xdg::BaseDirectories::with_prefix(env!("CARGO_PKG_NAME"));
@@ -3124,12 +3177,12 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 					return Ok(Some(path.0.clone()));
 				}
 
-				let app_name = env!("CARGO_PKG_NAME");
+				let config_name = #config_name_expr;
 				#xdg_conf_dir
 
 				let location_bases = [
-					format!("{xdg_conf_dir}/{app_name}"),
-					format!("{xdg_conf_dir}/{app_name}/config"),
+					format!("{xdg_conf_dir}/{config_name}"),
+					format!("{xdg_conf_dir}/{config_name}/config"),
 				];
 				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
 
