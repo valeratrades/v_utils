@@ -7,6 +7,9 @@ pub use percent::Percent;
 pub mod time;
 pub use time::Timelike;
 
+pub mod large_number;
+pub use large_number::{Compact, LargeNumber};
+
 pub mod now_then;
 pub use now_then::NowThen;
 
