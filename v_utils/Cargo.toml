@@ -30,7 +30,7 @@ cli = [
 schemars = ["dep:schemars"]
 async-io = ["dep:tokio", "tokio/io-std", "tokio/process", "tokio/rt-multi-thread"]
 assert-wasm-compat = []
-trades = ["dep:jiff", "dep:strum"]
+trades = ["dep:jiff"]
 macros = ["v_utils_macros"]
 tracing = [
     "dep:xdg",
@@ -88,7 +88,7 @@ reqwest = { workspace = true, features = ["json", "blocking", "stream", "rustls"
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
-strum = { workspace = true, features = ["derive"], optional = true }
+strum = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
 toml = { workspace = true, optional = true }
