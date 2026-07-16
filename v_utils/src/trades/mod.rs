@@ -1,6 +1,9 @@
 pub mod pair;
 pub use pair::*;
 
+pub mod exchange;
+pub use exchange::*;
+
 pub mod klines;
 pub use klines::*;
 

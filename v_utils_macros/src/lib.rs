@@ -968,6 +968,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				// forms `Settings` validates — no second, drifting grammar for the same attribute.
 				SettingsFieldAttrs::parse(std::slice::from_ref(attr)).ok().and_then(|a| a.default).map(|e| quote! { #e })
 			});
+			let settings_default_present = settings_default.is_some();
 			let smart_default_present = f.attrs.iter().any(|attr| attr.path().is_ident("default"));
 			let field_name_str = ident.as_ref().expect("named fields only").to_string();
 			let inline_default_present = inline_defaults.contains_key(&field_name_str);
@@ -992,6 +993,9 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 			if has_private_value_attr && inline_default_present {
 				panic!("field `{field_name_str}`: `#[private_value]` is incompatible with the nightly `field: T = expr` default-field-value syntax. Private values are resolved at deserialization from string / `{{ env = \"...\" }}`; supply the default through the environment instead.");
 			}
+			if has_private_value_attr && settings_default_present {
+				panic!("field `{field_name_str}`: `#[private_value]` is incompatible with `#[settings(default = expr)]`. Private values are resolved at deserialization from string / `{{ env = \"...\" }}`; supply the default through the environment instead.");
+			}
 
 			// Check if field already has an explicit #[serde(default...)] attribute
 			let has_serde_default = f.attrs.iter().any(|attr| {
@@ -1009,24 +1013,44 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				!attr.path().is_ident("private_value") && !attr.path().is_ident("settings") && !attr.path().is_ident("primitives") && !attr.path().is_ident("default")
 			}).map(|attr| quote! { #attr }).collect();
 
-			// If we recovered a default expression and the user didn't already write
-			// an explicit `#[serde(default)]`, generate `fn __default_<field>() -> Ty { expr }`
-			// and inject `#[serde(default = "...")]` onto the Helper field.
-			if let (Some(expr), false) = (&default_expr, has_serde_default) {
-				let fn_name = syn::Ident::new(&format!("__default_{}", ident.as_ref().unwrap()), proc_macro2::Span::call_site());
-				default_fns.push(quote! {
-					fn #fn_name() -> #ty { #expr }
-				});
-				let fn_name_str = fn_name.to_string();
-				forwarded_attrs.push(quote! { #[serde(default = #fn_name_str)] });
-			}
-
 			// Check if type is Option<T>
 			let is_option = if let syn::Type::Path(type_path) = ty {
 				is_option_type(type_path)
 			} else {
 				false
 			};
+
+			// If we recovered a default expression and the user didn't already write an explicit
+			// `#[serde(default)]`, synthesize `fn __default_<field>() -> HelperTy { expr }` and inject
+			// `#[serde(default = "...")]` onto the Helper field. The fn must return the *Helper* field
+			// type, which differs from the declared type for the types we rewrite (String/SecretString
+			// → PrivateValue, PathBuf → ExpandedPath), so the recovered expr is wrapped into that type.
+			if let (Some(expr), false) = (&default_expr, has_serde_default) {
+				let (helper_ty, wrapped) = if has_primitives_skip_attr {
+					(quote! { #ty }, quote! { #expr })
+				} else if is_option {
+					let inner = if let syn::Type::Path(tp) = ty { extract_option_inner_type(tp) } else { unreachable!("is_option implies Type::Path") };
+					match quote! { #inner }.to_string().as_str() {
+						"String" => (quote! { Option<PrivateValue> }, quote! { (#expr).map(PrivateValue::Direct) }),
+						"SecretString" => (quote! { Option<PrivateValue> }, quote! { (#expr).map(|s| PrivateValue::Direct(secrecy::ExposeSecret::expose_secret(&s).to_string())) }),
+						"PathBuf" => (quote! { Option<v_utils::io::ExpandedPath> }, quote! { (#expr).map(v_utils::io::ExpandedPath::from) }),
+						_ => (quote! { #ty }, quote! { #expr }),
+					}
+				} else {
+					match type_string.as_str() {
+						"String" => (quote! { PrivateValue }, quote! { PrivateValue::Direct(#expr) }),
+						"SecretString" => (quote! { PrivateValue }, quote! { PrivateValue::Direct(secrecy::ExposeSecret::expose_secret(&(#expr)).to_string()) }),
+						"PathBuf" => (quote! { v_utils::io::ExpandedPath }, quote! { v_utils::io::ExpandedPath::from(#expr) }),
+						_ => (quote! { #ty }, quote! { #expr }),
+					}
+				};
+				let fn_name = syn::Ident::new(&format!("__default_{}", ident.as_ref().unwrap()), proc_macro2::Span::call_site());
+				default_fns.push(quote! {
+					fn #fn_name() -> #helper_ty { #wrapped }
+				});
+				let fn_name_str = fn_name.to_string();
+				forwarded_attrs.push(quote! { #[serde(default = #fn_name_str)] });
+			}
 
 			// If field has #[primitives(skip)], don't apply PrivateValue transformation
 			if has_primitives_skip_attr {
@@ -2114,6 +2138,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 			fn eval_nix_file(path: &str) -> Result<String, ::v_utils::__internal::eyre::Report> {
 				use ::v_utils::__internal::eyre::WrapErr as _;
+				// An empty `.nix` file is invalid Nix and yields a cryptic `unexpected end of file`; surface the real cause.
+				if std::fs::read_to_string(path).map(|s| s.trim().is_empty()).unwrap_or(false) {
+					return Err(::v_utils::__internal::eyre::eyre!(
+						"Config file `{path}` is empty. Delete it to write a fresh default config, or fill in valid Nix."
+					));
+				}
 				let output = std::process::Command::new("nix")
 					.arg("eval")
 					.arg("--json")

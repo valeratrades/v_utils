@@ -43,6 +43,9 @@ tracing = [
 bevy = ["dep:bevy"]
 distributions = ["dep:rand", "dep:rand_distr"]
 wasm = ["dep:console_error_panic_hook", "dep:console_log"]
+# Framework-neutral lightweight-charts interop boilerplate (`src/lwc/`). The chart↔Rust glue lives
+# once here; each consumer supplies only a `draw(chart, data, viewSpec)` JS module.
+lightweight_charts = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:js-sys"]
 
 lite = ["io", "macros", "trades", "tracing", "dep:futures", "dep:tokio"]
 full = [
@@ -78,6 +81,7 @@ futures = { workspace = true, optional = true }
 indexmap.workspace = true
 insta.workspace = true
 jiff = { workspace = true, features = ["serde"], optional = true }
+js-sys = { workspace = true, optional = true }
 libc = { workspace = true, optional = true }
 macro-attr = { workspace = true, features = ["unstable-macros-1-1"] }
 miette = { workspace = true, optional = true }
@@ -98,6 +102,9 @@ tracing-log = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", "env-filter"], optional = true }
 ustr.workspace = true
 v_utils_macros = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement"], optional = true }
 xdg = { workspace = true, optional = true }
 
 [dev-dependencies]

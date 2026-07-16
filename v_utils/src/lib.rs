@@ -28,6 +28,8 @@ pub mod utils;
 
 #[cfg(feature = "io")]
 pub mod io;
+#[cfg(feature = "lightweight_charts")]
+pub mod lwc;
 pub mod other;
 #[cfg(feature = "lite")]
 pub mod prelude;
