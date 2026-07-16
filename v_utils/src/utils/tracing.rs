@@ -4,7 +4,7 @@ use std::{
 	io::{BufRead, BufReader, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
 	sync::{
-		Arc, Mutex,
+		Arc, Mutex, OnceLock,
 		atomic::{AtomicBool, Ordering},
 	},
 	thread,
@@ -91,6 +91,10 @@ pub struct LogDestination {
 	pub compiled_directives: Option<&'static str>,
 }
 
+// OTLP export layer (logs + traces over HTTP). Active only when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set, so non-cluster runs stay untouched. HTTP
+// (reqwest-blocking) is deliberate: init runs before any tokio runtime exists,
+// and the gRPC exporter would panic for lack of a reactor.
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
@@ -129,6 +133,7 @@ pub fn init_subscriber(log_destination: LogDestination) {
 			.with(formatting_layer)
 			.with(stderr_layer)
 			.with(error_layer)
+			.with(otlp_layer())
 			.init();
 		//tracing_subscriber::registry()
 		//  .with(tracing_subscriber::layer::Layer::and_then(formatting_layer, error_layer).with_filter(env_filter))
@@ -201,6 +206,39 @@ pub fn init_subscriber(log_destination: LogDestination) {
 
 	trace_the_init(); //? Should I make this a trace?
 }
+#[cfg(feature = "otlp")]
+static OTLP_PROVIDERS: OnceLock<(opentelemetry_sdk::trace::SdkTracerProvider, opentelemetry_sdk::logs::SdkLoggerProvider)> = OnceLock::new();
+
+#[cfg(feature = "otlp")]
+fn otlp_layer<S>() -> Option<Box<dyn tracing_subscriber::Layer<S> + Send + Sync>>
+where
+	S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a> + Send + Sync, {
+	use opentelemetry::trace::TracerProvider as _;
+	use opentelemetry_otlp::{LogExporter, SpanExporter};
+	use opentelemetry_sdk::{Resource, logs::SdkLoggerProvider, trace::SdkTracerProvider};
+	use tracing_subscriber::Layer as _;
+
+	std::env::var_os("OTEL_EXPORTER_OTLP_ENDPOINT")?;
+	// Resource picks up service.name from OTEL_SERVICE_NAME / OTEL_RESOURCE_ATTRIBUTES.
+	let resource = Resource::builder().build();
+	let span_exporter = SpanExporter::builder().with_http().build().expect("OTLP span exporter builds from OTEL_* env");
+	let tracer_provider = SdkTracerProvider::builder().with_batch_exporter(span_exporter).with_resource(resource.clone()).build();
+	let traces_layer = tracing_opentelemetry::layer().with_tracer(tracer_provider.tracer("v_utils"));
+	let log_exporter = LogExporter::builder().with_http().build().expect("OTLP log exporter builds from OTEL_* env");
+	let logger_provider = SdkLoggerProvider::builder().with_batch_exporter(log_exporter).with_resource(resource).build();
+	let logs_layer = opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new(&logger_provider);
+	// Providers own the batch-export threads; keep them alive for the process.
+	let _ = OTLP_PROVIDERS.set((tracer_provider, logger_provider));
+	Some(traces_layer.and_then(logs_layer).boxed())
+}
+
+#[cfg(not(feature = "otlp"))]
+fn otlp_layer<S>() -> Option<Box<dyn tracing_subscriber::Layer<S> + Send + Sync>>
+where
+	S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a> + Send + Sync, {
+	None
+}
+
 /// Wrapper to allow Arc<Mutex<File>> to implement Write safely
 #[derive(Clone)]
 struct SharedFileWriter {

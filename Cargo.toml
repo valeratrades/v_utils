@@ -37,6 +37,10 @@ js-sys = "0.3"
 libc = "0.2"
 macro-attr = "0.2.0"
 miette = "7.6"
+opentelemetry = { version = "0.32", default-features = false, features = ["trace", "logs"] }
+opentelemetry-appender-tracing = { version = "0.32", default-features = false }
+opentelemetry-otlp = { version = "0.32", default-features = false, features = ["trace", "logs", "http-proto", "reqwest-blocking-client"] }
+opentelemetry_sdk = { version = "0.32", default-features = false, features = ["trace", "logs"] }
 polars = { version = "0.53.0", default-features = false }
 proc-macro2 = "1.0.106"
 quote = { version = "^1.0.45" }
@@ -56,6 +60,7 @@ toml = { version = "^1.1" }
 tracing = "0.1.44"
 tracing-error = "0.2.1"
 tracing-log = "0.2.0"
+tracing-opentelemetry = "0.33"
 tracing-subscriber = "0.3.23"
 ui_test = "0.30"
 ustr = "1.1"
