@@ -4,7 +4,7 @@ use std::{
 	io::{BufRead, BufReader, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
 	sync::{
-		Arc, Mutex, OnceLock,
+		Arc, Mutex,
 		atomic::{AtomicBool, Ordering},
 	},
 	thread,
@@ -64,37 +64,17 @@ impl LogDestination {
 	}
 }
 
+// OTLP export layer (logs + traces over HTTP). Active only when
+// OTEL_EXPORTER_OTLP_ENDPOINT is set, so non-cluster runs stay untouched. HTTP
+// (reqwest-blocking) is deliberate: init runs before any tokio runtime exists,
+// and the gRPC exporter would panic for lack of a reactor.
+#[cfg(feature = "otlp")]
+use std::sync::OnceLock;
 use std::{
 	collections::BTreeMap,
 	env::{args_os, current_dir, current_exe, vars_os},
 };
 
-#[derive(Clone, Debug, Default)]
-pub enum LogDestinationKind {
-	#[default]
-	Stdout,
-	File {
-		path: PathBuf,
-	},
-	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
-	Xdg {
-		dname: String,
-		fname: Option<String>,
-	},
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct LogDestination {
-	pub kind: LogDestinationKind,
-	pub stderr_errors: bool,
-	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
-	pub compiled_directives: Option<&'static str>,
-}
-
-// OTLP export layer (logs + traces over HTTP). Active only when
-// OTEL_EXPORTER_OTLP_ENDPOINT is set, so non-cluster runs stay untouched. HTTP
-// (reqwest-blocking) is deliberate: init runs before any tokio runtime exists,
-// and the gRPC exporter would panic for lack of a reactor.
 /// # Panics (iff ` Some(path)` && `path`'s parent dir doesn't exist || `path` is not writable)
 /// Set "TEST_LOG=1" to redirect to stdout
 pub fn init_subscriber(log_destination: LogDestination) {
@@ -205,6 +185,28 @@ pub fn init_subscriber(log_destination: LogDestination) {
 	info!("Starting ...");
 
 	trace_the_init(); //? Should I make this a trace?
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct LogDestination {
+	pub kind: LogDestinationKind,
+	pub stderr_errors: bool,
+	/// Compile-time embedded directives (set via build.rs). Takes priority over file-based directives.
+	pub compiled_directives: Option<&'static str>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub enum LogDestinationKind {
+	#[default]
+	Stdout,
+	File {
+		path: PathBuf,
+	},
+	#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
+	Xdg {
+		dname: String,
+		fname: Option<String>,
+	},
 }
 #[cfg(feature = "otlp")]
 static OTLP_PROVIDERS: OnceLock<(opentelemetry_sdk::trace::SdkTracerProvider, opentelemetry_sdk::logs::SdkLoggerProvider)> = OnceLock::new();
