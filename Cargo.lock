@@ -6512,7 +6512,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils"
-version = "2.15.56"
+version = "2.15.57"
 dependencies = [
  "ahash",
  "async-sse",
