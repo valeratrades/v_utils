@@ -87,6 +87,8 @@ fn clientside_writes_stdout_stderr_and_file() {
 			(r"\x1b\[[0-9;]*m", ""),
 			// Thread ids
 			(r"ThreadId\(\d+\)", "ThreadId(N)"),
+			// Line numbers inside the library itself shift on every edit
+			(r"(src/utils/tracing\.rs):\d+", "$1:<LINE>"),
 		],
 	}, {
 		insta::assert_snapshot!(combined);

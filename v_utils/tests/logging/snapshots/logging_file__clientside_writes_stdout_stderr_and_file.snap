@@ -10,10 +10,10 @@ expression: combined
 ===== FILE =====
   <TIMESTAMP>  INFO v_utils::utils::tracing: Using log directives from `<TMPDIR>/v_utils/_log_directives`:
 info
-    at v_utils/src/utils/tracing.rs:327
+    at v_utils/src/utils/tracing.rs:<LINE>
 
   <TIMESTAMP>  INFO v_utils::utils::tracing: Starting ...
-    at v_utils/src/utils/tracing.rs:200
+    at v_utils/src/utils/tracing.rs:<LINE>
 
   <TIMESTAMP>  INFO logging_emit: boot starting
     at v_utils/examples/logging_emit.rs:23
