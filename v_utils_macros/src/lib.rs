@@ -3422,9 +3422,8 @@ fn strip_field_default_values(input: TokenStream) -> TokenStream {
 /// Macro generates FromStr and Display; assuming this format.
 ///```rust
 ///#[cfg(feature = "macros")] {
-///#[cfg(feature = "trades")] {
 ///use v_utils::macros::CompactFormatNamed;
-///use v_utils::trades::{Timeframe, TimeframeDesignator};
+///use v_utils::{Timeframe, TimeframeDesignator};
 ///
 ///#[derive(CompactFormatNamed, Debug, PartialEq)]
 ///pub struct SAR {
@@ -3439,7 +3438,6 @@ fn strip_field_default_values(input: TokenStream) -> TokenStream {
 ///assert_eq!(sar, params_str.parse::<SAR>().unwrap());
 ///let sar_write = sar.to_string();
 ///assert_eq!(params_str, sar_write);
-///}
 ///}
 ///```
 //HACK: syn (as of 2.0.117) doesn't parse `default_field_values` (`field: Type = expr`).

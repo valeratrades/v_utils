@@ -13,13 +13,23 @@ const draws = new Map();
 
 // Returns null on success, or a banner string on any chart-side failure — the caller renders it and
 // stays alive (under panic=abort a thrown/rejected promise crossing into wasm nukes the whole app).
-export async function mount(el, drawUrl, dataJson, viewSpec) {
+export async function mount(el, drawUrl, dataJson, viewSpec, fmt) {
   try {
     const lwc = await lib();
     let chart = charts.get(el);
     if (!chart) {
       chart = lwc.createChart(el, { autoSize: true });
       charts.set(el, chart);
+      // Rust owns label policy; JS only feeds it live geometry (visible span + pixel width — only
+      // obtainable from the chart). Falls back to the default label on pre-data (null range).
+      const ts = chart.timeScale();
+      ts.applyOptions({
+        tickMarkFormatter: (time) => {
+          const r = ts.getVisibleRange();
+          if (!r) return String(time);
+          return fmt(time, r.to - r.from, ts.width());
+        },
+      });
     }
     let mod = draws.get(drawUrl);
     if (!mod) { mod = await import(drawUrl); draws.set(drawUrl, mod); }

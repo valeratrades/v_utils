@@ -6,3 +6,6 @@ pub use reiman_zeta::*;
 
 mod normal;
 pub use normal::*;
+
+mod latency;
+pub use latency::*;

@@ -10,8 +10,8 @@ pub use eyre::*;
 pub mod format;
 pub use format::*;
 
-pub mod info_size;
-pub use info_size::*;
+pub mod pretty;
+pub use pretty::PrettyPrint;
 
 pub mod serde;
 pub use serde::*;

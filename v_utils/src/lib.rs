@@ -30,11 +30,9 @@ pub mod utils;
 pub mod io;
 #[cfg(feature = "lightweight_charts")]
 pub mod lwc;
-pub mod other;
 #[cfg(feature = "lite")]
 pub mod prelude;
-#[cfg(feature = "trades")]
-pub mod trades;
+pub mod primitives;
 #[doc(hidden)]
 pub mod __internal {
 	pub extern crate eyre;
@@ -253,7 +251,7 @@ pub(crate) mod internal_utils;
 
 //Q: I like the idea of having a prelude, but atm it just leads to possibility of mismatching def paths, client imports v_utils and something else relying on a different version of v_utils
 
-pub use other::*;
+pub use primitives::*;
 
 #[cfg(feature = "macros")]
 pub mod macros {

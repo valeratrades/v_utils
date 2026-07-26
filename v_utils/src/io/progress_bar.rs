@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use bon::Builder;
 
-use crate::{other::Timelike, print_rolling};
+use crate::{primitives::Timelike, print_rolling};
 
 /// Single-line terminal progress bar using `print_rolling!`.
 ///
