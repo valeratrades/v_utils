@@ -258,7 +258,9 @@ impl Editor {
 					))
 				}
 				// TODO: helix, vscode support
-				_ => bail!("with_buffer() only supported for nvim"),
+				_ => {
+					bail!("with_buffer() only supported for nvim")
+				}
 			};
 		}
 

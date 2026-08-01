@@ -141,7 +141,9 @@ impl FromStr for InfoSize {
 
 		let (n_str, unit_str) = match split_point {
 			Some(pos) => s.split_at(pos),
-			None => bail!("InfoSize string '{s}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc."),
+			None => {
+				bail!("InfoSize string '{s}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc.")
+			}
 		};
 
 		let unit = InfoSizeUnit::from_str(unit_str)?;
@@ -364,7 +366,9 @@ impl FromStr for InfoSizeUnit {
 			"GiB" => Ok(InfoSizeUnit::Gibibyte),
 			"TiB" => Ok(InfoSizeUnit::Tebibyte),
 			"PiB" => Ok(InfoSizeUnit::Pebibyte),
-			_ => bail!("Invalid info size unit: {s}"),
+			_ => {
+				bail!("Invalid info size unit: {s}")
+			}
 		}
 	}
 }

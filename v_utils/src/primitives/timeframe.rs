@@ -2,8 +2,20 @@ use std::{str::FromStr, time::Duration};
 
 use eyre::{Result, bail, eyre};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
-use strum::{EnumIter, IntoEnumIterator as _};
+use strum::EnumIter;
 
+/// Ascending; `EnumIter` equivalence asserted in tests.
+const TIMEFRAME_DESIGNATORS: [TimeframeDesignator; 9] = [
+	TimeframeDesignator::Milliseconds,
+	TimeframeDesignator::Seconds,
+	TimeframeDesignator::Minutes,
+	TimeframeDesignator::Hours,
+	TimeframeDesignator::Days,
+	TimeframeDesignator::Weeks,
+	TimeframeDesignator::Months,
+	TimeframeDesignator::Quarters,
+	TimeframeDesignator::Years,
+];
 #[derive(Clone, Copy, Debug, Default, EnumIter, PartialEq)]
 pub enum TimeframeDesignator {
 	Milliseconds,
@@ -47,6 +59,7 @@ impl TimeframeDesignator {
 		}
 	}
 }
+
 impl std::fmt::Display for TimeframeDesignator {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.as_str())
@@ -76,13 +89,18 @@ impl FromStr for TimeframeDesignator {
 			"Q" => Ok(TimeframeDesignator::Quarters),
 			"y" => Ok(TimeframeDesignator::Years),
 			"Y" => Ok(TimeframeDesignator::Years),
-			_ => bail!("Invalid timeframe designator: {s}"),
+			_ => {
+				bail!("Invalid timeframe designator: {s}")
+			}
 		}
 	}
 }
 
 /// Implemented over the number of milliseconds
-#[derive(derive_more::Add, Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, derive_more::Sub)]
+///
+/// `ConstParamTy` so a timeframe can stand in const-generic position: a retained window *is* a
+/// timeframe, and spelling it there as a bare `u64` is what loses the unit.
+#[derive(derive_more::Add, Clone, core::marker::ConstParamTy, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, derive_more::Sub)]
 pub struct Timeframe(pub u64);
 impl Timeframe {
 	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {
@@ -105,11 +123,17 @@ impl Timeframe {
 		self.0 / 1_000
 	}
 
-	pub fn designator(&self) -> TimeframeDesignator {
-		TimeframeDesignator::iter()
-			.rev()
-			.find(|d| self.0 % d.as_millis() == 0)
-			.expect("This can only fails if we were to allow creation of 0-len timeframes")
+	pub const fn designator(&self) -> TimeframeDesignator {
+		assert!(self.0 != 0, "0-len timeframes are not representable");
+		let mut i = TIMEFRAME_DESIGNATORS.len();
+		while i > 0 {
+			i -= 1;
+			let d = TIMEFRAME_DESIGNATORS[i];
+			if self.0 % d.as_millis() == 0 {
+				return d;
+			}
+		}
+		unreachable!()
 	}
 }
 impl FromStr for Timeframe {
@@ -224,7 +248,14 @@ impl std::ops::Mul<u64> for Timeframe {
 
 #[cfg(test)]
 mod timeframe_tests {
+	use strum::IntoEnumIterator as _;
+
 	use super::*;
+
+	#[test]
+	fn designators_array_matches_enum() {
+		assert!(TimeframeDesignator::iter().eq(TIMEFRAME_DESIGNATORS));
+	}
 
 	#[test]
 	fn to_str() {

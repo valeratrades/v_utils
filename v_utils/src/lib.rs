@@ -1,6 +1,7 @@
 #![allow(clippy::get_first)]
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
+#![feature(adt_const_params)]
 #![feature(stmt_expr_attributes)]
 #![feature(specialization)]
 #![allow(incomplete_features)]
@@ -153,7 +154,9 @@ pub mod __internal {
 				let nullable = branches.iter().any(|b| b.get("type").and_then(Value::as_str) == Some("null"));
 				let alts: Vec<&Value> = branches.iter().filter(|b| b.get("type").and_then(Value::as_str) != Some("null")).collect();
 				let inner = match alts.as_slice() {
-					[] => bail!("anyOf/oneOf with only a null branch"),
+					[] => {
+						bail!("anyOf/oneOf with only a null branch")
+					}
 					[one] => nix_type(one, defs, depth)?,
 					many => {
 						let rendered = many.iter().map(|b| nix_type(b, defs, depth)).collect::<Result<Vec<_>, _>>()?;
