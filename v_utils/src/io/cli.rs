@@ -157,9 +157,6 @@ fn read_inline_edit(initial: &str) -> Option<String> {
 		}
 	};
 
-	#[cfg(not(unix))]
-	let original_termios: Option<(i32, ())> = None;
-
 	let mut byte = [0u8; 1];
 	let mut result = None;
 	while stdin_handle.read_exact(&mut byte).is_ok() {
