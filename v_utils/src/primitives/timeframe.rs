@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use eyre::{Result, bail, eyre};
+use eyre::{Result, eyre};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as SerdeError};
 use strum::EnumIter;
 
@@ -44,6 +44,22 @@ impl TimeframeDesignator {
 		}
 	}
 
+	/// All characters could be in any case, except for m:minutes and M:months
+	const fn from_ascii(b: &[u8]) -> Option<Self> {
+		Some(match b {
+			b"ms" => TimeframeDesignator::Milliseconds,
+			b"s" => TimeframeDesignator::Seconds,
+			b"m" | b"min" => TimeframeDesignator::Minutes,
+			b"h" | b"H" => TimeframeDesignator::Hours,
+			b"d" | b"D" => TimeframeDesignator::Days,
+			b"w" | b"W" | b"wk" => TimeframeDesignator::Weeks,
+			b"M" | b"mo" => TimeframeDesignator::Months,
+			b"q" | b"Q" => TimeframeDesignator::Quarters,
+			b"y" | b"Y" => TimeframeDesignator::Years,
+			_ => return None,
+		})
+	}
+
 	//Q: not sure if it's better to keep this on its own or move inside the Display impl - is having this be `&'static str` worth something?
 	pub const fn as_str(&self) -> &'static str {
 		match self {
@@ -69,30 +85,8 @@ impl std::fmt::Display for TimeframeDesignator {
 impl FromStr for TimeframeDesignator {
 	type Err = eyre::Report;
 
-	/// All characters could be in any casee, except for m:minutes and M:months
 	fn from_str(s: &str) -> Result<Self> {
-		match s {
-			"ms" => Ok(TimeframeDesignator::Milliseconds),
-			"s" => Ok(TimeframeDesignator::Seconds),
-			"m" => Ok(TimeframeDesignator::Minutes),
-			"min" => Ok(TimeframeDesignator::Minutes),
-			"h" => Ok(TimeframeDesignator::Hours),
-			"H" => Ok(TimeframeDesignator::Hours),
-			"d" => Ok(TimeframeDesignator::Days),
-			"D" => Ok(TimeframeDesignator::Days),
-			"w" => Ok(TimeframeDesignator::Weeks),
-			"W" => Ok(TimeframeDesignator::Weeks),
-			"wk" => Ok(TimeframeDesignator::Weeks),
-			"M" => Ok(TimeframeDesignator::Months),
-			"mo" => Ok(TimeframeDesignator::Months),
-			"q" => Ok(TimeframeDesignator::Quarters),
-			"Q" => Ok(TimeframeDesignator::Quarters),
-			"y" => Ok(TimeframeDesignator::Years),
-			"Y" => Ok(TimeframeDesignator::Years),
-			_ => {
-				bail!("Invalid timeframe designator: {s}")
-			}
-		}
+		Self::from_ascii(s.as_bytes()).ok_or_else(|| eyre!("Invalid timeframe designator: {s}"))
 	}
 }
 
@@ -118,6 +112,47 @@ impl Timeframe {
 		Self(n * designator.as_millis())
 	}
 
+	/// [`FromStr`] in const position, so the literal that *names* a timeframe is the same one that
+	/// defines it. Malformed input is a compile error wherever this is what it's for.
+	pub const fn from_str_const(s: &str) -> Self {
+		match Self::parse_ascii(s.as_bytes()) {
+			Ok(tf) => tf,
+			// a const `panic!` takes a `&str` argument; inlining it into the format string would make it non-const
+			Err(e) => panic!("{}", { e }),
+		}
+	}
+
+	const fn parse_ascii(b: &[u8]) -> Result<Self, &'static str> {
+		if b.is_empty() {
+			return Err("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'");
+		}
+		let (mut n, mut i) = (0u64, 0);
+		while i < b.len() && b[i].is_ascii_digit() {
+			n = match n.checked_mul(10) {
+				Some(n) => n,
+				None => return Err("Number in timeframe str overflows a `u64`"),
+			};
+			n += (b[i] - b'0') as u64;
+			i += 1;
+		}
+		let (count, designator) = b.split_at(i);
+		let designator = match designator {
+			// Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
+			b"" => TimeframeDesignator::Minutes,
+			d => match TimeframeDesignator::from_ascii(d) {
+				Some(d) => d,
+				None => return Err(r#"Invalid timeframe designator. Expected one of ["ms", "s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"]"#),
+			},
+		};
+		if count.is_empty() {
+			n = 1;
+		}
+		match n.checked_mul(designator.as_millis()) {
+			Some(millis) => Ok(Self(millis)),
+			None => Err("Timeframe overflows a `u64` of milliseconds"),
+		}
+	}
+
 	#[deprecated(since = "3.0.0", note = "Use `duration` instead")]
 	pub fn seconds(&self) -> u64 {
 		self.0 / 1_000
@@ -140,31 +175,7 @@ impl FromStr for Timeframe {
 	type Err = eyre::Report;
 
 	fn from_str(s: &str) -> Result<Self> {
-		// Find where the numeric part ends and the designator begins
-		let split_point = s.chars().position(|c| c.is_ascii_alphabetic());
-
-		let (n_str, designator_str) = match split_point {
-			Some(pos) => s.split_at(pos),
-			None => (s, "m"), // Bybit has silent minutes. No other major exchange silents a different designator so this workaround is sufficient.
-		};
-
-		if s.is_empty() {
-			bail!("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'");
-		}
-
-		let allowed_designators = ["ms", "s", "m", "min", "h", "H", "d", "D", "w", "W", "wk", "M", "mo", "q", "Q", "y", "Y"];
-		let designator = TimeframeDesignator::from_str(designator_str)
-			.map_err(|_| eyre!(r#"Invalid timeframe designator '{designator_str}'. Expected one of the following: [{allowed_designators:?}]"#))?;
-
-		let n = if n_str.is_empty() {
-			1
-		} else {
-			n_str.parse::<u64>().map_err(|_| eyre!("Invalid number in timeframe str '{n_str}'. Expected a `u64` number."))?
-		};
-
-		let total_millis = n * designator.as_millis();
-
-		Ok(Timeframe(total_millis))
+		Self::parse_ascii(s.as_bytes()).map_err(|e| eyre!("{e}. Got: '{s}'"))
 	}
 }
 impl std::fmt::Display for Timeframe {
@@ -251,6 +262,8 @@ mod timeframe_tests {
 	use strum::IntoEnumIterator as _;
 
 	use super::*;
+
+	const _: () = assert!(Timeframe::from_str_const("15m").0 == Timeframe::from_naive(15, TimeframeDesignator::Minutes).0);
 
 	#[test]
 	fn designators_array_matches_enum() {
