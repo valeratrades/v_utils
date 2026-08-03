@@ -112,16 +112,6 @@ impl Timeframe {
 		Self(n * designator.as_millis())
 	}
 
-	/// [`FromStr`] in const position, so the literal that *names* a timeframe is the same one that
-	/// defines it. Malformed input is a compile error wherever this is what it's for.
-	pub const fn from_str_const(s: &str) -> Self {
-		match Self::parse_ascii(s.as_bytes()) {
-			Ok(tf) => tf,
-			// a const `panic!` takes a `&str` argument; inlining it into the format string would make it non-const
-			Err(e) => panic!("{}", { e }),
-		}
-	}
-
 	const fn parse_ascii(b: &[u8]) -> Result<Self, &'static str> {
 		if b.is_empty() {
 			return Err("Timeframe string is empty. Expected a string representing a timeframe like '5s' or '3M'");
@@ -217,16 +207,23 @@ impl schemars::JsonSchema for Timeframe {
 	}
 }
 
+/// Const, so the literal that *names* a timeframe is the same one that defines it, including in
+/// const-generic position. Malformed input is then a compile error.
+///
 /// # Panics
-impl From<&str> for Timeframe {
+impl const From<&str> for Timeframe {
 	fn from(s: &str) -> Self {
-		Timeframe::from_str(s).unwrap()
+		match Timeframe::parse_ascii(s.as_bytes()) {
+			Ok(tf) => tf,
+			// a const `panic!` takes a `&str` argument; inlining it into the format string would make it non-const
+			Err(e) => panic!("{}", { e }),
+		}
 	}
 }
 /// # Panics
-impl From<&&str> for Timeframe {
+impl const From<&&str> for Timeframe {
 	fn from(s: &&str) -> Self {
-		Timeframe::from_str(s).unwrap()
+		Timeframe::from(*s)
 	}
 }
 
@@ -263,7 +260,7 @@ mod timeframe_tests {
 
 	use super::*;
 
-	const _: () = assert!(Timeframe::from_str_const("15m").0 == Timeframe::from_naive(15, TimeframeDesignator::Minutes).0);
+	const _: () = assert!(Timeframe::from("15m").0 == Timeframe::from_naive(15, TimeframeDesignator::Minutes).0);
 
 	#[test]
 	fn designators_array_matches_enum() {

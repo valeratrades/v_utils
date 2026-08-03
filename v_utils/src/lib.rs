@@ -2,6 +2,8 @@
 #![allow(clippy::len_zero)]
 #![allow(clippy::tabs_in_doc_comments)]
 #![feature(adt_const_params)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
 #![feature(stmt_expr_attributes)]
 #![feature(specialization)]
 #![allow(incomplete_features)]
