@@ -16,6 +16,33 @@ const TIMEFRAME_DESIGNATORS: [TimeframeDesignator; 9] = [
 	TimeframeDesignator::Quarters,
 	TimeframeDesignator::Years,
 ];
+/// Common timeframes, as offered by exchanges. `MIN`/`MO` because screaming-snake would collide `m` with `M`.
+pub const TF_1MS: Timeframe = Timeframe::from("1ms");
+pub const TF_100MS: Timeframe = Timeframe::from("100ms");
+pub const TF_1S: Timeframe = Timeframe::from("1s");
+pub const TF_5S: Timeframe = Timeframe::from("5s");
+pub const TF_15S: Timeframe = Timeframe::from("15s");
+pub const TF_30S: Timeframe = Timeframe::from("30s");
+pub const TF_1MIN: Timeframe = Timeframe::from("1m");
+pub const TF_2MIN: Timeframe = Timeframe::from("2m");
+pub const TF_3MIN: Timeframe = Timeframe::from("3m");
+pub const TF_5MIN: Timeframe = Timeframe::from("5m");
+pub const TF_15MIN: Timeframe = Timeframe::from("15m");
+pub const TF_30MIN: Timeframe = Timeframe::from("30m");
+pub const TF_1H: Timeframe = Timeframe::from("1h");
+pub const TF_2H: Timeframe = Timeframe::from("2h");
+pub const TF_4H: Timeframe = Timeframe::from("4h");
+pub const TF_6H: Timeframe = Timeframe::from("6h");
+pub const TF_8H: Timeframe = Timeframe::from("8h");
+pub const TF_12H: Timeframe = Timeframe::from("12h");
+pub const TF_1D: Timeframe = Timeframe::from("1d");
+pub const TF_3D: Timeframe = Timeframe::from("3d");
+pub const TF_5D: Timeframe = Timeframe::from("5d");
+pub const TF_1W: Timeframe = Timeframe::from("1w");
+pub const TF_1MO: Timeframe = Timeframe::from("1M");
+pub const TF_3MO: Timeframe = Timeframe::from("3M");
+pub const TF_1Q: Timeframe = Timeframe::from("1q");
+pub const TF_1Y: Timeframe = Timeframe::from("1y");
 #[derive(Clone, Copy, Debug, Default, EnumIter, PartialEq)]
 pub enum TimeframeDesignator {
 	Milliseconds,

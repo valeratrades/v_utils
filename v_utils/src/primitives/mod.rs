@@ -11,7 +11,7 @@ pub mod time;
 pub use time::Timelike;
 
 pub mod timeframe;
-pub use timeframe::{Timeframe, TimeframeDesignator};
+pub use timeframe::*;
 
 pub mod large_number;
 pub use large_number::{Compact, LargeNumber};
