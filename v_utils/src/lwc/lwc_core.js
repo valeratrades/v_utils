@@ -3,19 +3,28 @@
 // `draw(chart, data, viewSpec, lib)` module fetched at runtime. The chart↔host boilerplate lives here;
 // "what we chart" lives entirely in the app's draw module.
 
-// Loaded lazily inside mount() via the app's import map — a static top-level import would become a
-// hard dependency of the wasm glue, so a slow/failed CDN would stall the whole app before first paint.
+// The library rides in the wasm binary as a string (build.rs pins and fetches it), so a blob URL is
+// what turns it back into a module — no import map, no network, nothing for the consumer to set up.
+// Still lazy and memoized: 196 KB of parse work stays off first paint, and off pages with no chart.
 let _lib;
-const lib = () => (_lib ??= import('lightweight-charts'));
+const lib = (src) =>
+  (_lib ??= (async () => {
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    try {
+      return await import(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  })());
 
 const charts = new WeakMap();
 const draws = new Map();
 
 // Returns null on success, or a banner string on any chart-side failure — the caller renders it and
 // stays alive (under panic=abort a thrown/rejected promise crossing into wasm nukes the whole app).
-export async function mount(el, drawUrl, dataJson, viewSpec, fmt) {
+export async function mount(el, drawUrl, dataJson, viewSpec, fmt, libSrc) {
   try {
-    const lwc = await lib();
+    const lwc = await lib(libSrc);
     let chart = charts.get(el);
     if (!chart) {
       chart = lwc.createChart(el, { autoSize: true });

@@ -1,44 +1,35 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    flake-utils.url = "github:numtide/flake-utils";
-    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-    v-utils.url = "github:valeratrades/v_flakes?ref=v1.6";
-    v-utils.inputs.nixpkgs.follows = "nixpkgs";
-    v-utils.inputs.rust-overlay.follows = "rust-overlay";
+    v_flakes.url = "github:valeratrades/v_flakes?ref=v1.6";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, pre-commit-hooks, v-utils }:
+  outputs = { self, v_flakes }:
+    let
+      inherit (v_flakes) flake-utils pre-commit-hooks;
+    in
     flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = builtins.trace "flake.nix sourced" [ (import rust-overlay) ];
-        rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "rust-docs" "rustc-codegen-cranelift-preview" ];
-        });
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
+        pkgs = import v_flakes.default_nixpkgs { inherit system; };
+        rust = v_flakes.rs.default_nightly system;
 
-        pre-commit-check = pre-commit-hooks.lib.${system}.run (v-utils.files.preCommit { inherit pkgs; });
+        pre-commit-check = pre-commit-hooks.lib.${system}.run (v_flakes.files.preCommit { inherit pkgs; });
         manifest = (pkgs.lib.importTOML ./v_utils/Cargo.toml).package;
         pname = manifest.name;
         stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.stdenv;
 
-        rs = v-utils.rs {
+        rs = v_flakes.rs {
           inherit pkgs rust;
           build = {
             enable = true;
             deny = true;
             workspace = let deprecate_by = "v3.0.0"; in {
-              "./v_utils" = [ "git_version" "log_directives" { deprecate = { by_version = deprecate_by; force = true; }; } ];
+              # Pinned here rather than in v_flakes because src/lwc/*.js is written against this exact API.
+              "./v_utils" = [ "git_version" "log_directives" { lightweight_charts = { version = "5.2.0"; sha256 = "66ac22df1b08de08ec2fae2b401b0f9731a4653a28e18a9837c7c3553c33dbe2"; }; } { deprecate = { by_version = deprecate_by; force = true; }; } ];
               "./v_utils_macros" = [{ deprecate = { by_version = deprecate_by; force = true; }; }];
             };
           };
         };
-        github = v-utils.github {
+        github = v_flakes.github {
           inherit pkgs pname rs;
           lastSupportedVersion = "nightly-2025-10-12";
           enable = true;
@@ -50,18 +41,17 @@
             warnings.exclude = [ "rust-doc" ];
           };
         };
-        readme = v-utils.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
+        readme = v_flakes.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
+        combined = v_flakes.utils.combine { inherit rust; modules = [ rs github readme ]; };
       in
       {
         devShells.default = with pkgs; mkShell {
           inherit stdenv;
           shellHook =
-            pre-commit-check.shellHook +
-            github.shellHook +
-            rs.shellHook +
-            readme.shellHook +
-            ''
-              cp -f ${(v-utils.files.treefmt) {inherit pkgs;}} ./.treefmt.toml
+            pre-commit-check.shellHook
+            + combined.shellHook
+            + ''
+              cp -f ${(v_flakes.files.treefmt) {inherit pkgs;}} ./.treefmt.toml
             '';
 
           buildInputs = [
@@ -69,7 +59,7 @@
             openssl
             pkg-config
             rust
-          ] ++ pre-commit-check.enabledPackages ++ github.enabledPackages;
+          ] ++ pre-commit-check.enabledPackages ++ combined.enabledPackages;
         };
       }
     );

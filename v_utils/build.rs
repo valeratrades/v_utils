@@ -1,13 +1,19 @@
 const DEPRECATE_BY_VERSION: Option<&str> = Some("v3.0.0");
 const DEPRECATE_FORCE: bool = true;
 
+const LWC_VERSION: &str = "5.2.0";
+const LWC_SHA256: &str = "66ac22df1b08de08ec2fae2b401b0f9731a4653a28e18a9837c7c3553c33dbe2";
+
 fn main() {
 	git_version();
 	log_directives();
+	lightweight_charts();
 	deprecate();
 }
 
 fn git_version() {
+	println!("cargo:rerun-if-changed=.git/HEAD");
+	println!("cargo:rerun-if-changed=.git/refs/");
 	// Embed git commit hash (fallback to "unknown" if git unavailable, e.g., in Nix sandbox)
 	let git_hash = std::process::Command::new("git")
 		.args(["rev-parse", "--short", "HEAD"])
@@ -31,7 +37,44 @@ fn log_directives() {
 	}
 }
 
+/// Fetched at build time rather than checked in — 196 KB of third-party JS has no business in a
+/// published tarball, where every consumer would download it regardless of features. The pinned
+/// hash is what makes fetching safe: it binds the bytes as firmly as vendoring would, and an
+/// upstream that changed under us fails the build instead of reaching a browser.
+fn lightweight_charts() {
+	if std::env::var_os("CARGO_FEATURE_LIGHTWEIGHT_CHARTS").is_none() {
+		return;
+	}
+	let out = std::path::Path::new(&std::env::var("OUT_DIR").expect("cargo sets OUT_DIR for build scripts")).join("lightweight-charts.mjs");
+	// Lets a rebuild that already has the right bytes stay offline.
+	if out.exists() && lwc_sha256(&out) == LWC_SHA256 {
+		return;
+	}
+	let url = format!("https://cdn.jsdelivr.net/npm/lightweight-charts@{LWC_VERSION}/dist/lightweight-charts.standalone.production.mjs");
+	let status = std::process::Command::new("curl")
+		.args(["-fsSL", "--output"])
+		.arg(&out)
+		.arg(&url)
+		.status()
+		.expect("`curl` must be on PATH to build the `lightweight_charts` feature");
+	assert!(status.success(), "fetching {url} failed: {status}");
+	let got = lwc_sha256(&out);
+	assert_eq!(got, LWC_SHA256, "{url} no longer hashes to the pinned value");
+}
+
+fn lwc_sha256(path: &std::path::Path) -> String {
+	let out = std::process::Command::new("sha256sum")
+		.arg(path)
+		.output()
+		.expect("`sha256sum` must be on PATH to build the `lightweight_charts` feature");
+	assert!(out.status.success(), "sha256sum {} failed", path.display());
+	let text = String::from_utf8(out.stdout).expect("sha256sum emits ascii");
+	text.split_whitespace().next().expect("output is `<hash>  <path>`").to_string()
+}
+
 fn deprecate() {
+	println!("cargo:rerun-if-changed=src");
+	println!("cargo:rerun-if-changed=Cargo.toml");
 	let pkg_version = env!("CARGO_PKG_VERSION");
 	let current = parse_semver(pkg_version);
 	let default_deprecate_at = DEPRECATE_BY_VERSION.map(parse_semver);
@@ -39,18 +82,16 @@ fn deprecate() {
 	let src_dir = std::path::Path::new("src");
 	if src_dir.exists() {
 		// Force mode: rewrite all since attributes to target version
-		if DEPRECATE_FORCE {
-			if let Some(target_version) = DEPRECATE_BY_VERSION {
-				let mut force_updates = Vec::new();
-				collect_force_updates(src_dir, target_version, &mut force_updates);
-				for (path, line_num, old_line) in &force_updates {
-					if let Err(e) = update_since_in_file(path, *line_num, old_line, target_version) {
-						eprintln!("Warning: failed to update {}: {}", path, e);
-					}
+		if let Some(target_version) = DEPRECATE_BY_VERSION.filter(|_| DEPRECATE_FORCE) {
+			let mut force_updates = Vec::new();
+			collect_force_updates(src_dir, target_version, &mut force_updates);
+			for (path, line_num, old_line) in &force_updates {
+				if let Err(e) = update_since_in_file(path, *line_num, old_line, target_version) {
+					eprintln!("Warning: failed to update {}: {}", path, e);
 				}
-				// In force mode, we just update files and exit - no validation
-				return;
 			}
+			// In force mode, we just update files and exit - no validation
+			return;
 		}
 
 		let mut expired_items = Vec::new();
@@ -105,42 +146,39 @@ fn find_deprecated_attrs(
 		if path.is_dir() {
 			find_deprecated_attrs(&path, current, default_deprecate_at, expired, missing_since);
 		} else if path.extension().is_some_and(|ext| ext == "rs") {
-			if let Ok(content) = std::fs::read_to_string(&path) {
-				// Auto-patch legacy v-prefixed since values
-				patch_legacy_v_prefix(&path, &content);
+			let Ok(content) = std::fs::read_to_string(&path) else {
+				continue;
+			};
+			// Auto-patch legacy v-prefixed since values
+			patch_legacy_v_prefix(&path, &content);
 
-				// Re-read content after potential patching
-				let content = std::fs::read_to_string(&path).unwrap_or(content);
+			// Re-read content after potential patching
+			let content = std::fs::read_to_string(&path).unwrap_or(content);
 
-				for (line_num, line) in content.lines().enumerate() {
-					let trimmed = line.trim_start();
-					if trimmed.starts_with("#[deprecated") {
-						let loc = format!("{}:{}", path.display(), line_num + 1);
+			for (line_num, line) in content.lines().enumerate() {
+				let trimmed = line.trim_start();
+				if trimmed.starts_with("#[deprecated") {
+					let loc = format!("{}:{}", path.display(), line_num + 1);
 
-						if let Some(since_version) = extract_since(trimmed) {
-							// Has since attribute
-							let deprecate_at = parse_semver(since_version);
-							if current >= deprecate_at {
-								expired.push((loc, since_version.to_string()));
-							}
-						} else {
-							// No since attribute
-							if let Some(default_at) = default_deprecate_at {
-								if current >= default_at {
-									expired.push((loc, DEPRECATE_BY_VERSION.unwrap().to_string()));
-								}
-							} else {
-								missing_since.push(loc);
-							}
+					if let Some(since_version) = extract_since(trimmed) {
+						// Has since attribute
+						let deprecate_at = parse_semver(since_version);
+						if current >= deprecate_at {
+							expired.push((loc, since_version.to_string()));
 						}
-					} else if trimmed.starts_with("#[allow(deprecated") {
-						// #[allow(deprecated)] should always be removed by default version
+					} else {
+						// No since attribute
 						if let Some(default_at) = default_deprecate_at {
 							if current >= default_at {
-								expired.push((format!("{}:{}", path.display(), line_num + 1), DEPRECATE_BY_VERSION.unwrap().to_string()));
+								expired.push((loc, DEPRECATE_BY_VERSION.unwrap().to_string()));
 							}
+						} else {
+							missing_since.push(loc);
 						}
 					}
+				// #[allow(deprecated)] should always be removed by default version
+				} else if trimmed.starts_with("#[allow(deprecated") && default_deprecate_at.is_some_and(|at| current >= at) {
+					expired.push((format!("{}:{}", path.display(), line_num + 1), DEPRECATE_BY_VERSION.unwrap().to_string()));
 				}
 			}
 		}
@@ -158,15 +196,16 @@ fn collect_force_updates(dir: &std::path::Path, target_version: &str, updates: &
 		if path.is_dir() {
 			collect_force_updates(&path, target_version, updates);
 		} else if path.extension().is_some_and(|ext| ext == "rs") {
-			if let Ok(content) = std::fs::read_to_string(&path) {
-				for (line_num, line) in content.lines().enumerate() {
-					let trimmed = line.trim_start();
-					if trimmed.starts_with("#[deprecated") {
-						// Check if since is missing or differs from target
-						match extract_since(trimmed) {
-							Some(v) if v == target_version => {} // Already correct
-							_ => updates.push((path.display().to_string(), line_num, line.to_string())),
-						}
+			let Ok(content) = std::fs::read_to_string(&path) else {
+				continue;
+			};
+			for (line_num, line) in content.lines().enumerate() {
+				let trimmed = line.trim_start();
+				if trimmed.starts_with("#[deprecated") {
+					// Check if since is missing or differs from target
+					match extract_since(trimmed) {
+						Some(v) if v == target_version => {} // Already correct
+						_ => updates.push((path.display().to_string(), line_num, line.to_string())),
 					}
 				}
 			}
@@ -178,39 +217,26 @@ fn collect_force_updates(dir: &std::path::Path, target_version: &str, updates: &
 //DEPRECATE: had some libs wrongly formatted, - here due to legacy. Won't be ran in normal workflows, - so it's fine that we're modifying files in place.
 fn patch_legacy_v_prefix(path: &std::path::Path, content: &str) {
 	let mut needs_patch = false;
+	let mut new_lines = Vec::new();
 	for line in content.lines() {
 		let trimmed = line.trim_start();
-		if trimmed.starts_with("#[deprecated") {
-			if let Some(since_version) = extract_since(trimmed) {
-				if since_version.starts_with('v') {
-					needs_patch = true;
-					break;
-				}
+		let legacy = extract_since(trimmed)
+			.filter(|_| trimmed.starts_with("#[deprecated"))
+			.and_then(|since_version| Some((since_version, since_version.strip_prefix('v')?)));
+		match legacy {
+			Some((since_version, corrected_version)) => {
+				needs_patch = true;
+				new_lines.push(
+					line.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
+						.replace(&format!("since=\"{}\"", since_version), &format!("since = \"{}\"", corrected_version)),
+				);
 			}
+			None => new_lines.push(line.to_string()),
 		}
 	}
 
 	if !needs_patch {
 		return;
-	}
-
-	let mut new_lines = Vec::new();
-	for line in content.lines() {
-		let trimmed = line.trim_start();
-		if trimmed.starts_with("#[deprecated") {
-			if let Some(since_version) = extract_since(trimmed) {
-				if since_version.starts_with('v') {
-					// Strip the 'v' prefix
-					let corrected_version = &since_version[1..];
-					let new_line = line
-						.replace(&format!("since = \"{}\"", since_version), &format!("since = \"{}\"", corrected_version))
-						.replace(&format!("since=\"{}\"", since_version), &format!("since = \"{}\"", corrected_version));
-					new_lines.push(new_line);
-					continue;
-				}
-			}
-		}
-		new_lines.push(line.to_string());
 	}
 
 	let mut new_content = new_lines.join("\n");
@@ -245,7 +271,7 @@ fn update_since_in_file(path: &str, line_num: usize, old_line: &str, target_vers
 	let lines: Vec<&str> = content.lines().collect();
 
 	// Verify line still matches
-	if lines.get(line_num) != Some(&old_line.as_ref()) {
+	if lines.get(line_num) != Some(&old_line) {
 		return Ok(()); // Line changed, skip
 	}
 
@@ -274,12 +300,9 @@ fn update_deprecated_since(line: &str, version: &str) -> String {
 		let after_since = &trimmed[since_start + 5..];
 		// Find the = and the quoted value
 		if let Some(eq_pos) = after_since.find('=') {
-			let after_eq = &after_since[eq_pos + 1..].trim_start();
-			if after_eq.starts_with('"') {
-				if let Some(end_quote) = after_eq[1..].find('"') {
-					let after_value = &after_eq[end_quote + 2..];
-					return format!("{}{}since = \"{}\"{}", indent, before_since, version, after_value);
-				}
+			let after_eq = after_since[eq_pos + 1..].trim_start();
+			if let Some(after_value) = after_eq.strip_prefix('"').and_then(|q| q.split_once('"')).map(|(_, rest)| rest) {
+				return format!("{}{}since = \"{}\"{}", indent, before_since, version, after_value);
 			}
 		}
 	}

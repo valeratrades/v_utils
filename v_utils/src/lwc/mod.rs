@@ -1,7 +1,11 @@
 //! Framework-neutral lightweight-charts interop boilerplate. A thin JS core (`lwc_core.js`, bundled
 //! as a wasm-bindgen snippet) owns the chart instance and dispatches to an app-supplied
-//! `draw(chart, data, viewSpec)` module served by the consumer at `draw_url`. Callers wire their own
-//! reactive effect around [`mount`]; no leptos/dioxus dependency lives here.
+//! `draw(chart, data, viewSpec, lib)` module served by the consumer at `draw_url`. Callers wire their
+//! own reactive effect around [`mount`]; no leptos/dioxus dependency lives here.
+//!
+//! lightweight-charts itself is embedded (see `LWC_VERSION` in `build.rs`) and handed to the draw
+//! module as `lib`. Consumers need no import map and no CDN: draw modules must take the library from
+//! that argument rather than importing it, or they will pull in a second, unresolvable copy.
 
 mod time_ticks;
 pub use time_ticks::format_time_tick;
@@ -15,8 +19,10 @@ mod imp {
 	#[wasm_bindgen(module = "/src/lwc/lwc_core.js")]
 	extern "C" {
 		#[wasm_bindgen(catch, js_name = mount)]
-		async fn mount_js(el: web_sys::HtmlElement, draw_url: &str, data_json: &str, view_spec: &str, fmt: &js_sys::Function) -> Result<JsValue, JsValue>;
+		async fn mount_js(el: web_sys::HtmlElement, draw_url: &str, data_json: &str, view_spec: &str, fmt: &js_sys::Function, lib_src: &str) -> Result<JsValue, JsValue>;
 	}
+
+	const LIB_SRC: &str = include_str!(concat!(env!("OUT_DIR"), "/lightweight-charts.mjs"));
 
 	thread_local! {
 		// Leaked once: stateless formatter, single-threaded wasm — cheaper than reallocating the closure
@@ -38,7 +44,7 @@ mod imp {
 	/// `draw_url`. `view_spec` is an opaque JSON blob forwarded verbatim to `draw`. Returns a banner
 	/// string on a chart-side error, else `None`.
 	pub async fn mount(el: web_sys::HtmlElement, draw_url: &str, data_json: &str, view_spec: &str) -> Option<String> {
-		match mount_js(el, draw_url, data_json, view_spec, &tick_fmt()).await {
+		match mount_js(el, draw_url, data_json, view_spec, &tick_fmt(), LIB_SRC).await {
 			Ok(v) => v.as_string(),
 			Err(e) => Some(format!("⚠ chart mount failed — {e:?}")),
 		}

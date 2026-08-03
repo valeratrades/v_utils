@@ -238,7 +238,7 @@ impl schemars::JsonSchema for Timeframe {
 /// const-generic position. Malformed input is then a compile error.
 ///
 /// # Panics
-impl const From<&str> for Timeframe {
+const impl From<&str> for Timeframe {
 	fn from(s: &str) -> Self {
 		match Timeframe::parse_ascii(s.as_bytes()) {
 			Ok(tf) => tf,
@@ -248,7 +248,7 @@ impl const From<&str> for Timeframe {
 	}
 }
 /// # Panics
-impl const From<&&str> for Timeframe {
+const impl From<&&str> for Timeframe {
 	fn from(s: &&str) -> Self {
 		Timeframe::from(*s)
 	}
