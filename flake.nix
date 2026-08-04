@@ -31,7 +31,7 @@
         };
         github = v_flakes.github {
           inherit pkgs pname rs;
-          lastSupportedVersion = "nightly-2025-10-12";
+          lastSupportedVersion = "nightly-2026-06-28";
           enable = true;
           jobs = {
             default = true;
@@ -41,7 +41,7 @@
             warnings.exclude = [ "rust-doc" ];
           };
         };
-        readme = v_flakes.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.92"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
+        readme = v_flakes.readme-fw { inherit pkgs pname; defaults = true; lastSupportedVersion = "nightly-1.98"; rootDir = ./.; badges = [ "msrv" "crates_io" "docs_rs" "loc" "ci" ]; };
         combined = v_flakes.utils.combine { inherit rust; modules = [ rs github readme ]; };
       in
       {
