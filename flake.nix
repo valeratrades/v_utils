@@ -31,7 +31,7 @@
         };
         github = v_flakes.github {
           inherit pkgs pname rs;
-          lastSupportedVersion = "nightly-2026-06-28";
+          lastSupportedVersion = "nightly-2026-06-29";
           enable = true;
           jobs = {
             default = true;
