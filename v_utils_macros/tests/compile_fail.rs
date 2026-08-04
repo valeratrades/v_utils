@@ -8,10 +8,13 @@ fn main() -> ui_test::color_eyre::Result<()> {
 	// Strict suite: every diagnostic must be annotated (these pin exact macro-expansion errors).
 	let strict = base_config(root.join("tests/compile_fail"), root);
 	// Cascade suite: the `SettingsNested` trait-bound failure necessarily repeats across every
-	// site that names `<T as SettingsNested>::Flags`. Annotating each is brittle, so this dir
-	// runs with annotations off and pins the full `.stderr` snapshot instead.
+	// site that names `<T as SettingsNested>::Flags`, dragging in notes that quote std, clap and
+	// serde internals — those churn on every toolchain and dependency bump. So this dir asserts
+	// only its own `//~ ERROR` annotations: `Ice` as the required level exempts the unannotated
+	// errors from the exhaustiveness sweep, and the `.stderr` snapshot is not compared at all.
 	let mut cascade = base_config(root.join("tests/compile_fail_cascade"), root);
-	cascade.comment_defaults.base().require_annotations = Spanned::dummy(false).into();
+	cascade.comment_defaults.base().require_annotations_for_level = Spanned::dummy(ui_test::diagnostics::Level::Ice).into();
+	cascade.output_conflict_handling = ui_test::ignore_output_conflict;
 
 	ui_test::run_tests(strict)?;
 	ui_test::run_tests(cascade)

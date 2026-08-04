@@ -8,11 +8,11 @@ use v_utils_macros::Settings;
 // nested settings field otherwise needs, so the *only* failure is the missing trait.
 //
 // The flags struct names `<Strategy as SettingsNested>::Flags` in many places (struct field,
-// every derive, the config-source impl), so the diagnostic cascades; this directory runs with
-// annotations off and pins the whole `.stderr` rather than tagging each line. The contract under
-// test is just that the error is the named trait bound, not a `__SettingsNested*` resolution miss.
+// every derive, the config-source impl), so the diagnostic cascades; this directory tags only the
+// one line below and lets the rest go unannotated. The contract under test is just that the error
+// is the named trait bound, not a `__SettingsNested*` resolution miss.
 // `MyConfigPrimitives` already emits the serde impls, so `AppConfig` must NOT also derive them.
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)] //~ ERROR: the trait bound `Strategy: SettingsNested` is not satisfied
 pub struct AppConfig {
 	#[settings(flatten)]
 	#[serde(default)]
