@@ -12,5 +12,8 @@ pub use file_open::*;
 pub mod progress_bar;
 pub use progress_bar::*;
 
-#[cfg(not(feature = "wasm"))] // no clue why, but it breaks (could it be lto and --no-bitcode?)
+// The target, not the `wasm` feature: a feature is additive, so one that *removes* a module leaves
+// `lib::xdg`'s re-export — gated on the target since it was written — pointing at nothing the moment
+// a workspace holding one wasm member unifies the feature onto a native build of this crate.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod xdg;
