@@ -12,7 +12,7 @@ use v_utils_macros::Settings;
 // one line below and lets the rest go unannotated. The contract under test is just that the error
 // is the named trait bound, not a `__SettingsNested*` resolution miss.
 // `MyConfigPrimitives` already emits the serde impls, so `AppConfig` must NOT also derive them.
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)] //~ ERROR: the trait bound `Strategy: SettingsNested` is not satisfied
+#[derive(Clone, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)] //~ ERROR: the trait bound `Strategy: SettingsNested` is not satisfied
 pub struct AppConfig {
 	#[settings(flatten)]
 	#[serde(default)]

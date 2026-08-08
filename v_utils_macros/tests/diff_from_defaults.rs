@@ -76,7 +76,7 @@ fn test() {
 		insta::assert_snapshot!(diff, @r###"database.url: "" -> "postgres://localhost/db""###);
 	}
 }
-#[derive(Clone, Debug, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Settings, v_utils_macros::MyConfigPrimitives)]
 struct Config {
 	#[serde(default)]
 	host: String,

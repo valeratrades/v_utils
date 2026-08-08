@@ -27,7 +27,7 @@ struct Logging {
 	tags: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, JsonSchema, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, JsonSchema, Settings, v_utils_macros::MyConfigPrimitives)]
 #[allow(unused)]
 struct ModuleConfig {
 	#[serde(default)]

@@ -12,7 +12,7 @@ struct Cli {
 	#[clap(flatten)]
 	settings_flags: SettingsFlags,
 }
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)]
 struct TestConfig {
 	#[serde(default)]
 	host: String,

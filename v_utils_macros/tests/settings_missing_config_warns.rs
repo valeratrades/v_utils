@@ -21,7 +21,7 @@ struct Cli {
 /// Every field has a default, so a build with no config file present is fully
 /// determined — the only question the test asks is whether `try_build` reaches
 /// it (warn-and-build) rather than bailing (silent-or-loud failure).
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)]
 struct DefaultedConfig {
 	#[serde(default)]
 	host: String,

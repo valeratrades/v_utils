@@ -1,6 +1,6 @@
 use crate::{LargeNumber, Percent};
 
-#[derive(bon::Builder, Clone, Copy, Debug, Default, serde::Deserialize, PartialEq, serde::Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, bon::Builder, serde::Deserialize, serde::Serialize)]
 pub struct NowThen {
 	#[builder(into)]
 	pub now: LargeNumber,

@@ -8,7 +8,7 @@ use v_utils_macros::Settings;
 
 // `use_env = false` is the default; it rides along to exercise the comma-separated
 // struct-attr parse path at compile time.
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)]
 #[settings(use_env = false, config_name = "parent_app/sub_tool")]
 struct SubToolConfig {
 	#[serde(default)]

@@ -6,7 +6,7 @@
 
 use v_utils_macros::Settings;
 
-#[derive(Clone, Debug, Default, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)]
 #[allow(unused)]
 struct NoSchemaConfig {
 	#[serde(default)]

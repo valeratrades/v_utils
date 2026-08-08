@@ -48,7 +48,7 @@ fn test() {
 /// Settings struct with Default and Serialize for config auto-extension support.
 /// When a config field is missing, the macro can offer to extend the config file
 /// with default values from Default::default().
-#[derive(Clone, Debug, Default, LiveSettings, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, LiveSettings, Settings, v_utils_macros::MyConfigPrimitives)]
 struct AppConfig {
 	#[serde(default)]
 	host: String,

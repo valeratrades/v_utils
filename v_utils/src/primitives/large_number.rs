@@ -9,7 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// assert_eq!(LargeNumber::with_precision(2420.0, 0.005).format(false).as_str(), "2.42K");
 /// assert_eq!(LargeNumber::new(69420.0).format(true).as_str(), "69"); // skip SI suffix
 ///```
-#[derive(Clone, Copy, Debug, derive_more::Deref, derive_more::DerefMut, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, derive_more::Deref, derive_more::DerefMut)]
 pub struct LargeNumber {
 	#[deref]
 	#[deref_mut]

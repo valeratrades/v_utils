@@ -18,7 +18,7 @@ struct Logging {
 	file: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, JsonSchema, v_utils_macros::MyConfigPrimitives, Settings)]
+#[derive(Clone, Debug, Default, JsonSchema, Settings, v_utils_macros::MyConfigPrimitives)]
 #[allow(unused)]
 struct SchemaConfig {
 	#[serde(default)]

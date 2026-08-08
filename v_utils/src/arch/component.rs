@@ -201,7 +201,7 @@ impl From<&str> for ComponentId {
 }
 
 /// The state of a component within the system.
-#[derive(Clone, Copy, Debug, Default, derive_more::Display, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, derive_more::Display)]
 pub enum ComponentState {
 	/// When a component is instantiated, but not yet ready to fulfill its specification.
 	#[default]
@@ -277,7 +277,7 @@ impl ComponentState {
 }
 
 /// A trigger condition for a component state transition.
-#[derive(Clone, Copy, Debug, derive_more::Display, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, derive_more::Display)]
 pub enum ComponentTrigger {
 	Initialize,
 	Start,
