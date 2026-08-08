@@ -69,11 +69,22 @@ pub mod __internal {
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
 	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
 
+	/// Written by `write-defaults` in place of a field whose type supplies no `Default`, and
+	/// rejected by `try_build` — the two ends of "we can scaffold your config, but we cannot
+	/// invent this value for you".
+	#[cfg(feature = "cli")]
+	pub const REQUIRED_PLACEHOLDER: &str = "REQUIRED";
+
 	#[cfg(feature = "cli")]
 	#[derive(Debug, thiserror::Error)]
 	pub enum SettingsError {
 		#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
 		MultipleConfigs { paths: Vec<PathBuf> },
+		#[error("Settings left unset (still holding the `{}` placeholder){}:\n{}\n\nThese fields have no default — `write-defaults` could only scaffold them. Open the file above and replace each placeholder with a real value.",
+			REQUIRED_PLACEHOLDER,
+			.config_path.as_ref().map(|p| format!(" in {}", p.display())).unwrap_or_else(|| " (from env/flags)".to_owned()),
+			.paths.iter().map(|p| format!("  - {p}")).collect::<Vec<_>>().join("\n"))]
+		Unset { paths: Vec<String>, config_path: Option<PathBuf> },
 		/// NB: no `#[from]`/`#[source]` — these are terminal error messages, not chain links.
 		/// With `#[from]`, thiserror sets `source()` to the inner type, which causes
 		/// `format_eyre_chain_for_user` to print the same message twice (once as root, once as wrapper).

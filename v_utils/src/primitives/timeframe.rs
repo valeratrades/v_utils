@@ -121,7 +121,7 @@ impl FromStr for TimeframeDesignator {
 ///
 /// `ConstParamTy` so a timeframe can stand in const-generic position: a retained window *is* a
 /// timeframe, and spelling it there as a bare `u64` is what loses the unit.
-#[derive(derive_more::Add, Clone, core::marker::ConstParamTy, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, derive_more::Sub)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, derive_more::Add, core::marker::ConstParamTy, derive_more::Sub)]
 pub struct Timeframe(pub u64);
 impl Timeframe {
 	pub fn try_as_predefined(&self, predefined: &[&'static str]) -> Option<&'static str> {
@@ -263,6 +263,7 @@ impl std::ops::Div for Timeframe {
 	type Output = u64;
 
 	fn div(self, rhs: Timeframe) -> u64 {
+		assert_eq!(self.0 % rhs.0, 0, "{self} is not a whole multiple of {rhs}");
 		self.0 / rhs.0
 	}
 }
@@ -270,6 +271,7 @@ impl std::ops::Div<u64> for Timeframe {
 	type Output = Timeframe;
 
 	fn div(self, rhs: u64) -> Timeframe {
+		assert_eq!(self.0 % rhs, 0, "{self} does not split into {rhs} whole parts");
 		Timeframe(self.0 / rhs)
 	}
 }

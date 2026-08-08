@@ -1652,6 +1652,13 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// and works normally, but the auto-extension feature is silently disabled.
 /// Missing fields will just show the regular error message.
 ///
+/// # Fields with no default
+/// `write_defaults()` does not require the struct as a whole to be `Default + Serialize` — it
+/// falls back to probing each top-level field's own type. A field whose type supplies no default
+/// is warned about on stderr and written as the string `"REQUIRED"`, so the scaffolded config
+/// still lists every field. `try_build` then refuses any config that still holds such a
+/// placeholder, naming the file and every unset path ([`SettingsError::Unset`]).
+///
 /// # Nesting
 /// Use `#[settings(flatten)]` on fields to include nested config sections. The nested struct
 /// must derive `SettingsNested`.
@@ -1806,6 +1813,26 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
+
+	// Field-wise default lookup, used when the struct as a whole has no `Default + Serialize`.
+	// Each field's *type* is probed independently (autoref specialization), so a single
+	// default-less section no longer sinks the whole config-writing feature.
+	let field_default_entries = fields.iter().map(|f| {
+		let name = f.ident.as_ref().unwrap().to_string();
+		let ty = &f.ty;
+		quote! {
+			{
+				let field_wrapper = __settings_default_provider::Wrapper::<#ty>(std::marker::PhantomData);
+				match (&field_wrapper).get_defaults() {
+					Some(v) => { map.insert(#name.to_string(), v); }
+					None => {
+						unset.push(#name);
+						map.insert(#name.to_string(), ::v_utils::__internal::serde_json::Value::String(::v_utils::__internal::REQUIRED_PLACEHOLDER.to_string()));
+					}
+				}
+			}
+		}
+	});
 
 	let try_build = quote! {
 		/// Helper module for autoref specialization pattern.
@@ -2086,6 +2113,22 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					Self::warn_unknown_fields(file_cfg);
 				}
 
+				// `write-defaults` fills default-less fields with a placeholder rather than
+				// refusing to write the file at all; refuse *here* instead, where we can name
+				// both the file and the exact paths still awaiting a value.
+				{
+					let mut unset = Vec::new();
+					if let Ok(table) = raw.clone().try_deserialize::<std::collections::HashMap<String, ::v_utils::__internal::serde_json::Value>>() {
+						for (key, value) in &table {
+							Self::collect_placeholder_paths(value, key.clone(), &mut unset);
+						}
+					}
+					if !unset.is_empty() {
+						unset.sort();
+						return Err(::v_utils::__internal::SettingsError::Unset { paths: unset, config_path });
+					}
+				}
+
 				// Deserialize with serde (which supports MyConfigPrimitives custom deserializer)
 				match raw.try_deserialize() {
 					Ok(config) => Ok(config),
@@ -2133,6 +2176,23 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 							eprintln!("warning: unknown configuration field '{field_name}' will be ignored");
 						}
 					}
+				}
+			}
+
+			fn collect_placeholder_paths(
+				value: &::v_utils::__internal::serde_json::Value,
+				path: String,
+				found: &mut Vec<String>,
+			) {
+				use ::v_utils::__internal::serde_json::Value;
+				match value {
+					Value::String(s) if s == ::v_utils::__internal::REQUIRED_PLACEHOLDER => found.push(path),
+					Value::Object(map) => {
+						for (key, nested) in map {
+							Self::collect_placeholder_paths(nested, format!("{path}.{key}"), found);
+						}
+					}
+					_ => {}
 				}
 			}
 
@@ -2580,41 +2640,46 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				Ok(module_path)
 			}
 
+			/// Default values for every top-level field, falling back to per-field probing when the
+			/// struct as a whole is not `Default + Serialize`. Fields whose own type cannot supply a
+			/// default are reported in the second tuple element and carry a `REQUIRED_PLACEHOLDER`
+			/// value, which `try_build` refuses to load.
+			fn defaults_with_placeholders() -> Result<(::v_utils::__internal::serde_json::Value, Vec<&'static str>), ::v_utils::__internal::eyre::Report> {
+				use __settings_default_provider::{GetDefaults as _, HasDefault as _, HasSerialize as _};
+
+				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
+				if let Some(defaults) = (&wrapper).get_defaults() {
+					return Ok((defaults, Vec::new()));
+				}
+				if (&wrapper).has_default() && (&wrapper).has_serialize() {
+					return Err(::v_utils::__internal::eyre::eyre!(
+						"write_defaults: `{}` implements Default + Serialize, but `serde_json::to_value(&Self::default())` returned Err (likely a Serialize impl rejecting some value, e.g. non-string map key or `f64::NAN`)",
+						std::any::type_name::<Self>()
+					));
+				}
+
+				let mut map = ::v_utils::__internal::serde_json::Map::new();
+				let mut unset: Vec<&'static str> = Vec::new();
+				#(#field_default_entries)*
+				Ok((::v_utils::__internal::serde_json::Value::Object(map), unset))
+			}
+
 			/// Writes default values to the config file for fields that aren't already specified.
 			///
 			/// If the config file doesn't exist, creates a new one at `~/.config/<app_name>.nix`
 			/// with all default values.
 			///
-			/// Returns `Err` if Default + Serialize are not implemented, or if file operations fail.
+			/// Fields with no obtainable default are written as `"REQUIRED"` and warned about on stderr.
 			pub fn write_defaults() -> Result<std::path::PathBuf, ::v_utils::__internal::eyre::Report> {
-				use __settings_default_provider::{GetDefaults as _, HasDefault as _, HasSerialize as _};
 				use ::v_utils::__internal::eyre::WrapErr as _;
 
-				let wrapper = __settings_default_provider::Wrapper::<Self>(std::marker::PhantomData);
-				let defaults = (&wrapper).get_defaults()
-					.ok_or_else(|| {
-						let has_default = (&wrapper).has_default();
-						let has_serialize = (&wrapper).has_serialize();
-						let missing: Vec<&'static str> = [
-							(!has_default).then_some("Default"),
-							(!has_serialize).then_some("serde::Serialize"),
-						].into_iter().flatten().collect();
-						let struct_name = std::any::type_name::<Self>();
-						if missing.is_empty() {
-							// Both traits present but serialization failed at runtime.
-							::v_utils::__internal::eyre::eyre!(
-								"write_defaults: `{}` implements Default + Serialize, but `serde_json::to_value(&Self::default())` returned Err (likely a Serialize impl rejecting some value, e.g. non-string map key or `f64::NAN`)",
-								struct_name
-							)
-						} else {
-							::v_utils::__internal::eyre::eyre!(
-								"write_defaults requires `{}` to `impl` {} (missing: {})",
-								struct_name,
-								missing.join(" + "),
-								missing.join(", "),
-							)
-						}
-					})?;
+				let (defaults, unset) = Self::defaults_with_placeholders()?;
+				for field in &unset {
+					eprintln!(
+						"warning: `{field}` has no default — written as \"{}\". Open the config and set it by hand.",
+						::v_utils::__internal::REQUIRED_PLACEHOLDER
+					);
+				}
 
 				let config_name = #config_name_expr;
 
@@ -2882,7 +2947,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 	let settings_args = quote_spanned! { proc_macro2::Span::call_site()=>
 		//HACK: we create a struct with a fixed name here, which will error if macro is derived on more than one struct in the same scope. But good news: it's only ever meant to be derived on one struct anyways.
 		#[allow(dead_code)]
-		#[derive(clap::Args, Clone, Debug, Default, PartialEq)] // have to derive for everything that `Cli` itself may ever want to derive.
+		#[derive(Clone, Debug, Default, PartialEq, clap::Args)] // have to derive for everything that `Cli` itself may ever want to derive.
 		pub struct SettingsFlags {
 			#[arg(short, long)]
 			config: Option<v_utils::io::ExpandedPath>,
@@ -3158,7 +3223,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 	let expanded = quote! {
 		#[allow(dead_code)]
 		#[doc(hidden)]
-		#[derive(clap::Args, Clone, Debug, Default, PartialEq)]
+		#[derive(Clone, Debug, Default, PartialEq, clap::Args)]
 		pub struct #produced_struct_name {
 			#(#prefixed_flags)*
 		}
