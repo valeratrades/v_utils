@@ -1,7 +1,7 @@
 use std::{
 	borrow::Cow,
 	fs::File,
-	io::{BufRead, BufReader, Seek, SeekFrom, Write},
+	io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
 	sync::{
 		Arc, Mutex,
@@ -15,9 +15,11 @@ use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 
-/// Maximum log file size before trimming (20GB)
-const LOG_MAX_SIZE_BYTES: u64 = 20 * 1024 * 1024 * 1024;
-/// How often to check log file size (1 minute)
+/// Entries older than this are dropped from the log file.
+const LOG_MAX_AGE_SECS: i64 = 7 * 24 * 60 * 60;
+/// Backstop for the age cap, which cannot bound a process that logs in a hot loop.
+const LOG_MAX_SIZE_BYTES: u64 = 512 * 1024 * 1024;
+/// How often the guardian re-checks the log file (1 minute)
 const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
 const DIRECTIVES_FILENAME: &str = "_log_directives";
@@ -96,7 +98,11 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		//#[feature("tokio_full")]
 		//let console_layer = console_subscriber::spawn::<Registry>(); // does nothing unless `RUST_LOG=tokio=trace,runtime=trace`. But how do I make it not write to file for them?
 		//
-		//TODO!!!: check out [tracing appender](https://docs.rs/tracing-appender/latest/tracing_appender/) - seems very useful for long-running processes. Probably should add it here + config for it in the same place as directives conf
+		//[x]TODO!!!: check out [tracing appender](https://docs.rs/tracing-appender/latest/tracing_appender/) - seems very useful for long-running processes. Probably should add it here + config for it in the same place as directives conf
+		// Unbounded growth is handled instead by the guardian thread below (age + size cap),
+		// which keeps the one-file-per-app layout that `LogDestination::Xdg` and every consumer
+		// tailing `$XDG_STATE_HOME/<app>/.log` depend on — `tracing-appender`'s rotation only
+		// ever writes `.log.<date>`. The runtime-configurable half of this is still open.
 
 		use tracing_subscriber::filter::LevelFilter;
 
@@ -251,36 +257,100 @@ struct SharedFileWriter {
 
 impl SharedFileWriter {
 	fn do_trim(&self, file: &mut File) {
-		// Read the file content (open new handle for reading)
-		let lines: Vec<String> = match std::fs::File::open(self.path.as_ref()) {
-			Ok(f) => BufReader::new(f).lines().map_while(Result::ok).collect(),
-			Err(_) => return,
+		let Some(drop_bytes) = drop_offset(self.path.as_ref(), now_unix_secs() - LOG_MAX_AGE_SECS) else {
+			return;
 		};
-
-		let total_lines = lines.len();
-		if total_lines < 1000 {
-			return;
+		match shift_file_back(file, self.path.as_ref(), drop_bytes) {
+			Ok(()) => eprintln!("[log-guardian] Trimmed {drop_bytes} bytes of aged-out entries from {}", self.path.display()),
+			// A failed shift leaves the file as it was; the guardian retries on the next tick.
+			Err(e) => eprintln!("[log-guardian] Failed to trim {}: {e}", self.path.display()),
 		}
-
-		// Keep the last 75% of lines
-		let lines_to_skip = total_lines / 4;
-		let remaining_lines = &lines[lines_to_skip..];
-
-		// Truncate and rewrite the file
-		if file.set_len(0).is_err() {
-			return;
-		}
-		if file.seek(SeekFrom::Start(0)).is_err() {
-			return;
-		}
-
-		for line in remaining_lines {
-			let _ = writeln!(file, "{line}");
-		}
-		let _ = file.flush();
-
-		eprintln!("[log-guardian] Trimmed log file: removed {lines_to_skip} lines, {} remaining", remaining_lines.len());
 	}
+}
+
+fn now_unix_secs() -> i64 {
+	std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("system clock is after 1970").as_secs() as i64
+}
+
+/// Unix seconds of the event that a `.pretty()` line opens, or `None` if the line is a
+/// continuation (`    at …` / `    in …`), a blank, or otherwise not an event header.
+///
+/// Shape being matched, from the `fmt` layer configured in [`init_subscriber`]:
+/// `␣␣2026-08-12T21:00:52.158805Z␣␣WARN␣…`
+fn event_start_secs(line: &str) -> Option<i64> {
+	let stamp = line.strip_prefix("  ")?.get(..19)?;
+	let b = stamp.as_bytes();
+	if b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' {
+		return None;
+	}
+	let num = |r: std::ops::Range<usize>| stamp[r].parse::<i64>().ok();
+	let (y, m, d) = (num(0..4)?, num(5..7)?, num(8..10)?);
+	let (h, mi, s) = (num(11..13)?, num(14..16)?, num(17..19)?);
+
+	// Hinnant `days_from_civil` — inverse of the `civil_from_days` in `lwc::time_ticks`.
+	let y = y - i64::from(m <= 2);
+	let era = if y >= 0 { y } else { y - 399 } / 400;
+	let yoe = y - era * 400;
+	let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+	let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	let days = era * 146097 + doe - 719468;
+
+	Some(days * 86400 + h * 3600 + mi * 60 + s)
+}
+
+/// Byte offset of the first event at or after `cutoff_secs`, i.e. how much of the head has aged
+/// out. `None` when nothing needs dropping. Streams rather than reading the file in — these grow
+/// to hundreds of MB, and the guardian runs on boxes where that is most of RAM.
+fn drop_offset(path: &Path, cutoff_secs: i64) -> Option<u64> {
+	let f = std::fs::File::open(path).ok()?;
+	let len = f.metadata().ok()?.len();
+	let mut reader = BufReader::new(f);
+	let mut offset = 0u64;
+	let mut saw_aged = false;
+	let mut first_live = None;
+	let mut line = String::new();
+	//LOOP: bounded by EOF, which `read_line` only reports as it reaches it
+	loop {
+		line.clear();
+		match reader.read_line(&mut line) {
+			Ok(0) => break,
+			Ok(n) => {
+				// Only headers are cut points, so an event's continuations go with it.
+				if let Some(secs) = event_start_secs(&line) {
+					if secs >= cutoff_secs {
+						first_live = Some(offset);
+						break;
+					}
+					saw_aged = true;
+				}
+				offset += n as u64;
+			}
+			// Non-UTF8 in the log means we cannot find event boundaries past this point.
+			Err(_) => break,
+		}
+	}
+	let by_age = match first_live {
+		Some(o) => o,
+		None if saw_aged => len, // every event aged out
+		None => 0,               // no events at all, or none old enough
+	};
+	let by_size = len.saturating_sub(LOG_MAX_SIZE_BYTES);
+	let drop = by_age.max(by_size).min(len);
+	(drop > 0).then_some(drop)
+}
+
+/// Discards the first `drop_bytes` of the file by copying the tail over the head in place.
+/// The read handle stays `drop_bytes` ahead of the write cursor throughout, so the regions
+/// never overlap.
+fn shift_file_back(file: &mut File, path: &Path, drop_bytes: u64) -> std::io::Result<()> {
+	let mut src = std::fs::File::open(path)?;
+	src.seek(SeekFrom::Start(drop_bytes))?;
+	file.seek(SeekFrom::Start(0))?;
+
+	let written = std::io::copy(&mut src, file)?;
+	file.set_len(written)?;
+	file.seek(SeekFrom::End(0))?;
+	file.flush()
 }
 
 impl Write for SharedFileWriter {
@@ -300,18 +370,26 @@ impl Write for SharedFileWriter {
 	}
 }
 
-/// Spawns a guardian thread that monitors log file size and signals when trim is needed.
+/// Spawns a guardian thread that signals when the log file has aged past [`LOG_MAX_AGE_SECS`]
+/// or grown past [`LOG_MAX_SIZE_BYTES`]. The trim itself happens on the next write, where the
+/// file handle is already locked.
 fn spawn_log_guardian(path: Arc<PathBuf>, needs_trim: Arc<AtomicBool>) {
 	thread::spawn(move || {
+		//LOOP: daemon thread, lives as long as the process it logs for
 		loop {
 			thread::sleep(LOG_CHECK_INTERVAL);
 
-			let file_size = match std::fs::metadata(path.as_ref()) {
-				Ok(m) => m.len(),
-				Err(_) => continue,
-			};
+			let Ok(meta) = std::fs::metadata(path.as_ref()) else { continue };
+			let aged = std::fs::File::open(path.as_ref())
+				.ok()
+				.and_then(|f| {
+					let mut first = String::new();
+					BufReader::new(f).read_line(&mut first).ok()?;
+					event_start_secs(&first)
+				})
+				.is_some_and(|oldest| oldest < now_unix_secs() - LOG_MAX_AGE_SECS);
 
-			if file_size > LOG_MAX_SIZE_BYTES {
+			if aged || meta.len() > LOG_MAX_SIZE_BYTES {
 				needs_trim.store(true, Ordering::Relaxed);
 			}
 		}
@@ -489,5 +567,55 @@ my_crate=debug
 
 		// Verify it actually parses
 		EnvFilter::builder().parse(&normalized).expect("normalized directives should parse");
+	}
+
+	#[test]
+	fn event_start_secs_reads_headers_and_skips_continuations() {
+		assert_eq!(event_start_secs("  1970-01-01T00:00:00.000000Z  INFO x: y"), Some(0));
+		assert_eq!(event_start_secs("  2026-08-12T21:00:52.158805Z  WARN x: y"), Some(1786568452));
+		// Leap-day and end-of-era cases, where `days_from_civil`'s month shift is easiest to get wrong.
+		assert_eq!(event_start_secs("  2024-02-29T00:00:00.0Z  INFO x: y"), Some(1709164800));
+		assert_eq!(event_start_secs("  2000-03-01T00:00:00.0Z  INFO x: y"), Some(951868800));
+
+		assert_eq!(event_start_secs("    at src/main.rs:60"), None);
+		assert_eq!(event_start_secs("    in some::span with x: 1"), None);
+		assert_eq!(event_start_secs(""), None);
+		assert_eq!(event_start_secs("  not-a-timestamp here"), None);
+	}
+
+	#[test]
+	fn drop_offset_cuts_at_the_first_live_event() {
+		let dir = tempfile::tempdir().expect("create tempdir");
+		let path = dir.path().join("t.log");
+		let head = "  2026-08-01T00:00:00.0Z  INFO old: a\n    at src/a.rs:1\n\n";
+		let tail = "  2026-08-12T00:00:00.0Z  INFO new: b\n    at src/b.rs:2\n\n";
+		std::fs::write(&path, format!("{head}{tail}")).expect("write log");
+
+		// Cutoff between the two events: the whole first event, continuation included, goes.
+		let cutoff = event_start_secs("  2026-08-06T00:00:00.0Z  INFO x: y").expect("parses");
+		assert_eq!(drop_offset(&path, cutoff), Some(head.len() as u64));
+
+		// Nothing old enough to drop.
+		assert_eq!(drop_offset(&path, 0), None);
+
+		// Everything aged out.
+		assert_eq!(drop_offset(&path, i64::MAX), Some((head.len() + tail.len()) as u64));
+	}
+
+	#[test]
+	fn shift_file_back_keeps_the_tail_and_appends_after_it() {
+		let dir = tempfile::tempdir().expect("create tempdir");
+		let path = dir.path().join("t.log");
+		std::fs::write(&path, "DROPME").expect("seed");
+		// Larger than the 64KiB copy buffer, so the chunked loop is actually exercised.
+		let keep = "k".repeat(200 * 1024);
+		std::fs::write(&path, format!("DROPME{keep}")).expect("write log");
+
+		let mut file = std::fs::OpenOptions::new().write(true).open(&path).expect("open for write");
+		shift_file_back(&mut file, &path, 6).expect("shift succeeds");
+		write!(file, "TAIL").expect("append after shift");
+		drop(file);
+
+		assert_eq!(std::fs::read_to_string(&path).expect("read back"), format!("{keep}TAIL"));
 	}
 }
