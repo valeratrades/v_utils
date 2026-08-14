@@ -15,10 +15,13 @@ use tracing::{info, warn};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt as _, prelude::*};
 
-/// Entries older than this are dropped from the log file.
+/// Entries older than this are dropped from the log file. Age is the aggressive axis on
+/// purpose: a week-old line is almost never the one being read.
 const LOG_MAX_AGE_SECS: i64 = 7 * 24 * 60 * 60;
-/// Backstop for the age cap, which cannot bound a process that logs in a hot loop.
-const LOG_MAX_SIZE_BYTES: u64 = 512 * 1024 * 1024;
+/// Worst-case catch for a process logging in a hot loop, not backpressure — a busy service
+/// legitimately writing gigabytes of recent lines should keep them, so this sits far above
+/// anything normal operation reaches.
+const LOG_MAX_SIZE_BYTES: u64 = 5 * 1024 * 1024 * 1024;
 /// How often the guardian re-checks the log file (1 minute)
 const LOG_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 const CARGO_DIRECTIVES_PATH: &str = ".cargo/log_directives";
