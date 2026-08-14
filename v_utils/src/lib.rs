@@ -29,6 +29,8 @@ pub mod bevy;
 // of course it's included unconditionally - the crate itself is called "v_utils"
 pub mod utils;
 
+#[cfg(feature = "fuzz")]
+pub mod fuzz;
 #[cfg(feature = "io")]
 pub mod io;
 #[cfg(feature = "lightweight_charts")]
