@@ -1,7 +1,7 @@
 use std::{
 	borrow::Cow,
 	fs::File,
-	io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+	io::{BufRead, BufReader, Seek, SeekFrom, Write},
 	path::{Path, PathBuf},
 	sync::{
 		Arc, Mutex,
@@ -260,7 +260,7 @@ struct SharedFileWriter {
 
 impl SharedFileWriter {
 	fn do_trim(&self, file: &mut File) {
-		let Some(drop_bytes) = drop_offset(self.path.as_ref(), now_unix_secs() - LOG_MAX_AGE_SECS) else {
+		let Some(drop_bytes) = drop_offset(self.path.as_ref(), now_unix_secs() - LOG_MAX_AGE_SECS, LOG_MAX_SIZE_BYTES) else {
 			return;
 		};
 		match shift_file_back(file, self.path.as_ref(), drop_bytes) {
@@ -301,16 +301,18 @@ fn event_start_secs(line: &str) -> Option<i64> {
 	Some(days * 86400 + h * 3600 + mi * 60 + s)
 }
 
-/// Byte offset of the first event at or after `cutoff_secs`, i.e. how much of the head has aged
-/// out. `None` when nothing needs dropping. Streams rather than reading the file in — these grow
-/// to hundreds of MB, and the guardian runs on boxes where that is most of RAM.
-fn drop_offset(path: &Path, cutoff_secs: i64) -> Option<u64> {
+/// How much of the head to discard so that what remains is both newer than `cutoff_secs` and no
+/// larger than `max_size`. `None` when nothing needs dropping. Streams rather than reading the
+/// file in — these grow to hundreds of MB, and the guardian runs on boxes where that is most of
+/// RAM.
+fn drop_offset(path: &Path, cutoff_secs: i64, max_size: u64) -> Option<u64> {
 	let f = std::fs::File::open(path).ok()?;
 	let len = f.metadata().ok()?.len();
+	// What the size backstop demands the head give up, before rounding out to an event.
+	let min_drop = len.saturating_sub(max_size);
 	let mut reader = BufReader::new(f);
 	let mut offset = 0u64;
-	let mut saw_aged = false;
-	let mut first_live = None;
+	let mut saw_header = false;
 	let mut line = String::new();
 	//LOOP: bounded by EOF, which `read_line` only reports as it reaches it
 	loop {
@@ -318,13 +320,13 @@ fn drop_offset(path: &Path, cutoff_secs: i64) -> Option<u64> {
 		match reader.read_line(&mut line) {
 			Ok(0) => break,
 			Ok(n) => {
-				// Only headers are cut points, so an event's continuations go with it.
+				// Only headers are cut points: that keeps an event's `at`/`in` continuations with
+				// it, and keeps the size path from leaving a torn line at the head of the file.
 				if let Some(secs) = event_start_secs(&line) {
-					if secs >= cutoff_secs {
-						first_live = Some(offset);
-						break;
+					saw_header = true;
+					if offset >= min_drop && secs >= cutoff_secs {
+						return (offset > 0).then_some(offset);
 					}
-					saw_aged = true;
 				}
 				offset += n as u64;
 			}
@@ -332,14 +334,9 @@ fn drop_offset(path: &Path, cutoff_secs: i64) -> Option<u64> {
 			Err(_) => break,
 		}
 	}
-	let by_age = match first_live {
-		Some(o) => o,
-		None if saw_aged => len, // every event aged out
-		None => 0,               // no events at all, or none old enough
-	};
-	let by_size = len.saturating_sub(LOG_MAX_SIZE_BYTES);
-	let drop = by_age.max(by_size).min(len);
-	(drop > 0).then_some(drop)
+	// No event survives both bounds. Only wipe if the file parsed as events at all — otherwise
+	// we do not understand its contents well enough to be deleting them.
+	saw_header.then_some(len)
 }
 
 /// Discards the first `drop_bytes` of the file by copying the tail over the head in place.
@@ -596,13 +593,39 @@ my_crate=debug
 
 		// Cutoff between the two events: the whole first event, continuation included, goes.
 		let cutoff = event_start_secs("  2026-08-06T00:00:00.0Z  INFO x: y").expect("parses");
-		assert_eq!(drop_offset(&path, cutoff), Some(head.len() as u64));
+		assert_eq!(drop_offset(&path, cutoff, u64::MAX), Some(head.len() as u64));
 
 		// Nothing old enough to drop.
-		assert_eq!(drop_offset(&path, 0), None);
+		assert_eq!(drop_offset(&path, 0, u64::MAX), None);
 
 		// Everything aged out.
-		assert_eq!(drop_offset(&path, i64::MAX), Some((head.len() + tail.len()) as u64));
+		assert_eq!(drop_offset(&path, i64::MAX, u64::MAX), Some((head.len() + tail.len()) as u64));
+
+		// Content we cannot parse as events is left alone rather than wiped.
+		let opaque = dir.path().join("opaque.log");
+		std::fs::write(&opaque, "not a log at all\n").expect("write opaque");
+		assert_eq!(drop_offset(&opaque, i64::MAX, u64::MAX), None);
+	}
+
+	#[test]
+	fn size_driven_cut_still_lands_on_an_event_boundary() {
+		let dir = tempfile::tempdir().expect("create tempdir");
+		let path = dir.path().join("t.log");
+		let head = "  2026-08-12T00:00:00.0Z  INFO a: a\n    at src/a.rs:1\n\n";
+		let tail = "  2026-08-12T00:00:01.0Z  INFO b: b\n    at src/b.rs:2\n\n";
+		std::fs::write(&path, format!("{head}{tail}")).expect("write log");
+		let total = (head.len() + tail.len()) as u64;
+
+		// Both events are recent, so only the size bound can force a cut. A budget that would
+		// bisect the first event has to round forward to the next header, never mid-line.
+		let bisecting = total - (head.len() as u64) + 1;
+		assert_eq!(drop_offset(&path, 0, bisecting), Some(head.len() as u64));
+
+		// Roomy enough for everything: no cut at all.
+		assert_eq!(drop_offset(&path, 0, total), None);
+
+		// Smaller than any single event: nothing can satisfy the bound, so the file goes.
+		assert_eq!(drop_offset(&path, 0, 1), Some(total));
 	}
 
 	#[test]
