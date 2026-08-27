@@ -27,7 +27,7 @@ export async function mount(el, drawUrl, dataJson, viewSpec, fmt, libSrc) {
     const lwc = await lib(libSrc);
     let chart = charts.get(el);
     if (!chart) {
-      chart = lwc.createChart(el, { autoSize: true });
+      chart = lwc.createChart(el, { autoSize: true, layout: { attributionLogo: false } });
       charts.set(el, chart);
       // Rust owns label policy; JS only feeds it live geometry (visible span + pixel width — only
       // obtainable from the chart). Falls back to the default label on pre-data (null range).
