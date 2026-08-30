@@ -18,7 +18,7 @@ compile_error!(
 compile_error!("Feature `async-io` is not compatible with wasm.");
 
 #[cfg(all(feature = "assert-wasm-compat", feature = "full"))]
-compile_error!("Feature `full` is not compatible with wasm (pulls in console-subscriber with mio).");
+compile_error!("Feature `full` is not compatible with wasm (pulls in `xdg` and a full tokio).");
 
 #[cfg(all(feature = "assert-wasm-compat", feature = "xdg"))]
 compile_error!("Feature `xdg` is not compatible with wasm.");

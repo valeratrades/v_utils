@@ -69,7 +69,6 @@ full = ["lite", "distributions", "xdg", "cli", "dep:tokio", "tokio/full"]
 ahash.workspace = true
 bevy = { workspace = true, features = ["bevy_state", "bevy_ui"], optional = true }
 bon.workspace = true
-bytes = { workspace = true, optional = true }
 config = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true, optional = true }
@@ -114,6 +113,9 @@ xdg = { workspace = true, optional = true }
 color-eyre.workspace = true
 miette = { workspace = true, features = ["fancy"] }
 tempfile.workspace = true
+
+[lints]
+workspace = true
 
 [[example]]
 name = "logging_emit"

@@ -40,6 +40,9 @@ tracing-error.workspace = true
 ui_test.workspace = true
 v_utils = { workspace = true, features = ["full"] }
 
+[lints]
+workspace = true
+
 [[test]]
 name = "graphemics"
 path = "tests/graphemics.rs"

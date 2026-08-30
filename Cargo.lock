@@ -5583,7 +5583,6 @@ dependencies = [
  "ahash",
  "bevy",
  "bon",
- "bytes",
  "color-eyre",
  "config",
  "console_error_panic_hook",
