@@ -136,15 +136,13 @@ impl FromStr for InfoSize {
 			bail!("InfoSize string is empty. Expected a string like '100MB' or '1GiB'");
 		}
 
-		// Find where the numeric part ends and the unit begins
-		let split_point = s.chars().position(|c| c.is_ascii_alphabetic());
-
-		let (n_str, unit_str) = match split_point {
-			Some(pos) => s.split_at(pos),
-			None => {
-				bail!("InfoSize string '{s}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc.")
-			}
+		// Find where the numeric part ends and the unit begins. `let..else` rather than a `match` arm so
+		// the `bail!` is a statement — in expression position its trailing semicolon trips
+		// `semicolon_in_expressions_from_macros`, a future hard error.
+		let Some(split_point) = s.chars().position(|c| c.is_ascii_alphabetic()) else {
+			bail!("InfoSize string '{s}' has no unit. Expected a unit like 'B', 'KB', 'MiB', etc.");
 		};
+		let (n_str, unit_str) = s.split_at(split_point);
 
 		let unit = InfoSizeUnit::from_str(unit_str)?;
 
@@ -366,9 +364,7 @@ impl FromStr for InfoSizeUnit {
 			"GiB" => Ok(InfoSizeUnit::Gibibyte),
 			"TiB" => Ok(InfoSizeUnit::Tebibyte),
 			"PiB" => Ok(InfoSizeUnit::Pebibyte),
-			_ => {
-				bail!("Invalid info size unit: {s}")
-			}
+			_ => Err(eyre!("Invalid info size unit: {s}")),
 		}
 	}
 }

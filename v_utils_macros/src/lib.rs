@@ -365,7 +365,9 @@ pub fn derive_compact_format_named(input: TokenStream) -> TokenStream {
 				quote! {
 					#ident: match provided_params.get(&#first_char) {
 						Some(v) => v.parse::<#ty>()?,
-						None => v_utils::__internal::eyre::bail!("missing required field '{}'", #field_name),
+						// `bail!` here would be a macro in expression position, and its trailing semicolon
+						// fires `semicolon_in_expressions_from_non_local_macros` in every consumer.
+						None => return Err(v_utils::__internal::eyre::eyre!("missing required field '{}'", #field_name).into()),
 					},
 				}
 			}
