@@ -66,6 +66,7 @@ pub mod __internal {
 	#[cfg(feature = "xdg")]
 	pub extern crate xdg;
 
+	#[cfg(feature = "cli")]
 	use std::path::PathBuf;
 
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
