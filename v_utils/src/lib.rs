@@ -1,5 +1,8 @@
 #![allow(clippy::get_first)]
 #![allow(clippy::len_zero)]
+// `eyre::bail!` expands to `return Err(..);`. Here rather than in `[lints]`, because CI's
+// `clippy -- -Dwarnings` is applied after the manifest's flags and would override it.
+#![allow(semicolon_in_expressions_from_macros)]
 #![allow(clippy::tabs_in_doc_comments)]
 #![feature(adt_const_params)]
 #![feature(const_convert)]
