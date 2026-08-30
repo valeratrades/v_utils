@@ -5622,6 +5622,7 @@ dependencies = [
  "ustr",
  "v_utils_macros",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "xdg",
 ]

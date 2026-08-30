@@ -9,6 +9,10 @@ readme = "README.md"
 repository = "https://github.com/valeratrades/v_utils"
 #
 
+# Reached only from a `#[wasm_bindgen]` expansion, and only on wasm32 — no `use` exists to find.
+[package.metadata.cargo-machete]
+ignored = ["wasm-bindgen-futures"]
+
 [features]
 default = ["lite"]
 
@@ -56,7 +60,7 @@ distributions = ["dep:rand", "dep:rand_distr"]
 wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 # Framework-neutral lightweight-charts interop boilerplate (`src/lwc/`). The chart↔Rust glue lives
 # once here; each consumer supplies only a `draw(chart, data, viewSpec)` JS module.
-lightweight_charts = ["dep:wasm-bindgen", "dep:web-sys", "dep:js-sys"]
+lightweight_charts = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:js-sys"]
 
 lite = ["io", "macros", "tracing", "dep:tokio"]
 full = ["lite", "distributions", "xdg", "cli", "dep:tokio", "tokio/full"]
@@ -102,6 +106,7 @@ tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", 
 ustr.workspace = true
 v_utils_macros = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement"], optional = true }
 xdg = { workspace = true, optional = true }
 

@@ -60,6 +60,7 @@ ustr = "1.1"
 # wasm interop (lightweight_charts feature). Floats within 0.2.x so it never forces a version on the
 # downstream graph — each consumer exact-pins wasm-bindgen to match its own wasm-bindgen-cli (in its flake).
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
 xdg = "3.0.0"
 
