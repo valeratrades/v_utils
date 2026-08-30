@@ -34,7 +34,6 @@ macros = ["v_utils_macros"]
 tracing = [
     "dep:xdg",
     "dep:tracing-subscriber",
-    "dep:tracing-log",
     "dep:tracing-error",
     "dep:miette",
     "dep:xdg",
@@ -57,30 +56,19 @@ distributions = ["dep:rand", "dep:rand_distr"]
 wasm = ["dep:console_error_panic_hook", "dep:console_log"]
 # Framework-neutral lightweight-charts interop boilerplate (`src/lwc/`). The chart↔Rust glue lives
 # once here; each consumer supplies only a `draw(chart, data, viewSpec)` JS module.
-lightweight_charts = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:js-sys"]
+lightweight_charts = ["dep:wasm-bindgen", "dep:web-sys", "dep:js-sys"]
 
-lite = ["io", "macros", "tracing", "dep:futures", "dep:tokio"]
-full = [
-    "lite",
-    "distributions",
-    "xdg",
-    "cli",
-    "dep:tokio",
-    "tokio/full",
-    "dep:console-subscriber",
-]
+lite = ["io", "macros", "tracing", "dep:tokio"]
+full = ["lite", "distributions", "xdg", "cli", "dep:tokio", "tokio/full"]
 
 [dependencies]
 ahash.workspace = true
-async-sse = { workspace = true, optional = true }
 bevy = { workspace = true, features = ["bevy_state", "bevy_ui"], optional = true }
 bon.workspace = true
 bytes = { workspace = true, optional = true }
 config = { workspace = true, optional = true }
-console-subscriber = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true, optional = true }
-const_format.workspace = true
 derive-new.workspace = true
 derive_more = { workspace = true, features = ["full"] }
 dirs = { workspace = true, optional = true }
@@ -89,21 +77,17 @@ facet = { workspace = true, optional = true }
 facet-json = { workspace = true, optional = true }
 facet-toml = { workspace = true, optional = true }
 function_name.workspace = true # weird to include this without a feature flag, but this is a utils crate in the end
-futures = { workspace = true, optional = true }
 indexmap.workspace = true
 insta.workspace = true
 js-sys = { workspace = true, optional = true }
 libc = { workspace = true, optional = true }
-macro-attr = { workspace = true, features = ["unstable-macros-1-1"] }
 miette = { workspace = true, optional = true }
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-appender-tracing = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, optional = true }
 opentelemetry_sdk = { workspace = true, optional = true }
-quote = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rand_distr = { workspace = true, optional = true }
-reqwest = { workspace = true, features = ["json", "blocking", "stream", "rustls"], optional = true }
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
@@ -113,13 +97,11 @@ tokio = { workspace = true, features = ["sync", "macros", "io-util", "rt", "time
 toml = { workspace = true, optional = true }
 tracing = { workspace = true, features = ["log", "std", "async-await"] }
 tracing-error = { workspace = true, optional = true }
-tracing-log = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json", "registry", "env-filter"], optional = true }
 ustr.workspace = true
 v_utils_macros = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, features = ["Document", "Element", "HtmlElement"], optional = true }
 xdg = { workspace = true, optional = true }
 

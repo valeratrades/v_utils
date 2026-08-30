@@ -7,6 +7,7 @@
 //!   2. libtest's stdout/stderr capture only intercepts the `print!`/
 //!      `println!` macros via `OUTPUT_CAPTURE`, not direct
 //!      `io::Stdout::write` calls — which is what tracing-subscriber does.
+//!
 //! So we spawn `examples/logging_emit.rs` as a fresh subprocess, point
 //! `XDG_STATE_HOME` at a tempdir, capture its stdout/stderr, then read
 //! the log file out of the tempdir.

@@ -731,28 +731,9 @@ pub fn derive_optional_fields_from_vec_str(input: TokenStream) -> TokenStream {
 		}
 	});
 
-	let expanded = quote! {
-	impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
-		type Error = &'static str;
-
-		fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
-			#(#init_nones)*
-
-			for s in strings {
-				#(#conversions)*
-
-				return std::result::Result::Err("Could not parse string");
-			}
-
-				std::result::Result::Ok(#name {
-					#(#write_fields)*
-			})
-			}
-		}
-	};
-
-	expanded.into()
+	try_from_vec_str(name, init_nones, conversions, write_fields).into()
 }
+
 #[proc_macro_derive(VecFieldsFromVecStr)]
 pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStream {
 	let ast = parse_macro_input!(input as syn::DeriveInput);
@@ -803,27 +784,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 		}
 	});
 
-	let expanded = quote! {
-	impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
-		type Error = &'static str;
-
-		fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
-			#(#init_empty_vecs)*
-
-			for s in strings {
-				#(#conversions)*
-
-				return std::result::Result::Err("Could not parse string");
-			}
-
-				std::result::Result::Ok(#name {
-					#(#write_fields)*
-			})
-			}
-		}
-	};
-
-	expanded.into()
+	try_from_vec_str(name, init_empty_vecs, conversions, write_fields).into()
 }
 /// Generates a custom serde Deserialize implementation for config deserialization with PrivateValue support.
 ///
@@ -1338,7 +1299,6 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	};
 	combined.into()
 }
-
 /// Drop-in replacement for `#[derive(schemars::JsonSchema)]` on config structs that use the
 /// `field: T = expr` default-field-value syntax (RFC 3681), the `#[settings(default = ..)]`
 /// attribute, or SmartDefault's `#[default(..)]`.
@@ -1408,7 +1368,6 @@ pub fn derive_config_json_schema(input: TokenStream) -> TokenStream {
 	}
 	.into()
 }
-
 #[proc_macro]
 pub fn make_df(input: TokenStream) -> TokenStream {
 	let DataFrameDef { values_vec, fields, .. } = parse_macro_input!(input as DataFrameDef);
@@ -3425,6 +3384,36 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+/// `FieldsFromVecStr` and `VecFieldsFromVecStr` emit the same `TryFrom<Vec<S>>` shell; all that
+/// differs is how a field starts out and how a parsed value is stored into it.
+fn try_from_vec_str(
+	name: &syn::Ident,
+	inits: impl Iterator<Item = proc_macro2::TokenStream>,
+	conversions: impl Iterator<Item = proc_macro2::TokenStream>,
+	write_fields: impl Iterator<Item = proc_macro2::TokenStream>,
+) -> proc_macro2::TokenStream {
+	let (inits, conversions, write_fields): (Vec<_>, Vec<_>, Vec<_>) = (inits.collect(), conversions.collect(), write_fields.collect());
+	quote! {
+	impl<S: AsRef<str>> TryFrom<Vec<S>> for #name {
+		type Error = &'static str;
+
+		fn try_from(strings: Vec<S>) -> core::result::Result<Self, Self::Error> {
+			#(#inits)*
+
+			for s in strings {
+				#(#conversions)*
+
+				return std::result::Result::Err("Could not parse string");
+			}
+
+				std::result::Result::Ok(#name {
+					#(#write_fields)*
+			})
+			}
+		}
+	}
+}
+
 /// Strip `field: T = expr` default-value tail from struct fields before handing the input to `syn`.
 ///
 /// `syn` 2.0 does not yet understand `#![feature(default_field_values)]` (RFC 3681) syntax, so

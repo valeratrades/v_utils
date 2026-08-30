@@ -141,6 +141,7 @@ impl From<&str> for Percent {
 /// Generate numeric conversions for percent wrapper types.
 /// - `infallible $T`: emits `From<f32/isize/usize/i32/i64/u32/u64>` (f64 comes from the derive).
 /// - `fallible $T`: emits `TryFrom<f64/f32/isize/usize/i32/i64/u32/u64>` going through `$T::try_new`.
+///
 /// Integer inputs are interpreted as raw percentage values (divided by 100); floats are treated as already-normalized.
 macro_rules! impl_numeric_conversions {
 	(infallible $T:ty) => {

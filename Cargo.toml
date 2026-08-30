@@ -9,17 +9,14 @@ v_utils = { path = "v_utils" }
 v_utils_macros = { path = "v_utils_macros", version = "2.12.7" }
 
 ahash = "0.8.12"
-async-sse = "5.1.0"
 bevy = { version = "0.18.1", default-features = false }
 bon = { version = "^3.9.1" }
 bytes = "1.11.1"
 clap = "4.6.1"
 color-eyre = "0.6"
 config = "0.15.22"
-console-subscriber = "0.5.0"
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
-const_format = "0.2.36"
 derive-new = "0.7.0"
 derive_more = "2.1.1"
 dirs = "6.0.0"
@@ -28,14 +25,12 @@ facet = { version = "^0.46" }
 facet-json = "0.46"
 facet-toml = "0.46"
 function_name = "0.3.0"
-futures = "0.3.32"
 heck = { version = "^0.5.0" }
 indexmap = "2.14.0"
 insta = { version = "^1.47.2", features = ["filters"] }
 jiff = "0.2.23"
 js-sys = "0.3"
 libc = "0.2"
-macro-attr = "0.2.0"
 miette = "7.6"
 opentelemetry = { version = "0.32", default-features = false, features = ["trace", "logs"] }
 opentelemetry-appender-tracing = { version = "0.32", default-features = false }
@@ -46,7 +41,6 @@ proc-macro2 = "1.0.106"
 quote = { version = "^1.0.45" }
 rand = "0.10.1"
 rand_distr = "0.6.0"
-reqwest = { version = "0.13.2", default-features = false }
 schemars = "1.2.1"
 secrecy = "0.10.3"
 serde = { version = "^1.0.228", features = ["derive"] }
@@ -59,7 +53,6 @@ tokio = "1.52.1"
 toml = { version = "^1.1" }
 tracing = "0.1.44"
 tracing-error = "0.2.1"
-tracing-log = "0.2.0"
 tracing-opentelemetry = "0.33"
 tracing-subscriber = "0.3.23"
 ui_test = "0.30"
@@ -67,7 +60,6 @@ ustr = "1.1"
 # wasm interop (lightweight_charts feature). Floats within 0.2.x so it never forces a version on the
 # downstream graph — each consumer exact-pins wasm-bindgen to match its own wasm-bindgen-cli (in its flake).
 wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
 xdg = "3.0.0"
 
