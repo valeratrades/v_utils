@@ -35,6 +35,8 @@ pub mod fuzz;
 pub mod io;
 #[cfg(feature = "lightweight_charts")]
 pub mod lwc;
+#[cfg(feature = "cli")]
+mod nix;
 #[cfg(feature = "lite")]
 pub mod prelude;
 pub mod primitives;
@@ -71,6 +73,8 @@ pub mod __internal {
 
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
 	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
+	#[cfg(feature = "cli")]
+	pub use crate::nix::eval_nix_file;
 
 	/// Written by `write-defaults` in place of a field whose type supplies no `Default`, and
 	/// rejected by `try_build` — the two ends of "we can scaffold your config, but we cannot

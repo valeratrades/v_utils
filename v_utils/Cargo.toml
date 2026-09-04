@@ -1,6 +1,6 @@
 [package]
 name = "v_utils"
-version = "2.17.15"
+version = "2.17.16"
 edition = "2024"
 description = "My utils crate"
 rust-version = "1.85"
@@ -28,6 +28,8 @@ cli = [
     "dep:facet-json",
     "dep:facet-toml",
     "dep:toml",
+    # pure-data `.nix` configs are parsed in-process instead of shelling out to `nix eval`
+    "dep:rnix",
 ]
 # JSON Schema generation (`schemars::JsonSchema`). Pulled in by `cli` for the Settings macro's
 # schema/module export; also enables `JsonSchema` for our own public types (e.g. `Timeframe`).
@@ -91,6 +93,7 @@ opentelemetry-otlp = { workspace = true, optional = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rand_distr = { workspace = true, optional = true }
+rnix = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true

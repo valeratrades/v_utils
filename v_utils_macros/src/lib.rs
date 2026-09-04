@@ -1579,7 +1579,8 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 ///   checking and editor awareness (`nixd`/`nil`). Options-only: it bakes in no value-defaults
 ///   (Rust's `Default` owns those); the config still sets every value itself.
 /// - Uses facet for deserialization with detailed error messages
-/// - Nix config files are evaluated using `nix eval --json --impure` and must return a valid attribute set
+/// - Nix config files must return a valid attribute set; ones that are plain literal data are read
+///   in-process, the rest go through `nix eval --json --impure --file`
 /// - **Auto-extension**: When a field is missing from the config, offers to extend the config file
 ///   with default values (requires the struct to implement `Default + Serialize`)
 ///
@@ -2020,7 +2021,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					Some(path) => {
 						// Check if it's a .nix file
 						if path.to_str().map(|s| s.ends_with(".nix")).unwrap_or(false) {
-							let json_str = Self::eval_nix_file(path.to_str().unwrap())?;
+							let json_str = ::v_utils::__internal::eval_nix_file(&path)?;
 							let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 							let file_only = file_builder.clone().build().ok();
 							let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json)).add_source(flags.clone());
@@ -2048,7 +2049,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 							1 => {
 								let found_path = conf_files_found[0];
 								if found_path.extension().map(|e| e == "nix").unwrap_or(false) {
-									let json_str = Self::eval_nix_file(found_path.to_str().unwrap())?;
+									let json_str = ::v_utils::__internal::eval_nix_file(found_path)?;
 									let file_builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json));
 									let file_only = file_builder.clone().build().ok();
 									let builder = builder.add_source(::v_utils::__internal::config::File::from_str(&json_str, ::v_utils::__internal::config::FileFormat::Json)).add_source(flags.clone());
@@ -2155,31 +2156,6 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					}
 					_ => {}
 				}
-			}
-
-			fn eval_nix_file(path: &str) -> Result<String, ::v_utils::__internal::eyre::Report> {
-				use ::v_utils::__internal::eyre::WrapErr as _;
-				// An empty `.nix` file is invalid Nix and yields a cryptic `unexpected end of file`; surface the real cause.
-				if std::fs::read_to_string(path).map(|s| s.trim().is_empty()).unwrap_or(false) {
-					return Err(::v_utils::__internal::eyre::eyre!(
-						"Config file `{path}` is empty. Delete it to write a fresh default config, or fill in valid Nix."
-					));
-				}
-				let output = std::process::Command::new("nix")
-					.arg("eval")
-					.arg("--json")
-					.arg("--impure")
-					.arg("--expr")
-					.arg(format!("import {}", path))
-					.output()
-					.wrap_err("Failed to execute nix command. Is nix installed?")?;
-
-				if !output.status.success() {
-					let stderr = String::from_utf8_lossy(&output.stderr);
-					return Err(::v_utils::__internal::eyre::eyre!("Nix evaluation failed: {}", stderr));
-				}
-
-				Ok(String::from_utf8(output.stdout)?)
 			}
 
 			/// Parse error message to extract missing field path
@@ -2695,7 +2671,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				// Read existing config as JSON
 				let existing_json: ::v_utils::__internal::serde_json::Value = match ext {
 					"nix" => {
-						let json_str = Self::eval_nix_file(config_path.to_str().unwrap())?;
+						let json_str = ::v_utils::__internal::eval_nix_file(config_path)?;
 						::v_utils::__internal::serde_json::from_str(&json_str)
 							.wrap_err("Failed to parse Nix config as JSON")?
 					}

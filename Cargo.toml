@@ -6,7 +6,7 @@ resolver = "1"
 
 [workspace.dependencies]
 v_utils = { path = "v_utils" }
-v_utils_macros = { path = "v_utils_macros", version = "2.12.12" }
+v_utils_macros = { path = "v_utils_macros", version = "=2.12.13" }
 
 ahash = "0.8.12"
 bevy = { version = "0.18.1", default-features = false }
@@ -39,6 +39,7 @@ proc-macro2 = "1.0.106"
 quote = { version = "^1.0.45" }
 rand = "0.10.1"
 rand_distr = "0.6.0"
+rnix = "0.14"
 schemars = "1.2.1"
 secrecy = "0.10.3"
 serde = { version = "^1.0.228", features = ["derive"] }
