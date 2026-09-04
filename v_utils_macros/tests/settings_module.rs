@@ -14,8 +14,9 @@ use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use v_utils_macros::{Settings, SettingsNested};
+use v_utils_macros::{ConfigJsonSchema, Settings, SettingsNested};
 
+/// Plain serde, so its `String` really is a bare string — the contrast against `ModuleConfig`.
 #[derive(Clone, Debug, Default, Deserialize, JsonSchema, Serialize, SettingsNested)]
 #[allow(unused)]
 struct Logging {
@@ -27,7 +28,7 @@ struct Logging {
 	tags: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, JsonSchema, Settings, v_utils_macros::MyConfigPrimitives)]
+#[derive(Clone, ConfigJsonSchema, Debug, Default, Settings, v_utils_macros::MyConfigPrimitives)]
 #[allow(unused)]
 struct ModuleConfig {
 	#[serde(default)]
@@ -62,8 +63,18 @@ fn emits_expected_option_types() {
 
 	assert!(m.contains("{ lib, ... }:"), "module must be a lib-taking function:\n{m}");
 	assert!(m.contains("options ="), "module must declare an options set:\n{m}");
-	assert!(m.contains("host = lib.mkOption { type = lib.types.str;"), "host should be a str option:\n{m}");
+	// `MyConfigPrimitives` reads a `String` from either a literal or `{ env = "VAR"; }`, so the
+	// option has to admit both — a bare `types.str` would reject configs the app accepts.
+	assert!(
+		m.contains("host = lib.mkOption { type = lib.types.either lib.types.str ("),
+		"host should accept a literal or an env indirection:\n{m}"
+	);
 	assert!(m.contains("port = lib.mkOption { type = lib.types.int;"), "port (u16) should map to types.int:\n{m}");
+	// `Logging` goes through plain serde, so its own strings stay bare.
+	assert!(
+		m.contains("level = lib.mkOption { type = lib.types.str;"),
+		"a non-primitives String should stay a plain str:\n{m}"
+	);
 	// Flattened nested struct -> submodule with its own options.
 	assert!(m.contains("logging = lib.mkOption { type = lib.types.submodule"), "logging should be a submodule:\n{m}");
 	// Option<String> -> nullOr str, with default null so it may be omitted.
@@ -71,6 +82,29 @@ fn emits_expected_option_types() {
 	assert!(m.contains("default = null;"), "optional field should carry `default = null;`:\n{m}");
 	// Vec<String> -> listOf str.
 	assert!(m.contains("lib.types.listOf lib.types.str"), "tags should be listOf str:\n{m}");
+}
+
+/// The module is only reachable without the app's source if the config says where it is, so
+/// `write_module` leaves a `#:schema` first line behind — taplo's TOML convention, reused for Nix.
+#[test]
+fn points_existing_nix_config_at_its_module() {
+	let tmp = tempfile::tempdir().unwrap();
+	// SAFETY: single-threaded test, and nextest gives each test its own process.
+	unsafe {
+		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+	}
+	let config_path = tmp.path().join(format!("{}.nix", env!("CARGO_PKG_NAME")));
+	std::fs::write(&config_path, "{\n  port = 8080;\n}\n").unwrap();
+
+	let module_path = ModuleConfig::write_module().unwrap();
+	let expected = format!("#:schema {}\n", module_path.file_name().unwrap().to_str().unwrap());
+
+	let after_first = std::fs::read_to_string(&config_path).unwrap();
+	assert!(after_first.starts_with(&expected), "config should open with `{expected}`, got:\n{after_first}");
+	assert!(after_first.contains("port = 8080;"), "the config body must survive:\n{after_first}");
+
+	ModuleConfig::write_module().unwrap();
+	assert_eq!(std::fs::read_to_string(&config_path).unwrap(), after_first, "re-running must not stack directives");
 }
 
 /// `true` if `nix` and a `<nixpkgs>` channel are usable; the eval-layer test no-ops otherwise.
@@ -109,6 +143,13 @@ fn nix_evalmodules_typechecks_config() {
 	assert!(
 		eval_check(&path, r#"host = "localhost"; port = 8080; logging = { level = "info"; tags = [ "a" ]; };"#),
 		"a correctly-typed config should pass evalModules"
+	);
+
+	// The env indirection `MyConfigPrimitives` accepts must survive the round trip to Nix. This is
+	// the assertion that fails against a bare `types.str`, and the reason the option is an `either`.
+	assert!(
+		eval_check(&path, r#"host = { env = "HOST"; }; port = 8080; logging = { level = "info"; tags = [ ]; };"#),
+		"`{{ env = \"HOST\"; }}` is a valid value for a String field and must pass evalModules"
 	);
 
 	// A wrongly-typed value (string where int expected) must be rejected by Nix.

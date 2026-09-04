@@ -1301,15 +1301,22 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 	};
 	combined.into()
 }
-/// Drop-in replacement for `#[derive(schemars::JsonSchema)]` on config structs that use the
-/// `field: T = expr` default-field-value syntax (RFC 3681), the `#[settings(default = ..)]`
-/// attribute, or SmartDefault's `#[default(..)]`.
+/// The `JsonSchema` derive for structs that also derive [`MyConfigPrimitives`], replacing
+/// `#[derive(schemars::JsonSchema)]` on them. Do **not** apply both: this macro provides that
+/// impl itself.
 ///
-/// schemars' own derive parses the struct body with `syn`, which rejects `field: T = expr`. This
-/// macro strips those `= expr` tails first (exactly as `MyConfigPrimitives` does for serde), derives
-/// `JsonSchema` on a private mirror struct, and forwards the schema through `impl JsonSchema for #name`
-/// — so the resulting schema is titled after the real struct, not the mirror. Do **not** also
-/// `#[derive(schemars::JsonSchema)]`: this macro provides that impl itself.
+/// It differs from schemars' own derive in two ways, both tracking what `MyConfigPrimitives`
+/// accepts at deserialization:
+///
+/// - schemars parses the struct body with `syn`, which rejects the `field: T = expr`
+///   default-field-value syntax (RFC 3681). Those `= expr` tails are stripped first, exactly as
+///   `MyConfigPrimitives` does for serde.
+/// - fields `MyConfigPrimitives` routes through `PrivateValue` — `String`, `SecretString`,
+///   `#[private_value]`, and their `Option<_>` forms — are typed as `"literal" | { env = "VAR" }`
+///   rather than as bare strings, so the schema does not reject configs the deserializer accepts.
+///
+/// Both go through a private mirror struct whose schema is forwarded by
+/// `impl JsonSchema for #name`, so the result is titled after the real struct, not the mirror.
 #[proc_macro_derive(ConfigJsonSchema, attributes(schemars, serde, settings, primitives, private_value, default))]
 pub fn derive_config_json_schema(input: TokenStream) -> TokenStream {
 	let (input, _inline_defaults) = strip_field_defaults(input);
@@ -1326,13 +1333,14 @@ pub fn derive_config_json_schema(input: TokenStream) -> TokenStream {
 		unimplemented!("ConfigJsonSchema only supports named-field structs")
 	};
 
-	// Mirror each field with its public type, forwarding only schema-relevant attributes. schemars
-	// honours `#[serde(..)]`, so those carry through (e.g. `rename`, `default`, `skip`); our own
-	// `#[settings(..)]` / `#[primitives(..)]` / `#[private_value]` / `#[default(..)]` are internal
-	// and must be dropped, as schemars would reject them.
+	// Mirror each field with the type `MyConfigPrimitives` actually deserializes it from,
+	// forwarding only schema-relevant attributes. schemars honours `#[serde(..)]`, so those carry
+	// through (e.g. `rename`, `default`, `skip`); our own `#[settings(..)]` / `#[primitives(..)]` /
+	// `#[private_value]` / `#[default(..)]` are internal and must be dropped, as schemars would
+	// reject them.
 	let mirror_fields = fields.iter().map(|f| {
 		let ident = &f.ident;
-		let ty = &f.ty;
+		let ty = primitives_schema_ty(f);
 		let attrs = f
 			.attrs
 			.iter()
@@ -2505,10 +2513,61 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				(&wrapper).compute_diff(self)
 			}
 
-			/// Writes the JSON Schema for this settings struct to `<config_dir>/<app_name>.schema.json`.
+			/// The config file this app would load, if one exists.
+			fn find_config() -> Result<Option<std::path::PathBuf>, ::v_utils::__internal::eyre::Report> {
+				let config_name = #config_name_expr;
+
+				#xdg_conf_dir
+
+				let location_bases = [
+					format!("{xdg_conf_dir}/{config_name}"),
+					format!("{xdg_conf_dir}/{config_name}/config"),
+				];
+				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
+
+				Ok(location_bases.iter()
+					.flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}"))))
+					.find(|p| p.exists()))
+			}
+
+			/// Prepend `#:schema <artifact>` to the config file, so an editor can find the artifact
+			/// with nothing but the config open — taplo's convention for TOML, borrowed as-is for
+			/// Nix, which has no convention of its own (see `docs/schema_directive.md`).
 			///
-			/// Editors with a JSON/TOML/YAML schema-aware LSP can then consume this file for
-			/// autocomplete, inline docs, and validation of the config.
+			/// `applies_to` lists the config extensions whose tooling understands this artifact;
+			/// for anything else (notably comment-less JSON) the config is left untouched and
+			/// `Ok(None)` comes back. The recorded path is relative, so config and artifact stay
+			/// movable as a pair.
+			fn point_config_at(artifact: &std::path::Path, applies_to: &[&str]) -> Result<Option<std::path::PathBuf>, ::v_utils::__internal::eyre::Report> {
+				use ::v_utils::__internal::eyre::{OptionExt as _, WrapErr as _};
+
+				let Some(config_path) = Self::find_config()? else { return Ok(None) };
+				let ext = config_path.extension().and_then(|e| e.to_str()).ok_or_eyre("config file has no extension")?;
+				if !applies_to.contains(&ext) {
+					return Ok(None);
+				}
+
+				let artifact = artifact.file_name().ok_or_eyre("artifact path has no file name")?.to_string_lossy();
+				let directive = format!("#:schema {artifact}");
+
+				let content = std::fs::read_to_string(&config_path)
+					.wrap_err_with(|| format!("Failed to read config file: {}", config_path.display()))?;
+				let body = match content.split_once('\n') {
+					Some((first, _)) if first.trim_end() == directive => return Ok(Some(config_path)),
+					Some((first, rest)) if first.starts_with("#:schema ") => rest,
+					_ => content.as_str(),
+				};
+
+				std::fs::write(&config_path, format!("{directive}\n{body}"))
+					.wrap_err_with(|| format!("Failed to write config file: {}", config_path.display()))?;
+				Ok(Some(config_path))
+			}
+
+			/// Writes the JSON Schema for this settings struct to `<config_dir>/<app_name>.schema.json`,
+			/// and points a TOML config at it with a leading `#:schema` line.
+			///
+			/// Editors with a JSON/TOML/YAML schema-aware LSP (taplo, for one) can then consume this
+			/// file for autocomplete, inline docs, and validation of the config.
 			///
 			/// Returns `Err` if the struct does not `impl schemars::JsonSchema`
 			/// (i.e. it does not also `#[derive(JsonSchema)]`), or if file operations fail.
@@ -2534,6 +2593,10 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 				std::fs::write(&schema_path, schema)
 					.wrap_err_with(|| format!("Failed to write schema file: {}", schema_path.display()))?;
+
+				// JSON Schema is what TOML tooling consumes; a `.nix` config is served by
+				// `write_module` instead, and JSON has nowhere to put the comment.
+				Self::point_config_at(&schema_path, &["toml"])?;
 
 				Ok(schema_path)
 			}
@@ -2573,6 +2636,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 				std::fs::write(&module_path, module)
 					.wrap_err_with(|| format!("Failed to write module file: {}", module_path.display()))?;
+
+				Self::point_config_at(&module_path, &["nix"])?;
 
 				Ok(module_path)
 			}
@@ -2622,18 +2687,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 				#xdg_conf_dir
 
-				let location_bases = [
-					format!("{xdg_conf_dir}/{config_name}"),
-					format!("{xdg_conf_dir}/{config_name}/config"),
-				];
-				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
-
-				// Find existing config file
-				let existing_config: Option<std::path::PathBuf> = location_bases.iter()
-					.flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}"))))
-					.find(|p| p.exists());
-
-				match existing_config {
+				match Self::find_config()? {
 					Some(config_path) => {
 						// Config exists - merge missing defaults
 						Self::merge_defaults_into_config(&config_path, &defaults)?;
@@ -2653,6 +2707,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						let nix_content = Self::json_to_nix_file(&defaults);
 						std::fs::write(&new_config_path, nix_content)
 							.wrap_err_with(|| format!("Failed to write config file: {}", new_config_path.display()))?;
+
+						// The module is what makes the fresh config editable without the app's source,
+						// so emit it alongside; it also leaves the `#:schema` line behind. Structs
+						// without a `JsonSchema` have no module to offer — say so rather than fail.
+						if let Err(e) = Self::write_module() {
+							eprintln!("note: no options module and no `#:schema` line for this config — {e}");
+						}
 
 						Ok(new_config_path)
 					}
@@ -2922,9 +2983,9 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 			WriteDefaults,
 			/// Show settings that differ from their default values
 			Diff,
-			/// Write the JSON Schema for the config to `<config_dir>/<app_name>.schema.json` (requires `#[derive(JsonSchema)]`)
+			/// Write the JSON Schema for the config to `<config_dir>/<app_name>.schema.json`, and point a TOML config at it (requires `#[derive(JsonSchema)]`)
 			Schema,
-			/// Write a NixOS-style options module to `<config_dir>/<app_name>.module.nix` for `import`/`evalModules` (requires `#[derive(JsonSchema)]`)
+			/// Write a NixOS-style options module to `<config_dir>/<app_name>.module.nix` for `import`/`evalModules`, and point a Nix config at it (requires `#[derive(JsonSchema)]`)
 			Module,
 		}
 	};
@@ -3362,6 +3423,37 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 	TokenStream::from(expanded)
 }
+/// The type `MyConfigPrimitives` deserializes this field *from*, which is what the schema has to
+/// describe. Mirrors the helper-field rewrite in `deserialize_with_private_values`, minus the
+/// `PathBuf` → `ExpandedPath` case: both render as a plain string, so there is nothing to correct.
+fn primitives_schema_ty(f: &syn::Field) -> proc_macro2::TokenStream {
+	let ty = &f.ty;
+	let declared = quote! { #ty };
+
+	if f.attrs
+		.iter()
+		.any(|attr| attr.path().is_ident("primitives") && attr.parse_args::<syn::Ident>().is_ok_and(|i| i == "skip"))
+	{
+		return declared;
+	}
+
+	let inner = match ty {
+		syn::Type::Path(tp) if is_option_type(tp) => Some(extract_option_inner_type(tp)),
+		_ => None,
+	};
+	let target = inner.map_or_else(|| declared.to_string(), |i| quote! { #i }.to_string());
+
+	// `#[private_value]` routes any `FromStr` type through the same string-or-env form.
+	let via_private_value = f.attrs.iter().any(|attr| attr.path().is_ident("private_value")) || matches!(target.as_str(), "String" | "SecretString");
+	if !via_private_value {
+		return declared;
+	}
+	match inner {
+		Some(_) => quote! { Option<::v_utils::__internal::PrivateValue> },
+		None => quote! { ::v_utils::__internal::PrivateValue },
+	}
+}
+
 /// `FieldsFromVecStr` and `VecFieldsFromVecStr` emit the same `TryFrom<Vec<S>>` shell; all that
 /// differs is how a field starts out and how a parsed value is stored into it.
 fn try_from_vec_str(

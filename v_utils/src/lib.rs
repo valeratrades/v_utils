@@ -120,6 +120,37 @@ pub mod __internal {
 		}
 	}
 
+	/// Schema-side mirror of the `"literal" | { env = "VAR" }` form that `MyConfigPrimitives`
+	/// deserializes `String`, `SecretString` and `#[private_value]` fields from.
+	/// `ConfigJsonSchema` substitutes this for those fields' declared types, so the emitted
+	/// schema and nix module admit exactly the configs the deserializer does.
+	///
+	/// The `schemars(description)` is spelled out rather than taken from this doc comment,
+	/// because it is what a user hovering the *field* reads — the paragraph above is for whoever
+	/// is reading this file instead.
+	#[cfg(feature = "schemars")]
+	#[derive(schemars::JsonSchema, serde::Serialize)]
+	#[schemars(
+		crate = "crate::__internal::schemars",
+		rename = "PrivateValue",
+		untagged,
+		description = "The value itself, or `{ env = \"VAR\" }` to read it from that environment variable at startup."
+	)]
+	#[serde(crate = "crate::__internal::serde", untagged)]
+	pub enum PrivateValue {
+		Direct(String),
+		Env { env: String },
+	}
+
+	// Only ever called by schemars, to render the default of a `#[serde(default)]` field — which
+	// for these is the empty string, matching the `String::default()` they stand in for.
+	#[cfg(feature = "schemars")]
+	impl Default for PrivateValue {
+		fn default() -> Self {
+			Self::Direct(String::default())
+		}
+	}
+
 	/// Translate a `schemars` JSON Schema into a NixOS-style options module.
 	///
 	/// Lives in `__internal` because its only caller is the `write_module()` method generated
@@ -151,6 +182,13 @@ pub mod __internal {
 			Ok(node)
 		}
 
+		/// Parenthesise a rendered type before it becomes an *argument* to another type
+		/// constructor. Nix application is left-associative, so an unbracketed
+		/// `nullOr submodule { … }` reads as `nullOr submodule { … }` — three arguments, not two.
+		fn as_arg(rendered: String) -> String {
+			if rendered.contains(' ') { format!("({rendered})") } else { rendered }
+		}
+
 		/// Map a single (resolved-on-demand) schema node to a `lib.types.<…>` expression.
 		/// `depth` is the indentation level of the line this expression is emitted on, so that a
 		/// nested `submodule { options = …; }` indents its contents relative to that line.
@@ -164,7 +202,7 @@ pub mod __internal {
 				// Reconstruct a single-typed node so the scalar branch below handles it.
 				let mut single = node.clone();
 				single["type"] = (*inner).clone();
-				return Ok(format!("lib.types.nullOr {}", nix_type(&single, defs, depth)?));
+				return Ok(format!("lib.types.nullOr {}", as_arg(nix_type(&single, defs, depth)?)));
 			}
 
 			// `Option<NamedType>` (and other unions) are encoded as `anyOf`/`oneOf` lists of
@@ -181,7 +219,7 @@ pub mod __internal {
 				let inner = match alts.as_slice() {
 					[one] => nix_type(one, defs, depth)?,
 					many => {
-						let rendered = many.iter().map(|b| nix_type(b, defs, depth)).collect::<Result<Vec<_>, _>>()?;
+						let rendered = many.iter().map(|b| nix_type(b, defs, depth).map(as_arg)).collect::<Result<Vec<_>, _>>()?;
 						// `either` is binary; `oneOf` takes a list and fits 3+ alternatives.
 						if rendered.len() == 2 {
 							format!("lib.types.either {} {}", rendered[0], rendered[1])
@@ -190,7 +228,7 @@ pub mod __internal {
 						}
 					}
 				};
-				return Ok(if nullable { format!("lib.types.nullOr {inner}") } else { inner });
+				return Ok(if nullable { format!("lib.types.nullOr {}", as_arg(inner)) } else { inner });
 			}
 
 			// Unit-variant enums: `"type": "string", "enum": [...]`.
@@ -209,13 +247,13 @@ pub mod __internal {
 				Some("number") => Ok("lib.types.float".to_string()),
 				Some("array") => {
 					let items = node.get("items").ok_or_eyre("array schema without `items`")?;
-					Ok(format!("lib.types.listOf {}", nix_type(items, defs, depth)?))
+					Ok(format!("lib.types.listOf {}", as_arg(nix_type(items, defs, depth)?)))
 				}
 				Some("object") => {
 					// Free-form map (`HashMap<String, V>`) vs a struct with named properties.
 					if let Some(additional) = node.get("additionalProperties") {
 						if additional.is_object() {
-							return Ok(format!("lib.types.attrsOf {}", nix_type(additional, defs, depth)?));
+							return Ok(format!("lib.types.attrsOf {}", as_arg(nix_type(additional, defs, depth)?)));
 						}
 					}
 					Ok(format!("lib.types.submodule {{ options = {}; }}", options_block(node, defs, depth)?))
