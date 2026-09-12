@@ -120,8 +120,8 @@ pub mod __internal {
 		}
 	}
 
-	/// Schema-side mirror of the `"literal" | { env = "VAR" }` form that `MyConfigPrimitives`
-	/// deserializes `String`, `SecretString` and `#[private_value]` fields from.
+	/// Schema-side mirror of the `"literal" | { env = "VAR" } | { file = "PATH" }` form that
+	/// `MyConfigPrimitives` deserializes `String`, `SecretString` and `#[private_value]` fields from.
 	/// `ConfigJsonSchema` substitutes this for those fields' declared types, so the emitted
 	/// schema and nix module admit exactly the configs the deserializer does.
 	///
@@ -134,12 +134,13 @@ pub mod __internal {
 		crate = "crate::__internal::schemars",
 		rename = "PrivateValue",
 		untagged,
-		description = "The value itself, or `{ env = \"VAR\" }` to read it from that environment variable at startup."
+		description = "The value itself, `{ env = \"VAR\" }` to read it from that environment variable at startup, or `{ file = \"PATH\" }` to read it from that file (e.g. a sops-nix/agenix secret under /run/secrets), minus one trailing newline."
 	)]
 	#[serde(crate = "crate::__internal::serde", untagged)]
 	pub enum PrivateValue {
 		Direct(String),
 		Env { env: String },
+		File { file: String },
 	}
 
 	// Only ever called by schemars, to render the default of a `#[serde(default)]` field — which

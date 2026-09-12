@@ -791,7 +791,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// Generates a custom serde Deserialize implementation for config deserialization with PrivateValue support.
 ///
 /// This macro handles:
-/// - String fields: wrapped with PrivateValue for env var support (`{ env = "VAR_NAME" }`)
+/// - String fields: wrapped with PrivateValue for indirection (`{ env = "VAR_NAME" }` / `{ file = "PATH" }`)
 /// - PathBuf fields: wrapped with ExpandedPath for tilde expansion
 /// - SecretString fields: wrapped with PrivateValue and converted to SecretString (debug shows `[REDACTED]`)
 /// - Option<T> variants of the above
@@ -809,7 +809,7 @@ pub fn derive_optioinal_vec_fields_from_vec_str(input: TokenStream) -> TokenStre
 /// pub struct Config {
 ///     api_key: String,                    // Supports { env = "API_KEY" }
 ///     config_path: PathBuf,               // Supports ~ expansion
-///     secret: SecretString,               // Supports { env = "SECRET" }, debug shows [REDACTED]
+///     secret: SecretString,               // Supports { env = "SECRET" } / { file = "/run/secrets/x" }, debug shows [REDACTED]
 ///     #[private_value]
 ///     port: Port,                         // Custom type via FromStr
 ///     #[primitives(skip)]
@@ -1145,6 +1145,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 				enum PrivateValue {
 					Direct(String),
 					Env { env: String },
+					File { file: String },
 				}
 				impl Default for PrivateValue {
 					fn default() -> Self {
@@ -1152,15 +1153,24 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 					}
 				}
 				impl PrivateValue {
+					/// Trailing newline is stripped: `echo -n` is not what writes most secret files.
+					fn read_file(file: &str) -> std::io::Result<String> {
+						let path: v_utils::io::ExpandedPath = <v_utils::io::ExpandedPath as std::str::FromStr>::from_str(file)
+							.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
+						let s = std::fs::read_to_string(&path)?;
+						Ok(s.strip_suffix('\n').unwrap_or(&s).to_owned())
+					}
+
 					pub fn into_string(&self) -> v_utils::__internal::eyre::Result<String> {
 						match self {
 							PrivateValue::Direct(s) => Ok(s.clone()),
 							PrivateValue::Env { env } => std::env::var(env).wrap_err_with(|| format!("Environment variable '{}' not found", env)),
+							PrivateValue::File { file } => Self::read_file(file).wrap_err_with(|| format!("Could not read secret file '{}'", file)),
 						}
 					}
 
-					/// Like `into_string`, but returns `Ok(None)` if env var is not present.
-					/// Other errors (like invalid unicode) still propagate as `Err`.
+					/// Like `into_string`, but returns `Ok(None)` if the env var / file is not present.
+					/// Other errors (invalid unicode, unreadable file) still propagate as `Err`.
 					pub fn into_string_optional(&self) -> v_utils::__internal::eyre::Result<Option<String>> {
 						match self {
 							PrivateValue::Direct(s) => Ok(Some(s.clone())),
@@ -1168,6 +1178,11 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 								Ok(s) => Ok(Some(s)),
 								Err(std::env::VarError::NotPresent) => Ok(None),
 								Err(e) => Err(v_utils::__internal::eyre::eyre!("Failed to read environment variable '{}': {}", env, e)),
+							},
+							PrivateValue::File { file } => match Self::read_file(file) {
+								Ok(s) => Ok(Some(s)),
+								Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+								Err(e) => Err(v_utils::__internal::eyre::eyre!("Failed to read secret file '{}': {}", file, e)),
 							},
 						}
 					}
@@ -1183,7 +1198,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							type Value = PrivateValue;
 
 							fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-								formatter.write_str("a value (string, number, bool, etc.) or a map with a single key 'env'")
+								formatter.write_str("a value (string, number, bool, etc.) or a map with a single key 'env' or 'file'")
 							}
 
 							fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
@@ -1240,11 +1255,10 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 								M: v_utils::__internal::serde::de::MapAccess<'de>,
 							{
 								let key: String = access.next_key()?.ok_or_else(|| v_utils::__internal::serde::de::Error::custom("expected a key"))?;
-								if key == "env" {
-									let value: String = access.next_value()?;
-									Ok(PrivateValue::Env { env: value })
-								} else {
-									Err(v_utils::__internal::serde::de::Error::custom("expected key to be 'env'"))
+								match key.as_str() {
+									"env" => Ok(PrivateValue::Env { env: access.next_value()? }),
+									"file" => Ok(PrivateValue::File { file: access.next_value()? }),
+									_ => Err(v_utils::__internal::serde::de::Error::custom("expected key to be 'env' or 'file'")),
 								}
 							}
 						}
@@ -1312,7 +1326,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 ///   default-field-value syntax (RFC 3681). Those `= expr` tails are stripped first, exactly as
 ///   `MyConfigPrimitives` does for serde.
 /// - fields `MyConfigPrimitives` routes through `PrivateValue` — `String`, `SecretString`,
-///   `#[private_value]`, and their `Option<_>` forms — are typed as `"literal" | { env = "VAR" }`
+///   `#[private_value]`, and their `Option<_>` forms — are typed as `"literal" | { env = "VAR" } | { file = "PATH" }`
 ///   rather than as bare strings, so the schema does not reject configs the deserializer accepts.
 ///
 /// Both go through a private mirror struct whose schema is forwarded by

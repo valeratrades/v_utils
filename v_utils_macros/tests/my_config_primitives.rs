@@ -44,24 +44,30 @@ pub struct Test {
 }
 #[test]
 fn test() {
-	let toml_str = r#"
-	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
-	alpaca_secret = { env = "HOME" }
-whoami = { env = "USER" }
+	let secret_file = std::env::temp_dir().join("v_utils_private_value_file_test");
+	std::fs::write(&secret_file, "from-a-file\n").unwrap();
+
+	let toml_str = format!(
+		r#"
+	alpaca_key = {{ file = "{}" }}
+	alpaca_secret = {{ env = "HOME" }}
+whoami = {{ env = "USER" }}
 a_random_non_string = 1
 path = "~/.config/a_test_path"
 port = "8080"
 test_private_value_works_with_non_strings = 1234
-optional_string = { env = "USER" }
-optional_secret = { env = "USER" }
+optional_string = {{ env = "USER" }}
+optional_secret = {{ env = "USER" }}
 skipped_string = "this should not be wrapped in PrivateValue"
 optional_port = "9090"
-"#;
+"#,
+		secret_file.display()
+	);
 
-	let t: Test = toml::from_str(toml_str).expect("Failed to deserialize");
+	let t: Test = toml::from_str(&toml_str).expect("Failed to deserialize");
 
 	// variables change, so assert properties
-	assert_eq!(t.alpaca_key, "PKTJYTJNKYSBHAZYT3CO");
+	assert_eq!(t.alpaca_key, "from-a-file"); // trailing newline stripped
 	assert_eq!(secrecy::ExposeSecret::expose_secret(&t.alpaca_secret), &std::env::var("HOME").unwrap());
 	assert_eq!(t.path, PathBuf::from(format!("{}/.config/a_test_path", std::env::var("HOME").unwrap())));
 	assert_eq!(t.whoami, std::env::var("USER").unwrap());
@@ -82,7 +88,7 @@ optional_port = "9090"
 	let debug_output = format!("{t:?}");
 	assert!(debug_output.contains("[REDACTED]"), "SecretString should show [REDACTED] in debug output, got: {debug_output}");
 
-	// Test that Option<T> with #[private_value] becomes None when env var is missing
+	// Test that Option<T> with #[private_value] becomes None when env var / file is missing
 	let toml_with_missing_env = r#"
 	alpaca_key = "PKTJYTJNKYSBHAZYT3CO"
 	alpaca_secret = { env = "HOME" }
@@ -99,6 +105,15 @@ optional_port = { env = "THIS_ENV_VAR_DEFINITELY_DOES_NOT_EXIST_12345" }
 
 	let t2: Test = toml::from_str(toml_with_missing_env).expect("Failed to deserialize with missing env var");
 	assert_eq!(t2.optional_port, None, "Option<T> with #[private_value] should be None when env var is missing");
+
+	let toml_with_missing_file = toml_with_missing_env.replace(
+		r#"optional_port = { env = "THIS_ENV_VAR_DEFINITELY_DOES_NOT_EXIST_12345" }"#,
+		r#"optional_port = { file = "/nonexistent/v_utils/secret" }"#,
+	);
+	let t3: Test = toml::from_str(&toml_with_missing_file).expect("Failed to deserialize with missing secret file");
+	assert_eq!(t3.optional_port, None, "Option<T> with #[private_value] should be None when the secret file is absent");
+
+	std::fs::remove_file(&secret_file).unwrap();
 }
 fn __default_num_of_retries() -> u8 {
 	3

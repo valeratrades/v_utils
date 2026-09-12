@@ -63,11 +63,11 @@ fn emits_expected_option_types() {
 
 	assert!(m.contains("{ lib, ... }:"), "module must be a lib-taking function:\n{m}");
 	assert!(m.contains("options ="), "module must declare an options set:\n{m}");
-	// `MyConfigPrimitives` reads a `String` from either a literal or `{ env = "VAR"; }`, so the
-	// option has to admit both — a bare `types.str` would reject configs the app accepts.
+	// `MyConfigPrimitives` reads a `String` from a literal, `{ env = "VAR"; }` or `{ file = "PATH"; }`,
+	// so the option has to admit all three — a bare `types.str` would reject configs the app accepts.
 	assert!(
-		m.contains("host = lib.mkOption { type = lib.types.either lib.types.str ("),
-		"host should accept a literal or an env indirection:\n{m}"
+		m.contains("host = lib.mkOption { type = lib.types.oneOf [ lib.types.str ("),
+		"host should accept a literal or an env/file indirection:\n{m}"
 	);
 	assert!(m.contains("port = lib.mkOption { type = lib.types.int;"), "port (u16) should map to types.int:\n{m}");
 	// `Logging` goes through plain serde, so its own strings stay bare.
