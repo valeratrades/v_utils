@@ -51,6 +51,7 @@ fn run_and_collect() -> String {
 	let output = Command::new(&binary)
 		.current_dir(&manifest_dir)
 		.env("XDG_STATE_HOME", xdg_state_home)
+		.env("HOME", xdg_state_home)
 		// Strip directives that could leak from the dev shell.
 		.env_remove("RUST_LOG")
 		.env_remove("LOG_DIRECTIVES")

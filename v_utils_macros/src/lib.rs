@@ -2607,6 +2607,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 				std::fs::write(&schema_path, schema)
 					.wrap_err_with(|| format!("Failed to write schema file: {}", schema_path.display()))?;
+				#[cfg(unix)]
+				::v_utils::__internal::xdg_index(env!("CARGO_PKG_NAME"), &schema_path.file_name().expect("formatted with a basename").to_string_lossy(), &schema_path);
 
 				// JSON Schema is what TOML tooling consumes; a `.nix` config is served by
 				// `write_module` instead, and JSON has nowhere to put the comment.
@@ -2650,6 +2652,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				}
 				std::fs::write(&module_path, module)
 					.wrap_err_with(|| format!("Failed to write module file: {}", module_path.display()))?;
+				#[cfg(unix)]
+				::v_utils::__internal::xdg_index(env!("CARGO_PKG_NAME"), &module_path.file_name().expect("formatted with a basename").to_string_lossy(), &module_path);
 
 				Self::point_config_at(&module_path, &["nix"])?;
 
@@ -2721,6 +2725,8 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						let nix_content = Self::json_to_nix_file(&defaults);
 						std::fs::write(&new_config_path, nix_content)
 							.wrap_err_with(|| format!("Failed to write config file: {}", new_config_path.display()))?;
+						#[cfg(unix)]
+						::v_utils::__internal::xdg_index(env!("CARGO_PKG_NAME"), &new_config_path.file_name().expect("formatted with a basename").to_string_lossy(), &new_config_path);
 
 						// The module is what makes the fresh config editable without the app's source,
 						// so emit it alongside; it also leaves the `#:schema` line behind. Structs

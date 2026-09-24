@@ -71,6 +71,8 @@ pub mod __internal {
 	#[cfg(feature = "cli")]
 	use std::path::PathBuf;
 
+	#[cfg(all(unix, not(target_arch = "wasm32")))]
+	pub use crate::io::xdg::app_index::index as xdg_index;
 	#[cfg(all(feature = "io", not(target_arch = "wasm32")))]
 	pub use crate::io::xdg::{home_dir, xdg_cache_fallback, xdg_config_fallback, xdg_data_fallback, xdg_runtime_fallback, xdg_state_fallback};
 	#[cfg(feature = "cli")]

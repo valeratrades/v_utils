@@ -47,6 +47,7 @@ fn emit_module() -> (PathBuf, String) {
 	// which honors `$XDG_CONFIG_HOME`. SAFETY: single-threaded test.
 	unsafe {
 		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+		std::env::set_var("HOME", tmp.path());
 	}
 	let path = ModuleConfig::write_module().expect("JsonSchema is derived, so this must succeed");
 	let contents = std::fs::read_to_string(&path).unwrap();
@@ -92,6 +93,7 @@ fn points_existing_nix_config_at_its_module() {
 	// SAFETY: single-threaded test, and nextest gives each test its own process.
 	unsafe {
 		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+		std::env::set_var("HOME", tmp.path());
 	}
 	let config_path = tmp.path().join(format!("{}.nix", env!("CARGO_PKG_NAME")));
 	std::fs::write(&config_path, "{\n  port = 8080;\n}\n").unwrap();

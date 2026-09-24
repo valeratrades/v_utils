@@ -178,7 +178,9 @@ pub fn init_subscriber(log_destination: LogDestination) {
 		}
 		#[cfg(all(not(target_arch = "wasm32"), feature = "xdg"))]
 		LogDestinationKind::Xdg { dname, fname } => {
-			let associated_state_home = xdg::BaseDirectories::with_prefix(dname).create_state_directory("").unwrap();
+			let associated_state_home = xdg::BaseDirectories::with_prefix(&dname).create_state_directory("").unwrap();
+			#[cfg(unix)]
+			crate::__internal::xdg_index(&dname, "state", &associated_state_home);
 			let filename = fname
 				.as_ref()
 				.map(|s| if s.ends_with(".log") { s.to_string() } else { format!("{s}.log") })

@@ -24,6 +24,7 @@ fn resolves_config_at_overridden_nested_path() {
 	// SAFETY: single-threaded test, no other thread reads env concurrently.
 	unsafe {
 		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+		std::env::set_var("HOME", tmp.path());
 	}
 
 	let config_dir = tmp.path().join("parent_app");

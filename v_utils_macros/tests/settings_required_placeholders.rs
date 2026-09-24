@@ -27,6 +27,7 @@ fn scaffolds_placeholders_then_refuses_to_load_them() {
 	// SAFETY: single-threaded test, and this is the only `#[test]` in the binary.
 	unsafe {
 		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+		std::env::set_var("HOME", tmp.path());
 	}
 	assert!(
 		std::env::var_os("V_UTILS_MACROS__API_KEY").is_none(),

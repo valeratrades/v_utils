@@ -39,6 +39,7 @@ fn writes_valid_schema_when_jsonschema_derived() {
 	// SAFETY: single-threaded test, no other thread reads env concurrently.
 	unsafe {
 		std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+		std::env::set_var("HOME", tmp.path());
 	}
 
 	let path = SchemaConfig::write_schema().expect("JsonSchema is derived, so this must succeed");
