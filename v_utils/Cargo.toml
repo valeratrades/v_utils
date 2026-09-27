@@ -17,7 +17,7 @@ ignored = ["wasm-bindgen-futures"]
 [features]
 default = ["lite"]
 
-io = ["dep:dirs", "dep:libc"]
+io = ["dep:dirs", "dep:libc", "dep:data-encoding", "dep:totp-lite"]
 xdg = ["dep:xdg", "v_utils_macros/xdg"]
 cli = [
     "io",
@@ -75,6 +75,7 @@ bon.workspace = true
 config = { workspace = true, optional = true }
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true, optional = true }
+data-encoding = { workspace = true, optional = true }
 derive-new.workspace = true
 derive_more = { workspace = true, features = ["full"] }
 dirs = { workspace = true, optional = true }
@@ -102,6 +103,7 @@ strum = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros", "io-util", "rt", "time"], optional = true } # by default only enable features that play with wasm.
 toml = { workspace = true, optional = true }
+totp-lite = { workspace = true, optional = true }
 tracing = { workspace = true, features = ["log", "std", "async-await"] }
 tracing-error = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }

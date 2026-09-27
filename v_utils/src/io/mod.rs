@@ -9,6 +9,9 @@ pub mod file_open;
 #[cfg(feature = "async-io")]
 pub use file_open::*;
 
+pub mod totp;
+pub use totp::*;
+
 pub mod progress_bar;
 pub use progress_bar::*;
 
