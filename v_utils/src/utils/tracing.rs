@@ -242,7 +242,24 @@ where
 	let logs_layer = opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new(&logger_provider);
 	// Providers own the batch-export threads; keep them alive for the process.
 	let _ = OTLP_PROVIDERS.set((tracer_provider, logger_provider));
+	let prev_hook = std::panic::take_hook();
+	std::panic::set_hook(Box::new(move |info| {
+		prev_hook(info);
+		flush_otlp();
+	}));
 	Some(traces_layer.and_then(logs_layer).boxed())
+}
+
+/// Batches still in the exporter die with the process, and the last lines before an exit are the ones that say why.
+#[cfg(feature = "otlp")]
+pub(crate) fn flush_otlp() {
+	let Some((tracer_provider, logger_provider)) = OTLP_PROVIDERS.get() else { return };
+	if let Err(e) = logger_provider.force_flush() {
+		eprintln!("[v_utils] OTLP log flush failed: {e}");
+	}
+	if let Err(e) = tracer_provider.force_flush() {
+		eprintln!("[v_utils] OTLP span flush failed: {e}");
+	}
 }
 
 #[cfg(not(feature = "otlp"))]
