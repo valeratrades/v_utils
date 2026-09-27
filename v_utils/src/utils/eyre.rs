@@ -79,9 +79,9 @@ pub fn exit_on_error<T, E: Into<eyre::Report>>(r: Result<T, E>) -> T {
 		Ok(t) => t,
 		Err(e) => {
 			let code = e.exit_code();
-			let msg = format_eyre_chain_for_user(e.into());
-			tracing::error!("{msg}");
-			eprintln!("{msg}");
+			let report: eyre::Report = e.into();
+			tracing::error!("{report:#}"); // uncoloured: log sinks render escapes literally
+			eprintln!("{}", format_eyre_chain_for_user(report));
 			#[cfg(feature = "otlp")]
 			super::tracing::flush_otlp();
 			std::process::exit(code);
