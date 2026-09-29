@@ -170,10 +170,12 @@ impl Client {
 					std::fs::File::create(path).with_context(|| format!("Failed to force-create file at '{}'.\n{e}", path.display()))?;
 					std::fs::metadata(path).unwrap()
 				}
-				_ => eyre::bail!(
-					"Failed to read metadata of file/directory at '{}', which means we do not have sufficient permissions or it does not exist",
-					path.display()
-				),
+				_ => {
+					eyre::bail!(
+						"Failed to read metadata of file/directory at '{}', which means we do not have sufficient permissions or it does not exist",
+						path.display()
+					);
+				}
 			},
 		};
 		let sp = match metadata.is_dir() {
@@ -259,7 +261,7 @@ impl Editor {
 				}
 				// TODO: helix, vscode support
 				_ => {
-					bail!("with_buffer() only supported for nvim")
+					bail!("with_buffer() only supported for nvim");
 				}
 			};
 		}
