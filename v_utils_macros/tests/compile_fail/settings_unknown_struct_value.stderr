@@ -1,4 +1,4 @@
-error: unknown `prefxi`; valid values are: prefix, use_env
+error: unknown `prefxi`; valid values are: prefix
  --> $DIR/v_utils_macros/tests/compile_fail/settings_unknown_struct_value.rs:7:12
   |
 7 | #[settings(prefxi = "strategy")]

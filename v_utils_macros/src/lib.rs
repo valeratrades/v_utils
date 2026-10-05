@@ -1069,7 +1069,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							},
 							quote! {
 								#ident: match helper.#ident {
-									Some(pv) => Some(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?),
+									Some(pv) => pv.into_string_optional().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?,
 									None => None,
 								}
 							},
@@ -1088,7 +1088,7 @@ pub fn deserialize_with_private_values(input: TokenStream) -> TokenStream {
 							},
 							quote! {
 								#ident: match helper.#ident {
-									Some(pv) => Some(secrecy::SecretString::new(pv.into_string().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.into_boxed_str())),
+									Some(pv) => pv.into_string_optional().map_err(|e| v_utils::__internal::serde::de::Error::custom(format!("Failed to convert {} to string: {}", stringify!(#ident), e)))?.map(|s| secrecy::SecretString::new(s.into_boxed_str())),
 									None => None,
 								}
 							},
@@ -1617,7 +1617,14 @@ pub fn scream_it(input: TokenStream) -> TokenStream {
 /// `#[settings(config_name = "...")]`. The override may contain `/` to nest a tool's config
 /// inside a parent app's dir, e.g. `config_name = "parent_app/tool"` resolves
 /// `~/.config/parent_app/tool.{nix,toml,...}` (and is where `write-defaults`/`schema`/`module`
-/// write to). The env-var prefix is *not* affected — it stays `CARGO_PKG_NAME`.
+/// write to). The env-var prefix is *not* affected — it stays `CARGO_PKG_NAME`, `-` as `_`.
+///
+/// # Env and profiles
+/// Sources layer env < file < flags. A field's env var is `<PKG>_<FIELD>`, a nested one
+/// `<PKG>_<SECTION>__<FIELD>` (`PKG` = `CARGO_PKG_NAME` upper-cased, `-` as `_`).
+/// `#[settings(required_in("production", ...))]` on an `Option` field makes a `None` an error
+/// while `APP_ENV` is one of those profiles; all such fields are reported in one
+/// [`SettingsError::Unset`], which exits 78 (`EX_CONFIG`).
 ///
 /// # Auto-extension of Config Files
 /// When the config is missing a required field, the macro will:
@@ -1742,8 +1749,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		}
 	}
 
+	let unset_required = match unset_required_body(fields) {
+		Ok(body) => body,
+		Err(e) => return e.to_compile_error().into(),
+	};
+
 	// Parse struct-level #[settings(...)] attributes. Unknown idents are rejected.
-	let mut use_env = false;
 	let mut config_name: Option<String> = None;
 	for attr in &ast.attrs {
 		if !attr.path().is_ident("settings") {
@@ -1752,16 +1763,12 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let parsed = attr.parse_args_with(|input: syn::parse::ParseStream| {
 			loop {
 				let ident: syn::Ident = input.parse()?;
-				if ident == "use_env" {
-					let _: Token![=] = input.parse()?;
-					let lit: syn::LitBool = input.parse()?;
-					use_env = lit.value;
-				} else if ident == "config_name" {
+				if ident == "config_name" {
 					let _: Token![=] = input.parse()?;
 					let lit: syn::LitStr = input.parse()?;
 					config_name = Some(lit.value());
 				} else {
-					return Err(unknown_attr_ident(&ident, &["use_env", "config_name"]));
+					return Err(unknown_attr_ident(&ident, &["config_name"]));
 				}
 				if input.is_empty() {
 					return Ok(());
@@ -1791,9 +1798,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 		let xdg_conf_dir = ::v_utils::__internal::xdg_config_fallback();
 	};
 
-	// Generate field lists for validation (include all fields)
-	// Note: #[settings(skip)], #[settings(skip(flag))], #[settings(skip(env))], and #[settings(flatten)] only affect CLI flag/env generation,
-	// not config file validation - all fields are valid in config files
+	// Every field is valid in a config file; `skip` and `flatten` only shape the CLI flags.
 	let all_field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()).collect();
 
 	let field_name_strings = all_field_names.iter().map(|name| quote! { #name });
@@ -2034,7 +2039,9 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				// Source precedence is config-rs add order (later wins): env < file < flags.
 				// Flags are appended LAST at every build site below — a CLI flag is the
 				// most explicit user intent and must override the config file.
-				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(app_name).separator("__"/*default separator is '.', which I don't like being present in var names*/));
+				// `<PKG>_FIELD`, `<PKG>_SECTION__FIELD`: `-` is not valid in an env name.
+				let env_prefix = app_name.replace('-', "_");
+				let mut builder = ::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::Environment::with_prefix(&env_prefix).prefix_separator("_").separator("__"));
 
 				let mut err_msg = "Could not construct config from aggregated sources (conf, env, flags).".to_owned();
 				#[allow(unused_imports)]
@@ -2109,13 +2116,25 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					}
 					if !unset.is_empty() {
 						unset.sort();
-						return Err(::v_utils::__internal::SettingsError::Unset { paths: unset, config_path });
+						return Err(::v_utils::__internal::SettingsError::Unset { paths: unset, config_path, profile: None });
 					}
 				}
 
 				// Deserialize with serde (which supports MyConfigPrimitives custom deserializer)
-				match raw.try_deserialize() {
-					Ok(config) => Ok(config),
+				match raw.try_deserialize::<Self>() {
+					Ok(config) => {
+						let profile = match std::env::var("APP_ENV") {
+							Ok(p) => p,
+							Err(std::env::VarError::NotPresent) => return Ok(config),
+							Err(e) => return Err(::v_utils::__internal::eyre::eyre!("APP_ENV: {e}").into()),
+						};
+						let mut unset = config.unset_required(&profile);
+						if !unset.is_empty() {
+							unset.sort();
+							return Err(::v_utils::__internal::SettingsError::Unset { paths: unset, config_path, profile: Some(profile) });
+						}
+						Ok(config)
+					}
 					Err(e) => {
 						// Check if this is a missing field error and we can extend the config
 						let error_str = e.to_string();
@@ -2148,6 +2167,13 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						Err(::v_utils::__internal::eyre::eyre!("{}\n\nRoot cause: {}", err_msg, e).into())
 					}
 				}
+			}
+
+			fn unset_required(&self, profile: &str) -> Vec<String> {
+				let path = "";
+				let out = &mut Vec::new();
+				#unset_required
+				std::mem::take(out)
 			}
 
 			fn warn_unknown_fields(file_config: &::v_utils::__internal::config::Config) {
@@ -2872,13 +2898,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
-		// Skip fields with both skip_flag and skip_env (completely hidden from CLI)
-		if field_attrs.skip_flag && field_attrs.skip_env {
-			return None;
-		}
-
-		// Skip fields with skip_flag (no CLI flag generation)
-		if field_attrs.skip_flag {
+		if field_attrs.skip {
 			return None;
 		}
 
@@ -2907,18 +2927,9 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 					syn::Type::Path(type_path) if is_vec_type(type_path) => quote! { , value_delimiter = ',' },
 					_ => quote! {},
 				};
-				// Only add env binding if use_env is enabled AND skip_env is not set
-				if use_env && !field_attrs.skip_env {
-					let env_var_name = AsShoutySnakeCase(ident.as_ref().unwrap().to_string()).to_string();
-					quote! {
-						#[arg(long, env = #env_var_name #delimiter)]
-						#ident: #clap_ty,
-					}
-				} else {
-					quote! {
-						#[arg(long #delimiter)]
-						#ident: #clap_ty,
-					}
+				quote! {
+					#[arg(long #delimiter)]
+					#ident: #clap_ty,
 				}
 			}
 		})
@@ -2930,8 +2941,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
-		// Skip fields with skip_flag (not in SettingsFlags struct, so can't collect from them)
-		if field_attrs.skip_flag {
+		if field_attrs.skip {
 			return None;
 		}
 
@@ -3124,10 +3134,13 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		}
 	}
 
-	// Find the optional #[settings(prefix = "...", use_env = true)] attributes.
-	// Unknown struct-level idents are rejected.
+	let unset_required = match unset_required_body(fields) {
+		Ok(body) => body,
+		Err(e) => return e.to_compile_error().into(),
+	};
+
+	// Find the optional #[settings(prefix = "...")] attribute. Unknown struct-level idents are rejected.
 	let mut prefix = None;
-	let mut use_env = false;
 	for attr in &ast.attrs {
 		if !attr.path().is_ident("settings") {
 			continue;
@@ -3139,12 +3152,8 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 					let _: Token![=] = input.parse()?;
 					let lit: syn::LitStr = input.parse()?;
 					prefix = Some(lit.value());
-				} else if ident == "use_env" {
-					let _: Token![=] = input.parse()?;
-					let lit: syn::LitBool = input.parse()?;
-					use_env = lit.value;
 				} else {
-					return Err(unknown_attr_ident(&ident, &["prefix", "use_env"]));
+					return Err(unknown_attr_ident(&ident, &["prefix"]));
 				}
 				// Skip comma if present
 				let _ = input.parse::<Option<Token![,]>>();
@@ -3166,8 +3175,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
-		// Skip fields with skip_flag (no CLI flag generation)
-		if field_attrs.skip_flag {
+		if field_attrs.skip {
 			return None;
 		}
 
@@ -3185,19 +3193,10 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 		} else {
 			let clap_ty = clap_compatible_option_wrapped_ty(ty);
 			let prefixed_field_name = format_ident!("{}_{}", prefix, ident.as_ref().unwrap());
-			// Only add env binding if use_env is enabled AND skip_env is not set
-			if use_env && !field_attrs.skip_env {
-				let env_var_name = AsShoutySnakeCase(prefixed_field_name.to_string()).to_string();
-				Some(quote! {
-					#[arg(long, env = #env_var_name)]
-					#prefixed_field_name: #clap_ty,
-				})
-			} else {
-				Some(quote! {
-					#[arg(long)]
-					#prefixed_field_name: #clap_ty,
-				})
-			}
+			Some(quote! {
+				#[arg(long)]
+				#prefixed_field_name: #clap_ty,
+			})
 		}
 	});
 
@@ -3207,8 +3206,7 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 
 		let field_attrs = SettingsFieldAttrs::parse(&field.attrs).expect("validated up front");
 
-		// Skip fields with skip_flag (not in the struct, so can't collect from them)
-		if field_attrs.skip_flag {
+		if field_attrs.skip {
 			return None;
 		}
 
@@ -3249,6 +3247,9 @@ pub fn derive_settings_nested(input: TokenStream) -> TokenStream {
 			type Flags = #produced_struct_name;
 			fn collect_config(flags: &Self::Flags, map: &mut v_utils::__internal::config::Map<String, v_utils::__internal::config::Value>) {
 				#(#config_inserts)*
+			}
+			fn unset_required(&self, profile: &str, path: &str, out: &mut Vec<String>) {
+				#unset_required
 			}
 		}
 	};
@@ -3337,6 +3338,8 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 
 		struct __LiveSettingsTimeCapsule {
 			value: #name,
+			/// The config file and every `{ file = … }` leaf it names: secrets are read at build, so a rotated one needs a rebuild too.
+			watched: Vec<std::path::PathBuf>,
 			loaded_at: std::time::SystemTime,
 			update_freq: std::time::Duration,
 		}
@@ -3350,14 +3353,16 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 		impl LiveSettings {
 			/// Create a new LiveSettings from CLI flags.
 			/// `update_freq` controls how often the file modification time is checked.
-			pub fn new(flags: SettingsFlags, update_freq: std::time::Duration) -> ::v_utils::__internal::eyre::Result<Self> {
+			pub fn new(flags: SettingsFlags, update_freq: std::time::Duration) -> Result<Self, ::v_utils::__internal::SettingsError> {
 				let config_path = Self::resolve_config_path(&flags)?;
 				let settings = #name::try_build(flags.clone())?;
+				let watched = Self::watched(config_path.as_deref())?;
 
 				Ok(Self {
 					config_path,
 					inner: std::sync::Arc::new(std::sync::RwLock::new(__LiveSettingsTimeCapsule {
 						value: settings,
+						watched,
 						loaded_at: std::time::SystemTime::now(),
 						update_freq,
 					})),
@@ -3396,7 +3401,31 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 				}
 			}
 
-			/// Get the current settings, reloading from file if it has changed.
+			fn watched(config_path: Option<&std::path::Path>) -> ::v_utils::__internal::eyre::Result<Vec<std::path::PathBuf>> {
+				fn file_leaves(v: &::v_utils::__internal::serde_json::Value, out: &mut Vec<std::path::PathBuf>) -> ::v_utils::__internal::eyre::Result<()> {
+					use ::v_utils::__internal::serde_json::Value;
+					match v {
+						Value::Object(map) => match (map.len(), map.get("file")) {
+							(1, Some(Value::String(file))) => out.push(<v_utils::io::ExpandedPath as std::str::FromStr>::from_str(file)?.0),
+							_ => map.values().try_for_each(|v| file_leaves(v, out))?,
+						},
+						Value::Array(items) => items.iter().try_for_each(|v| file_leaves(v, out))?,
+						_ => {}
+					}
+					Ok(())
+				}
+				let Some(path) = config_path else { return Ok(Vec::new()) };
+				let content: ::v_utils::__internal::serde_json::Value = if path.extension().is_some_and(|e| e == "nix") {
+					::v_utils::__internal::serde_json::from_str(&::v_utils::__internal::eval_nix_file(path)?)?
+				} else {
+					::v_utils::__internal::config::Config::builder().add_source(::v_utils::__internal::config::File::from(path)).build()?.try_deserialize()?
+				};
+				let mut watched = vec![path.to_path_buf()];
+				file_leaves(&content, &mut watched)?;
+				Ok(watched)
+			}
+
+			/// Get the current settings, reloading if the config file or a secret file it names has changed.
 			pub fn config(&self) -> Result<#name, ::v_utils::__internal::SettingsError> {
 				// Check for multiple configs (could have been added while running)
 				Self::resolve_config_path(&self.flags)?;
@@ -3411,25 +3440,22 @@ pub fn derive_live_settings(input: TokenStream) -> TokenStream {
 						return Ok(capsule.value.clone());
 					}
 
-					self.config_path
-						.as_ref()
-						.and_then(|path| std::fs::metadata(path).ok())
-						.and_then(|meta| meta.modified().ok())
-						.map(|file_mtime| {
-							let since_file_change = now.duration_since(file_mtime).unwrap_or_default();
-							since_file_change < age
-						})
-						.unwrap_or(false)
+					capsule.watched.iter()
+						.filter_map(|path| std::fs::metadata(path).ok()) // gone: a rebuild would fail on it anyway
+						.filter_map(|meta| meta.modified().ok())
+						.any(|file_mtime| now.duration_since(file_mtime).unwrap_or_default() < age)
 				};
 
 				if should_reload {
-					if let Ok(new_settings) = #name::try_build(self.flags.clone()) {
-						let mut capsule = self.inner.write().unwrap();
-						capsule.value = new_settings;
-						capsule.loaded_at = now;
-					} else {
-						let mut capsule = self.inner.write().unwrap();
-						capsule.loaded_at = now;
+					let rebuilt = #name::try_build(self.flags.clone()).map_err(::v_utils::__internal::eyre::Report::from).and_then(|s| Ok((s, Self::watched(self.config_path.as_deref())?)));
+					let mut capsule = self.inner.write().unwrap();
+					capsule.loaded_at = now;
+					match rebuilt {
+						Ok((new_settings, watched)) => {
+							capsule.value = new_settings;
+							capsule.watched = watched;
+						}
+						Err(e) => eprintln!("warning: settings reload failed, keeping the previous ones: {e:#}"),
 					}
 				} else {
 					let mut capsule = self.inner.write().unwrap();
@@ -3772,20 +3798,63 @@ fn unknown_attr_ident(ident: &syn::Ident, valid: &[&str]) -> syn::Error {
 
 /// Parsed field-level settings attributes
 ///
+/// Body of `unset_required(&self, profile, path, out)`: pushes the dotted path of every
+/// `required_in` field that is `None` under `profile`, recursing into flattened sections.
+fn unset_required_body(fields: &syn::punctuated::Punctuated<syn::Field, Token![,]>) -> syn::Result<proc_macro2::TokenStream> {
+	let mut checks = Vec::new();
+	for field in fields {
+		let attrs = SettingsFieldAttrs::parse(&field.attrs)?;
+		let ident = field.ident.as_ref().unwrap();
+		let key = ident.to_string();
+		let option_inner = match &field.ty {
+			syn::Type::Path(type_path) if is_option_type(type_path) => Some(extract_option_inner_type(type_path)),
+			_ => None,
+		};
+		if attrs.flatten {
+			checks.push(match option_inner {
+				Some(inner) => quote! {
+					if let Some(section) = &self.#ident {
+						<#inner as v_utils::macros::SettingsNested>::unset_required(section, profile, &format!("{path}{}.", #key), out);
+					}
+				},
+				None => {
+					let ty = &field.ty;
+					quote! { <#ty as v_utils::macros::SettingsNested>::unset_required(&self.#ident, profile, &format!("{path}{}.", #key), out); }
+				}
+			});
+		}
+		if attrs.required_in.is_empty() {
+			continue;
+		}
+		if option_inner.is_none() {
+			return Err(syn::Error::new_spanned(
+				&field.ty,
+				"`required_in` is for `Option` fields; a non-`Option` field is required in every profile already",
+			));
+		}
+		let profiles = &attrs.required_in;
+		checks.push(quote! {
+			if [#(#profiles),*].contains(&profile) && self.#ident.is_none() {
+				out.push(format!("{path}{}", #key));
+			}
+		});
+	}
+	Ok(quote! { #(#checks)* })
+}
+
 /// Supports:
-/// - `#[settings(skip)]` - skip both flags and env
-/// - `#[settings(skip(flag))]` - skip only CLI flag generation
-/// - `#[settings(skip(env))]` - skip only env var binding
-/// - `#[settings(skip(flag, env))]` - skip both (same as `skip`)
+/// - `#[settings(skip)]` - no CLI flag
 /// - `#[settings(flatten)]` - flatten nested struct
 /// - `#[settings(default = expr)]` - field default (attribute form of the nightly `field: T = expr`
 ///   syntax; consumed by `MyConfigPrimitives` for both `Default` and serde-default wiring)
+/// - `#[settings(required_in("production", ...))]` - an `Option` field that must resolve to `Some`
+///   while `APP_ENV` is one of these profiles
 #[derive(Default)]
 struct SettingsFieldAttrs {
 	flatten: bool,
-	skip_flag: bool,
-	skip_env: bool,
+	skip: bool,
 	default: Option<syn::Expr>,
+	required_in: Vec<String>,
 }
 
 impl SettingsFieldAttrs {
@@ -3802,31 +3871,18 @@ impl SettingsFieldAttrs {
 							let _: Token![=] = input.parse()?;
 							result.default = Some(input.parse()?);
 						} else if ident == "skip" {
-							// Check if followed by parentheses with specific targets
-							if input.peek(token::Paren) {
-								let content;
-								syn::parenthesized!(content in input);
-								while !content.is_empty() {
-									let target: syn::Ident = content.parse()?;
-									if target == "flag" {
-										result.skip_flag = true;
-									} else if target == "env" {
-										result.skip_env = true;
-									} else {
-										return Err(unknown_attr_ident(&target, &["flag", "env"]));
-									}
-									// Skip comma if present
-									let _ = content.parse::<Option<Token![,]>>();
-								}
-							} else {
-								// Plain `skip` means skip both
-								result.skip_flag = true;
-								result.skip_env = true;
+							result.skip = true;
+						} else if ident == "required_in" {
+							let content;
+							syn::parenthesized!(content in input);
+							let profiles = content.parse_terminated(|p| p.parse::<syn::LitStr>(), Token![,])?;
+							if profiles.is_empty() {
+								return Err(syn::Error::new(ident.span(), "`required_in` needs at least one profile"));
 							}
+							result.required_in = profiles.iter().map(syn::LitStr::value).collect();
 						} else {
-							return Err(unknown_attr_ident(&ident, &["flatten", "skip", "skip(flag)", "skip(env)", "default"]));
+							return Err(unknown_attr_ident(&ident, &["flatten", "skip", "default", "required_in"]));
 						}
-						// Skip comma if present
 						let _ = input.parse::<Option<Token![,]>>();
 					}
 					Ok(())

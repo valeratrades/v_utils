@@ -73,6 +73,17 @@ fn xdg_index() {
 		assert_eq!(fs::read_link(&link).unwrap(), tmp.path().join("state").join(APP));
 	}
 
+	// outside HOME (a container's mounted `/config`): not indexed
+	{
+		let tmp = sandbox();
+		let outside = tempfile::tempdir().unwrap();
+		// SAFETY: as in `sandbox`.
+		unsafe { std::env::set_var("XDG_CACHE_HOME", outside.path()) };
+		v_utils::xdg_cache_dir!("");
+		assert!(outside.path().join(APP).is_dir());
+		assert!(fs::symlink_metadata(index_entry(tmp.path(), "cache")).is_err());
+	}
+
 	// conflict: legacy and XDG both hold data -> refuse to merge
 	{
 		let tmp = sandbox();

@@ -89,11 +89,17 @@ pub mod __internal {
 	pub enum SettingsError {
 		#[error("Found multiple config files:\n{}\n\nPlease keep only one. Pick a location, merge all settings into it, then delete the rest.", .paths.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n"))]
 		MultipleConfigs { paths: Vec<PathBuf> },
-		#[error("Settings left unset (still holding the `{}` placeholder){}:\n{}\n\nThese fields have no default — `write-defaults` could only scaffold them. Open the file above and replace each placeholder with a real value.",
-			REQUIRED_PLACEHOLDER,
-			.config_path.as_ref().map(|p| format!(" in {}", p.display())).unwrap_or_else(|| " (from env/flags)".to_owned()),
+		/// `profile: None` — fields still holding the `REQUIRED_PLACEHOLDER` `write-defaults` scaffolded;
+		/// `Some` — `required_in` fields that `APP_ENV` makes mandatory.
+		#[error("Settings left unset{}{}:\n{}\n\nSet each in the config file, as a `<PKG>_<PATH>` env var (sections joined by `__`), or as a flag.",
+			.config_path.as_ref().map(|p| format!(" in {}", p.display())).unwrap_or_else(|| " (no config file)".to_owned()),
+			.profile.as_ref().map(|p| format!(", required with APP_ENV={p}")).unwrap_or_else(|| format!(", still holding the `{REQUIRED_PLACEHOLDER}` placeholder")),
 			.paths.iter().map(|p| format!("  - {p}")).collect::<Vec<_>>().join("\n"))]
-		Unset { paths: Vec<String>, config_path: Option<PathBuf> },
+		Unset {
+			paths: Vec<String>,
+			config_path: Option<PathBuf>,
+			profile: Option<String>,
+		},
 		/// NB: no `#[from]`/`#[source]` — these are terminal error messages, not chain links.
 		/// With `#[from]`, thiserror sets `source()` to the inner type, which causes
 		/// `format_eyre_chain_for_user` to print the same message twice (once as root, once as wrapper).
@@ -333,5 +339,7 @@ pub mod macros {
 	pub trait SettingsNested {
 		type Flags;
 		fn collect_config(flags: &Self::Flags, map: &mut crate::__internal::config::Map<String, crate::__internal::config::Value>);
+		/// Dotted paths (under `path`) of `required_in` fields left `None` under `profile`.
+		fn unset_required(&self, profile: &str, path: &str, out: &mut Vec<String>);
 	}
 }

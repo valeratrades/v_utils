@@ -1,0 +1,15 @@
+# A deployed binary, as `settings_env_profile.rs` runs it: the `-` in the name is the point.
+# Detached from the parent workspace so the `v_utils_*` member glob doesn't claim it.
+[workspace]
+
+[package]
+name = "env-prefix-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+v_utils_macros = { path = "../.." }
+v_utils = { path = "../../../v_utils", features = ["full"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }

@@ -25,7 +25,7 @@ fn test() {
 	};
 
 	// Test that LiveSettings::new exists and has correct signature
-	let _new_exists: fn(SettingsFlags, Duration) -> v_utils::__internal::eyre::Result<LiveSettings> = LiveSettings::new;
+	let _new_exists: fn(SettingsFlags, Duration) -> Result<LiveSettings, v_utils::__internal::SettingsError> = LiveSettings::new;
 
 	// Test that LiveSettings is Clone
 	fn assert_clone<T: Clone>() {}

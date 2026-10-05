@@ -103,8 +103,13 @@ pub(crate) mod app_index {
 	use std::{fs, io::ErrorKind, path::Path};
 
 	/// Links `~/.<app>/<entry>` to `target`, so every path created for an app is reachable from one place.
+	/// A `target` outside `$HOME` (a container's `/config`, a system dir) is someone else's layout, so it is not indexed.
 	pub fn index(app: &str, entry: &str, target: &Path) {
-		let index_dir = Path::new(&super::home_dir()).join(format!(".{app}"));
+		let home = super::home_dir();
+		if !target.starts_with(&home) {
+			return;
+		}
+		let index_dir = Path::new(&home).join(format!(".{app}"));
 		fs::create_dir_all(&index_dir).unwrap_or_else(|e| panic!("creating {}: {e}", index_dir.display()));
 		let link = index_dir.join(entry);
 
