@@ -13,6 +13,9 @@ pub use time::Timelike;
 pub mod timeframe;
 pub use timeframe::*;
 
+pub mod timeframe_range;
+pub use timeframe_range::TimeframeRange;
+
 pub mod half_life;
 pub use half_life::HalfLife;
 

@@ -283,6 +283,37 @@ impl std::ops::Mul<u64> for Timeframe {
 	}
 }
 
+/// So `rng.random_range(a..=b)` takes `Timeframe` bounds directly.
+#[cfg(feature = "distributions")]
+impl rand::distr::uniform::SampleUniform for Timeframe {
+	type Sampler = UniformTimeframe;
+}
+#[cfg(feature = "distributions")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct UniformTimeframe(rand::distr::uniform::UniformInt<u64>);
+#[cfg(feature = "distributions")]
+impl rand::distr::uniform::UniformSampler for UniformTimeframe {
+	type X = Timeframe;
+
+	fn new<B1, B2>(low: B1, high: B2) -> Result<Self, rand::distr::uniform::Error>
+	where
+		B1: rand::distr::uniform::SampleBorrow<Timeframe> + Sized,
+		B2: rand::distr::uniform::SampleBorrow<Timeframe> + Sized, {
+		rand::distr::uniform::UniformInt::new(low.borrow().0, high.borrow().0).map(Self)
+	}
+
+	fn new_inclusive<B1, B2>(low: B1, high: B2) -> Result<Self, rand::distr::uniform::Error>
+	where
+		B1: rand::distr::uniform::SampleBorrow<Timeframe> + Sized,
+		B2: rand::distr::uniform::SampleBorrow<Timeframe> + Sized, {
+		rand::distr::uniform::UniformInt::new_inclusive(low.borrow().0, high.borrow().0).map(Self)
+	}
+
+	fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Timeframe {
+		Timeframe(self.0.sample(rng))
+	}
+}
+
 #[cfg(test)]
 mod timeframe_tests {
 	use strum::IntoEnumIterator as _;
