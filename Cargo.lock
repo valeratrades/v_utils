@@ -5715,7 +5715,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils"
-version = "2.22.0"
+version = "2.23.0"
 dependencies = [
  "ahash",
  "bevy",
