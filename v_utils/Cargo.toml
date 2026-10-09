@@ -35,6 +35,8 @@ cli = [
 # schema/module export; also enables `JsonSchema` for our own public types (e.g. `Timeframe`).
 schemars = ["dep:schemars"]
 async-io = ["dep:tokio", "tokio/io-std", "tokio/process", "tokio/rt-multi-thread"]
+# `Lease`: in-place pod memory bursts from devops' memory-lease broker.
+memory_lease = ["dep:tokio", "tokio/net", "tokio/io-util"]
 assert-wasm-compat = []
 macros = ["v_utils_macros"]
 tracing = [

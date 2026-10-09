@@ -35,6 +35,8 @@ pub mod fuzz;
 pub mod io;
 #[cfg(feature = "lightweight_charts")]
 pub mod lwc;
+#[cfg(feature = "memory_lease")]
+pub mod memory_lease;
 #[cfg(feature = "cli")]
 mod nix;
 #[cfg(feature = "lite")]
