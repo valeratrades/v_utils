@@ -15,6 +15,9 @@ pub use totp::*;
 pub mod progress_bar;
 pub use progress_bar::*;
 
+pub mod spinner;
+pub use spinner::*;
+
 // The target, not the `wasm` feature: a feature is additive, so one that *removes* a module leaves
 // `lib::xdg`'s re-export — gated on the target since it was written — pointing at nothing the moment
 // a workspace holding one wasm member unifies the feature onto a native build of this crate.
