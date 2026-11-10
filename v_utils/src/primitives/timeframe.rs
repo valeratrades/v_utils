@@ -12,8 +12,8 @@ const TIMEFRAME_DESIGNATORS: [TimeframeDesignator; 9] = [
 	TimeframeDesignator::Hours,
 	TimeframeDesignator::Days,
 	TimeframeDesignator::Weeks,
-	TimeframeDesignator::Months,
-	TimeframeDesignator::Quarters,
+	TimeframeDesignator::IfcMonths,
+	TimeframeDesignator::IfcQuarters,
 	TimeframeDesignator::Years,
 ];
 /// Common timeframes, as offered by exchanges. `MIN`/`MO` because screaming-snake would collide `m` with `M`.
@@ -52,8 +52,10 @@ pub enum TimeframeDesignator {
 	Hours,
 	Days,
 	Weeks,
-	Months,
-	Quarters,
+	/// International Fixed Calendar: 28 days
+	IfcMonths,
+	/// International Fixed Calendar: 13 weeks
+	IfcQuarters,
 	Years,
 }
 impl TimeframeDesignator {
@@ -65,9 +67,9 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Hours => 3_600_000,
 			TimeframeDesignator::Days => 86_400_000,
 			TimeframeDesignator::Weeks => 604_800_000,
-			TimeframeDesignator::Months => 2_592_000_000,   //NB: is approximate (30 days)
-			TimeframeDesignator::Quarters => 7_776_000_000, //NB: is approximate (90 days)
-			TimeframeDesignator::Years => 31_536_000_000,   //NB: is approximate (365 days)
+			TimeframeDesignator::IfcMonths => 2_419_200_000,
+			TimeframeDesignator::IfcQuarters => 7_862_400_000,
+			TimeframeDesignator::Years => 31_536_000_000, //NB: is approximate (365 days)
 		}
 	}
 
@@ -80,8 +82,8 @@ impl TimeframeDesignator {
 			b"h" | b"H" => TimeframeDesignator::Hours,
 			b"d" | b"D" => TimeframeDesignator::Days,
 			b"w" | b"W" | b"wk" => TimeframeDesignator::Weeks,
-			b"M" | b"mo" => TimeframeDesignator::Months,
-			b"q" | b"Q" => TimeframeDesignator::Quarters,
+			b"M" | b"mo" => TimeframeDesignator::IfcMonths,
+			b"q" | b"Q" => TimeframeDesignator::IfcQuarters,
 			b"y" | b"Y" => TimeframeDesignator::Years,
 			_ => return None,
 		})
@@ -96,8 +98,8 @@ impl TimeframeDesignator {
 			TimeframeDesignator::Hours => "h",
 			TimeframeDesignator::Days => "d",
 			TimeframeDesignator::Weeks => "w",
-			TimeframeDesignator::Months => "M",
-			TimeframeDesignator::Quarters => "Q",
+			TimeframeDesignator::IfcMonths => "M",
+			TimeframeDesignator::IfcQuarters => "Q",
 			TimeframeDesignator::Years => "y",
 		}
 	}
@@ -348,7 +350,7 @@ mod timeframe_tests {
 		assert_eq!(tf.designator(), TimeframeDesignator::Weeks);
 
 		let tf = Timeframe::from_str("mo").unwrap();
-		assert_eq!(tf.designator(), TimeframeDesignator::Months);
+		assert_eq!(tf.designator(), TimeframeDesignator::IfcMonths);
 	}
 
 	#[test]

@@ -71,3 +71,6 @@ unused_features = "allow"
 [workspace.lints.clippy]
 # `derive_new::new` expands to `Self { field: field, .. }`; the lint cannot see it is generated.
 redundant_field_names = "allow"
+
+[workspace.lints.cargo]
+non_kebab_case_bins = "allow"
