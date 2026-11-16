@@ -2027,14 +2027,17 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 				let app_name = env!("CARGO_PKG_NAME");
 				let config_name = #config_name_expr;
 
-				#xdg_conf_dir
+				// an explicit `--config` needs no config dir: a container may have no HOME
+				let locations = || -> Vec<std::path::PathBuf> {
+					#xdg_conf_dir
 
-				let location_bases = [
-					format!("{xdg_conf_dir}/{config_name}"),
-					format!("{xdg_conf_dir}/{config_name}/config"),
-				];
-				let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
-				let locations: Vec<std::path::PathBuf> = location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect();
+					let location_bases = [
+						format!("{xdg_conf_dir}/{config_name}"),
+						format!("{xdg_conf_dir}/{config_name}/config"),
+					];
+					let supported_exts = ["nix", "toml", "json", "yaml", "json5", "ron", "ini"];
+					location_bases.iter().flat_map(|base| supported_exts.iter().map(move |ext| std::path::PathBuf::from(format!("{base}.{ext}")))).collect()
+				};
 
 				// Source precedence is config-rs add order (later wins): env < file < flags.
 				// Flags are appended LAST at every build site below — a CLI flag is the
@@ -2063,6 +2066,7 @@ pub fn derive_setings(input: TokenStream) -> proc_macro::TokenStream {
 						}
 					}
 					None => {
+						let locations = locations();
 						let conf_files_found: Vec<_> = locations.iter().filter(|p| p.exists()).collect();
 						match conf_files_found.len() {
 							0 => {
