@@ -24,7 +24,12 @@
 mod frng;
 mod minimize;
 
-use std::{cell::RefCell, fs::OpenOptions, io::Write, path::Path};
+use std::{
+	cell::{Cell, RefCell},
+	fs::OpenOptions,
+	io::Write,
+	path::Path,
+};
 
 pub use frng::*;
 pub use minimize::*;
@@ -75,8 +80,7 @@ pub struct Suite<'a> {
 }
 
 impl Suite<'_> {
-	/// Scan → minimize → replay → record → panic. Installs [`quiet_hook`], so anything this binary
-	/// runs afterwards reports its panics through [`replay`] rather than to stderr.
+	/// Scan → minimize → replay → record → panic.
 	pub fn fuzz(&self) {
 		quiet_hook();
 		let size = env_usize("FUZZ_SIZE", DEFAULT_SIZE);
@@ -127,7 +131,10 @@ impl Suite<'_> {
 				continue;
 			}
 			live += 1;
-			assert!(!fails(t, e.seed, e.size), "recorded regression ({}, seed={}, size={}) fails again", e.target, e.seed, e.size);
+			if fails(t, e.seed, e.size) {
+				let reason = replay(t, e.seed, e.size).unwrap_or_else(|| "(no failure on verbose replay)".to_string());
+				panic!("recorded regression ({}, seed={}, size={}) fails again: {reason}", e.target, e.seed, e.size);
+			}
 		}
 		// Loud, because a corpus that has silently emptied itself still reports green.
 		eprintln!(
@@ -182,20 +189,29 @@ struct Entry {
 
 thread_local! {
 	static LAST_PANIC: RefCell<String> = const { RefCell::new(String::new()) };
+	static IN_CASE: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Swallow the default panic backtrace (we catch and report ourselves), but stash `info` — the
-/// `catch_unwind` payload downcasts to the message alone, so the `file:line` a recorded `PANIC:`
-/// line carries is only recoverable from here.
-///
-/// This mutes the *whole test binary*, including any test not driven through a [`Suite`].
+/// Inside a case, swallow the default panic backtrace (we catch and report ourselves), but stash
+/// `info` — the `catch_unwind` payload downcasts to the message alone, so the `file:line` a recorded
+/// `PANIC:` line carries is only recoverable from here. Outside one, the hook installed before us
+/// reports, so the other tests in the binary keep their messages.
 fn quiet_hook() {
 	static ONCE: std::sync::Once = std::sync::Once::new();
 	ONCE.call_once(|| {
-		std::panic::set_hook(Box::new(|info| {
-			LAST_PANIC.with(|c| *c.borrow_mut() = info.to_string());
+		let outer = std::panic::take_hook();
+		std::panic::set_hook(Box::new(move |info| match IN_CASE.get() {
+			true => LAST_PANIC.with(|c| *c.borrow_mut() = info.to_string()),
+			false => outer(info),
 		}));
 	});
+}
+
+fn in_case<R>(f: impl FnOnce() -> R + std::panic::UnwindSafe) -> std::thread::Result<R> {
+	IN_CASE.set(true);
+	let r = std::panic::catch_unwind(f);
+	IN_CASE.set(false);
+	r
 }
 
 fn env_usize(key: &str, default: usize) -> usize {
@@ -207,7 +223,7 @@ fn env_usize(key: &str, default: usize) -> usize {
 /// `Suite` across the unwind boundary for nothing.
 fn fails(t: &Target, seed: u64, size: usize) -> bool {
 	let run = t.run;
-	std::panic::catch_unwind(move || run(seed, size, false)).map(|r| r.is_err()).unwrap_or(true)
+	in_case(move || run(seed, size, false)).map(|r| r.is_err()).unwrap_or(true)
 }
 
 /// Verbose re-run of one case: the target prints its own trace, and this reports the failure (or the
@@ -215,7 +231,7 @@ fn fails(t: &Target, seed: u64, size: usize) -> bool {
 fn replay(t: &Target, seed: u64, size: usize) -> Option<String> {
 	eprintln!("--- replay (target={}, seed={seed}, size={size}) ---", t.name);
 	let run = t.run;
-	match std::panic::catch_unwind(move || run(seed, size, true)) {
+	match in_case(move || run(seed, size, true)) {
 		Ok(Ok(())) => {
 			eprintln!("(no failure on replay)");
 			None
