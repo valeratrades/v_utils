@@ -1,5 +1,3 @@
-#![feature(default_field_values)]
-
 use std::str::FromStr;
 
 use v_utils_macros::{CompactFormatMap, CompactFormatNamed, TryParseVariants};
