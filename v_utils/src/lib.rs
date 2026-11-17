@@ -24,6 +24,7 @@ compile_error!("Feature `full` is not compatible with wasm (pulls in `xdg` and a
 compile_error!("Feature `xdg` is not compatible with wasm.");
 
 pub mod arch;
+pub mod chart;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 // of course it's included unconditionally - the crate itself is called "v_utils"
