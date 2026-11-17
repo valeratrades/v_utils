@@ -17,7 +17,6 @@
 //! `= expr` defaults into the synthesised Helper as `#[serde(default = "...")]`, so
 //! missing fields deserialize to the RFC-3681 default rather than erroring.
 
-#![feature(default_field_values)]
 
 use v_utils_macros::{ConfigJsonSchema, LiveSettings, MyConfigPrimitives, Settings};
 

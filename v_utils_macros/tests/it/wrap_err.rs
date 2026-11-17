@@ -1,4 +1,3 @@
-#![feature(error_generic_member_access)]
 use v_utils_macros::wrap_err;
 
 // Struct case: injects backtrace + spantrace, generates new()
