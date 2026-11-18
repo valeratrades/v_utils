@@ -525,6 +525,8 @@ mod tests {
 		assert!((*Certainty::from_str("95%").unwrap() - 1.959964).abs() < 1e-6);
 		assert_eq!(Certainty::from_str("2").unwrap(), Certainty::from_str("2σ").unwrap());
 		assert_eq!(Certainty::from_str("2std").unwrap(), Certainty(2.0));
+		assert_eq!(Certainty::from_str("1.5").unwrap(), Certainty(1.5));
+		assert_eq!(serde_json::from_str::<Certainty>("1.5").unwrap(), Certainty(1.5));
 		assert!(Certainty::from_str("-1").is_err());
 		let p = PercentU::try_new(0.9973).unwrap();
 		assert!((*PercentU::from(Certainty::from(p)) - 0.9973).abs() < 1e-12);
