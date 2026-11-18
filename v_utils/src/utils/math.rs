@@ -94,7 +94,15 @@ pub fn quad_polynomial(x: f64, x0: f64, x1: f64, x2: f64, y0: f64, y1: f64, y2: 
 	let diff_12 = (x1 - x2).abs();
 
 	assert!(
-		diff_01 >= EPSILON && diff_02 >= EPSILON && diff_12 >= EPSILON,
+		diff_01 >= EPSILON,
+		"Abscissas are too close for stable interpolation: x0={x0}, x1={x1}, x2={x2} (diffs: {diff_01:.2e}, {diff_02:.2e}, {diff_12:.2e}, min: {EPSILON})"
+	);
+	assert!(
+		diff_02 >= EPSILON,
+		"Abscissas are too close for stable interpolation: x0={x0}, x1={x1}, x2={x2} (diffs: {diff_01:.2e}, {diff_02:.2e}, {diff_12:.2e}, min: {EPSILON})"
+	);
+	assert!(
+		diff_12 >= EPSILON,
 		"Abscissas are too close for stable interpolation: x0={x0}, x1={x1}, x2={x2} (diffs: {diff_01:.2e}, {diff_02:.2e}, {diff_12:.2e}, min: {EPSILON})"
 	);
 

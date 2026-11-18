@@ -96,6 +96,7 @@ fn xdg_index() {
 
 		let res = std::panic::catch_unwind(|| v_utils::xdg_config_dir!(""));
 		assert!(res.is_err());
-		assert!(legacy.join("old").exists() && xdg.join("new").exists());
+		assert!(legacy.join("old").exists());
+		assert!(xdg.join("new").exists());
 	}
 }

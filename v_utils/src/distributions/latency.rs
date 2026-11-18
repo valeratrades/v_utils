@@ -63,8 +63,13 @@ impl LatencySampler {
 /// Least-squares line `ln q = μ + σ·z` through the three `(z, ln q)` anchors — closed-form. Panics
 /// on a non-increasing or non-positive triple: misconfiguration must die at setup, not skew a run.
 fn fit_ln(quantiles: [f64; 3]) -> (f64, f64) {
+	assert!(0.0 < quantiles[0], "latency percentiles must be positive and strictly increasing, got {quantiles:?} (ns)");
 	assert!(
-		0.0 < quantiles[0] && quantiles[0] < quantiles[1] && quantiles[1] < quantiles[2],
+		quantiles[0] < quantiles[1],
+		"latency percentiles must be positive and strictly increasing, got {quantiles:?} (ns)"
+	);
+	assert!(
+		quantiles[1] < quantiles[2],
 		"latency percentiles must be positive and strictly increasing, got {quantiles:?} (ns)"
 	);
 	let y = quantiles.map(f64::ln);

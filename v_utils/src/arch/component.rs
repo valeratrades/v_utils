@@ -169,7 +169,8 @@ pub struct ComponentId(Ustr);
 
 impl ComponentId {
 	pub fn new(value: &str) -> Self {
-		assert!(!value.is_empty() && value.is_ascii(), "ComponentId must be non-empty ASCII, got: {value:?}");
+		assert!(!value.is_empty(), "ComponentId must be non-empty ASCII, got: {value:?}");
+		assert!(value.is_ascii(), "ComponentId must be non-empty ASCII, got: {value:?}");
 		Self(Ustr::from(value))
 	}
 
