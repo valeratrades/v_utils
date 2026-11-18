@@ -45,6 +45,7 @@ schemars = "1.2.1"
 secrecy = "0.10.3"
 serde = { version = "^1.0.228", features = ["derive"] }
 serde_json = { version = "^1.0.149" }
+statrs = { version = "0.18", default-features = false }
 strum = "0.28.0"
 syn = "2.0.117"
 tempfile = "3"

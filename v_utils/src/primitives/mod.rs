@@ -5,7 +5,7 @@ pub mod info_size;
 pub use info_size::*;
 
 pub mod percent;
-pub use percent::Percent;
+pub use percent::{Certainty, Percent};
 
 pub mod time;
 pub use time::Timelike;

@@ -321,6 +321,100 @@ impl<'de> Deserialize<'de> for PercentU {
 	}
 }
 
+/// Two-sided coverage of a normal distribution, in standard deviations: `1σ` ≈ 68.27%, `2σ` ≈ 95.45%.
+/// Bare numbers are read as σ; `%`-suffixed ones as coverage.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
+pub struct Certainty(f64);
+impl Certainty {
+	pub fn try_new(sigmas: f64) -> Result<Self> {
+		if !(sigmas >= 0.0) {
+			bail!("Certainty of {sigmas}σ is not a non-negative number of standard deviations");
+		}
+		Ok(Certainty(sigmas))
+	}
+}
+
+impl Default for Certainty {
+	fn default() -> Self {
+		Certainty(1.0)
+	}
+}
+
+impl std::ops::Deref for Certainty {
+	type Target = f64;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl From<PercentU> for Certainty {
+	fn from(p: PercentU) -> Self {
+		Certainty(std::f64::consts::SQRT_2 * statrs::function::erf::erf_inv(*p))
+	}
+}
+impl From<Certainty> for PercentU {
+	fn from(c: Certainty) -> Self {
+		PercentU(Percent(statrs::function::erf::erf(c.0 / std::f64::consts::SQRT_2)))
+	}
+}
+
+impl FromStr for Certainty {
+	type Err = eyre::Report;
+
+	fn from_str(s: &str) -> Result<Self> {
+		let s = s.trim();
+		if s.ends_with('%') {
+			return Ok(PercentU::try_from(Percent::from_str(s)?)?.into());
+		}
+		let n = s.trim_end_matches(['σ', 's']).trim_end_matches("std").trim_end_matches("sd").trim();
+		match n.parse::<f64>() {
+			Ok(v) => Self::try_new(v),
+			Err(_) => bail!("Failed to parse \"{s}\" to certainty, expected `<σ>`, `<σ>σ`, `<σ>std` or `<coverage>%`"),
+		}
+	}
+}
+
+impl std::fmt::Display for Certainty {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}σ", utils::format_significant_digits(self.0, 3))
+	}
+}
+
+impl<'de> Deserialize<'de> for Certainty {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		struct CertaintyVisitor;
+
+		impl de::Visitor<'_> for CertaintyVisitor {
+			type Value = Certainty;
+
+			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+				formatter.write_str("standard deviations as a number or `<n>σ`, or a `<coverage>%` string")
+			}
+
+			fn visit_f64<E: de::Error>(self, v: f64) -> Result<Certainty, E> {
+				Certainty::try_new(v).map_err(de::Error::custom)
+			}
+
+			fn visit_u64<E: de::Error>(self, v: u64) -> Result<Certainty, E> {
+				self.visit_f64(v as f64)
+			}
+
+			fn visit_i64<E: de::Error>(self, v: i64) -> Result<Certainty, E> {
+				self.visit_f64(v as f64)
+			}
+
+			fn visit_str<E: de::Error>(self, v: &str) -> Result<Certainty, E> {
+				Certainty::from_str(v).map_err(de::Error::custom)
+			}
+		}
+
+		deserializer.deserialize_any(CertaintyVisitor)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -422,5 +516,21 @@ mod tests {
 		assert!(PercentU::try_new(0.5).is_ok());
 		assert!(PercentU::try_new(-0.1).is_err());
 		assert!(PercentU::try_new(1.1).is_err());
+	}
+
+	#[test]
+	fn certainty() {
+		assert_eq!(*Certainty::default(), 1.0);
+		assert!((*PercentU::from(Certainty::default()) - 0.682689).abs() < 1e-6);
+		assert!((*Certainty::from_str("95%").unwrap() - 1.959964).abs() < 1e-6);
+		assert_eq!(Certainty::from_str("2").unwrap(), Certainty::from_str("2σ").unwrap());
+		assert_eq!(Certainty::from_str("2std").unwrap(), Certainty(2.0));
+		assert!(Certainty::from_str("-1").is_err());
+		let p = PercentU::try_new(0.9973).unwrap();
+		assert!((*PercentU::from(Certainty::from(p)) - 0.9973).abs() < 1e-12);
+		let c: Certainty = serde_json::from_str(r#""68.27%""#).unwrap();
+		assert!((*c - 1.0).abs() < 1e-3);
+		let c: Certainty = serde_json::from_str("3").unwrap();
+		assert_eq!(c, Certainty(3.0));
 	}
 }
