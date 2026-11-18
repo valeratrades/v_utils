@@ -5748,7 +5748,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils"
-version = "2.25.0"
+version = "2.25.1"
 dependencies = [
  "ahash",
  "bevy",
@@ -5802,7 +5802,7 @@ dependencies = [
 
 [[package]]
 name = "v_utils_macros"
-version = "2.16.1"
+version = "2.16.2"
 dependencies = [
  "clap",
  "heck",
