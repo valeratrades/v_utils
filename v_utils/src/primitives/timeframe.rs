@@ -285,6 +285,49 @@ impl std::ops::Mul<u64> for Timeframe {
 	}
 }
 
+/// A [`Timeframe`] with a direction, in milliseconds. Parses `+1h`, `-30m`; an unsigned `1h` is forward.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, derive_more::Add, derive_more::Neg, derive_more::Sub)]
+pub struct SignedTimeframe(pub i64);
+impl From<Timeframe> for SignedTimeframe {
+	fn from(tf: Timeframe) -> Self {
+		Self(i64::try_from(tf.0).expect("a Timeframe past i64::MAX ms is ~292M years"))
+	}
+}
+impl FromStr for SignedTimeframe {
+	type Err = eyre::Report;
+
+	fn from_str(s: &str) -> Result<Self> {
+		let (neg, abs) = match s.as_bytes().first() {
+			Some(b'-') => (true, &s[1..]),
+			Some(b'+') => (false, &s[1..]),
+			_ => (false, s),
+		};
+		let tf = Self::from(Timeframe::from_str(abs)?);
+		Ok(if neg { -tf } else { tf })
+	}
+}
+impl std::fmt::Display for SignedTimeframe {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let s = format!("{}{}", if self.0 < 0 { "-" } else { "+" }, Timeframe(self.0.unsigned_abs()));
+		crate::fmt_with_width!(f, &s)
+	}
+}
+impl<'de> Deserialize<'de> for SignedTimeframe {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: Deserializer<'de>, {
+		let s = String::deserialize(deserializer)?;
+		Self::from_str(&s).map_err(|e| SerdeError::custom(e.to_string()))
+	}
+}
+impl Serialize for SignedTimeframe {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer, {
+		serializer.serialize_str(&self.to_string())
+	}
+}
+
 /// So `rng.random_range(a..=b)` takes `Timeframe` bounds directly.
 #[cfg(feature = "distributions")]
 impl rand::distr::uniform::SampleUniform for Timeframe {
@@ -376,6 +419,18 @@ mod timeframe_tests {
 
 		let tf = Timeframe::from_str("500ms").unwrap();
 		assert_eq!(tf.designator(), TimeframeDesignator::Milliseconds);
+	}
+
+	#[test]
+	fn signed() {
+		assert_eq!(SignedTimeframe::from_str("+1h").unwrap(), SignedTimeframe(3_600_000));
+		assert_eq!(SignedTimeframe::from_str("1h").unwrap(), SignedTimeframe(3_600_000));
+		assert_eq!(SignedTimeframe::from_str("-30m").unwrap(), SignedTimeframe(-1_800_000));
+		assert_eq!(SignedTimeframe(-1_800_000).to_string(), "-30m");
+		assert_eq!(SignedTimeframe(86_400_000).to_string(), "+1d");
+		assert!(SignedTimeframe::from_str("--1h").is_err());
+		let rt: SignedTimeframe = serde_json::from_str(&serde_json::to_string(&SignedTimeframe(-5_000)).unwrap()).unwrap();
+		assert_eq!(rt, SignedTimeframe(-5_000));
 	}
 
 	#[test]
